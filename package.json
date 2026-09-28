@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "node src/server.js",
-    "dev:ui": "vite",
+    "ui": "vite",
     "build": "vite build"
   },
   "repository": {
@@ -26,7 +26,8 @@
     "express": "^5.2.1",
     "nodemon": "^3.1.14",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.1",
