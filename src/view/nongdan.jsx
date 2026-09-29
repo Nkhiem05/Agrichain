@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import "../public/css/nongdan.css";
+import { useNavigate } from "react-router-dom";
 
 const DEFAULT_FARM_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg";
 const DEFAULT_LOGO_IMG =
-  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790603730/logo_hvpizf.png";
+  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
 const DashboardPage = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("farm");
 
   // State quản lý popup thêm mới
@@ -14,6 +16,18 @@ const DashboardPage = () => {
   const [showSeasonModal, setShowSeasonModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [showMaterialForm, setShowMaterialForm] = useState(false);
+
+  // chuyển trang sang chi tiết nông dân
+  const handlechitietnongtrai = (e) => {
+    e.preventDefault();
+    navigate("/chi-tiet-nong-trai");
+  };
+
+  // chuyển sang trang chi tiết thu hoạch
+  const handlechitietthuhoach = (e) => {
+    e.preventDefault();
+    navigate("/chi-tiet-thu-hoach");
+  };
 
   // State quản lý việc mở Dropdown menu của các nút "..."
   const [openDropdown, setOpenDropdown] = useState(null);
@@ -132,7 +146,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              <div className="farm-card">
+              <div className="farm-card" onClick={handlechitietnongtrai}>
                 <img src={DEFAULT_FARM_IMG} alt="Farm" className="farm-image" />
                 <div className="farm-details">
                   <div>
@@ -395,7 +409,10 @@ const DashboardPage = () => {
                             {/* Dropdown Menu Lô Thu Hoạch */}
                             {openDropdown === "batch-1" && (
                               <div className="dropdown-menu">
-                                <div className="dropdown-item">
+                                <div
+                                  className="dropdown-item"
+                                  onClick={handlechitietthuhoach}
+                                >
                                   Xem chi tiết
                                 </div>
                                 <div className="dropdown-divider"></div>

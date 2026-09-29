@@ -1,0 +1,501 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+.dashboard-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f7f9fa;
+  color: #333333;
+}
+
+/* ================= HEADER ================= */
+.dashboard-header {
+  height: 56px;
+  background-color: #278d49;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  color: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 220px;
+}
+
+.header-logo-icon {
+  width: 45px;
+  height: 45px;
+  object-fit: contain;
+}
+
+.header-brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.header-search-bar {
+  flex: 1;
+  max-width: 620px;
+  margin: 0 20px;
+}
+
+.header-search-bar input {
+  width: 100%;
+  height: 34px;
+  border-radius: 4px;
+  border: none;
+  padding: 0 14px;
+  font-size: 13px;
+  outline: none;
+  background-color: #ffffff;
+  color: #333;
+}
+
+.header-search-bar input::placeholder {
+  color: #8c8c8c;
+}
+
+.header-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.avatar-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: #d1d5db;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.profile-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.profile-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.profile-role {
+  font-size: 11px;
+  color: #d1fae5;
+}
+
+/* ================= MAIN CONTAINER ================= */
+.main-container {
+  max-width: 1240px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 20px 48px 20px;
+}
+
+/* Nút Quay Lại */
+.top-actions {
+  margin-bottom: 16px;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #ffffff;
+  color: #279450;
+  border: 1px solid #c8e6c9;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.back-button:hover {
+  background-color: #e8f5e9;
+  border-color: #279450;
+  transform: translateX(-3px);
+}
+
+.back-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* Thông tin Vườn */
+.farm-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  padding: 20px;
+  display: flex;
+  gap: 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  margin-bottom: 28px;
+}
+
+.farm-image-box {
+  width: 165px;
+  height: 145px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.farm-image-box img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.farm-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.farm-title-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.farm-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.farm-badge {
+  background-color: #6ee7b7;
+  color: #065f46;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.farm-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1.8fr 1.2fr;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.stat-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #718096;
+}
+
+.stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.farm-crops {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.crops-label {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.crops-value {
+  color: #4a5568;
+}
+
+/* Quản lý thửa */
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.section-subtitle {
+  font-size: 13px;
+  color: #718096;
+  margin-top: 4px;
+}
+
+.btn-add-plot {
+  background-color: #2e7d32;
+  color: #ffffff;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  box-shadow: 0 2px 4px rgba(46, 125, 50, 0.2);
+}
+
+.btn-add-plot:hover {
+  background-color: #256628;
+}
+
+/* Grid Thửa Đất */
+.plots-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.plot-card {
+  border-radius: 12px;
+  padding: 16px 18px;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+
+.plot-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.plot-active {
+  background-color: #eaf7ed;
+  border: 1px solid #c8e6c9;
+}
+
+.plot-empty {
+  background-color: #edeef0;
+  border: 1px solid #dcdfe3;
+}
+
+.plot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.plot-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.plot-area {
+  font-size: 13px;
+  color: #718096;
+}
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-active {
+  color: #2e7d32;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background-color: #2e7d32;
+  border-radius: 50%;
+}
+
+.status-empty {
+  color: #b78103;
+}
+
+.plot-body {
+  margin-top: 14px;
+}
+
+.crop-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.plot-date {
+  font-size: 13px;
+  color: #4a5568;
+  margin-top: 2px;
+}
+
+.plot-duration {
+  font-size: 13px;
+  color: #718096;
+  margin-top: 2px;
+}
+
+.empty-notice {
+  font-size: 14px;
+  color: #4a5568;
+}
+
+/* Modal Popup */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 440px;
+  padding: 24px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.modal-header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #a0aec0;
+}
+
+.modal-form .form-group {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-form label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.modal-form input,
+.modal-form select {
+  padding: 9px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+}
+
+.modal-form input:focus,
+.modal-form select:focus {
+  border-color: #279450;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.btn-cancel {
+  background: #edf2f7;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+}
+
+.btn-submit {
+  background: #279450;
+  border: none;
+  padding: 9px 18px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .plots-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .farm-stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .plots-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .farm-card {
+    flex-direction: column;
+  }
+
+  .farm-image-box {
+    width: 100%;
+    height: 180px;
+  }
+
+  .header-search {
+    display: none;
+  }
+}
