@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AGRICHAIN - Truy Xuất Nguồn Gốc Chuỗi Khối Minh Bạch</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-[#f4f7f5] text-gray-800 font-sans antialiased min-h-screen flex flex-col pb-20 md:pb-0"
+  >
+    <!-- ============================================== -->
+    <!-- 1. HEADER                                      -->
+    <!-- ============================================== -->
+    <header
+      class="h-16 bg-[#2d8647] flex items-center justify-between px-4 md:px-8 shrink-0 shadow-sm sticky top-0 z-30"
+    >
+      <div
+        class="flex items-center gap-3 cursor-pointer"
+        onclick="backToLanding()"
+      >
+        <div
+          class="w-8 h-8 rounded-full border-2 border-white/80 border-dashed flex items-center justify-center"
+        >
+          <div class="w-3 h-3 bg-white rounded-full"></div>
+        </div>
+        <div>
+          <span
+            class="text-white font-bold text-lg tracking-wide block leading-none"
+            >AGRICHAIN</span
+          >
+          <span
+            class="text-[10px] text-green-100 uppercase tracking-widest hidden sm:block"
+            >Hệ Thống Truy Xuất Nguồn Gốc Chuỗi Khối</span
+          >
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span
+          class="inline-flex items-center gap-1.5 text-xs text-green-100 bg-white/10 px-3 py-1 rounded-full border border-white/20"
+        >
+          <span
+            class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"
+          ></span>
+          <span class="hidden sm:inline">Mainnet Online</span>
+          <span>Block #18,924,102</span>
+        </span>
+      </div>
+    </header>
+
+    <!-- ======================================================= -->
+    <!-- 2. MÀN HÌNH 1: LANDING & QUÉT QR                       -->
+    <!-- Mobile (<768px): Khung QR lên đầu                      -->
+    <!-- iPad & Laptop (>=768px): 2 Cột cao bằng nhau song song  -->
+    <!-- ======================================================= -->
+    <section
+      id="screen-landing"
+      class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 flex items-center justify-center"
+    >
+      <!-- items-stretch giúp 2 cột trên iPad & Laptop tự động có chiều cao bằng nhau -->
+      <div
+        class="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-stretch w-full"
+      >
+        <!-- CỘT BÊN TRÁI: TIMELINE QUY TRÌNH (MD: 7 CỘT | MOBILE: ORDER-2) -->
+        <div
+          class="md:col-span-7 order-2 md:order-1 flex flex-col justify-between space-y-4"
+        >
+          <div>
+            <span
+              class="inline-block bg-[#edf5f0] text-[#1c693a] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider mb-2"
+            >
+              Hành Trình Chuỗi Cung Ứng Khép Kín
+            </span>
+            <h1
+              class="text-xl sm:text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight"
+            >
+              Quy Trình Chuẩn Hóa <br class="hidden sm:block" />
+              <span class="text-[#2d8647]"
+                >Từ Nông Trại Canh Tác Đến Bàn Ăn</span
+              >
+            </h1>
+            <p class="text-xs text-gray-600 mt-1">
+              Mỗi mắt xích đều ký số điện tử để xác nhận dữ liệu độc lập trước
+              khi đẩy lên Smart Contract phân tán[cite: 5].
+            </p>
+          </div>
+
+          <!-- KHUNG TIMELINE DỌC 5 GIAI ĐOẠN (CHIỀU CAO TỰ CO DÃN BẰNG CỘT PHẢI) -->
+          <div
+            class="flex-1 bg-white border border-gray-200/90 rounded-3xl p-5 md:p-6 shadow-xs flex flex-col justify-between"
+          >
+            <div
+              class="relative border-l-2 border-emerald-500 ml-3.5 pl-5 space-y-4 md:space-y-4.5 text-xs"
+            >
+              <!-- Chặng 1: Gieo trồng & Chăm sóc -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[29px] top-0.5 w-3.5 h-3.5 bg-emerald-600 rounded-full border-2 border-white ring-2 ring-emerald-200"
+                ></span>
+                <div class="flex items-center justify-between">
+                  <h4
+                    class="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-1.5"
+                  >
+                    <i
+                      data-lucide="sprout"
+                      class="w-4 h-4 text-emerald-600"
+                    ></i>
+                    1. Gieo Trồng & Quản Lý Canh Tác
+                  </h4>
+                  <span
+                    class="text-[9px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded"
+                    >Nông Trại</span
+                  >
+                </div>
+                <p class="text-gray-500 mt-0.5 text-[11px]">
+                  Lập nhật ký bón phân, tưới tiêu và ghi lại chi tiết hoạt chất
+                  BVTV theo tiêu chuẩn an toàn sinh học[cite: 1].
+                </p>
+              </div>
+
+              <!-- Chặng 2: Thu hoạch -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[29px] top-0.5 w-3.5 h-3.5 bg-emerald-600 rounded-full border-2 border-white ring-2 ring-emerald-200"
+                ></span>
+                <div class="flex items-center justify-between">
+                  <h4
+                    class="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-1.5"
+                  >
+                    <i
+                      data-lucide="scissors"
+                      class="w-4 h-4 text-emerald-600"
+                    ></i>
+                    2. Thu Hoạch & Cách Ly An Toàn
+                  </h4>
+                  <span
+                    class="text-[9px] bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded"
+                    >Nhà Vườn</span
+                  >
+                </div>
+                <p class="text-gray-500 mt-0.5 text-[11px]">
+                  Thu hái đúng độ chín, bảo đảm đủ thời gian cách ly thuốc BVTV
+                  và niêm phong lô quả trước khi xuất vườn.
+                </p>
+              </div>
+
+              <!-- Chặng 3: Kiểm định chất lượng -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[29px] top-0.5 w-3.5 h-3.5 bg-purple-600 rounded-full border-2 border-white ring-2 ring-purple-200"
+                ></span>
+                <div class="flex items-center justify-between">
+                  <h4
+                    class="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-1.5"
+                  >
+                    <i data-lucide="award" class="w-4 h-4 text-purple-600"></i>
+                    3. Kiểm Định & Giám Định Chất Lượng
+                  </h4>
+                  <span
+                    class="text-[9px] bg-purple-50 text-purple-700 font-semibold px-2 py-0.5 rounded"
+                    >Phòng Thí Nghiệm</span
+                  >
+                </div>
+                <p class="text-gray-500 mt-0.5 text-[11px]">
+                  Đơn vị độc lập kiểm tra dư lượng hóa chất, vi sinh và công bố
+                  mã giấy chứng nhận đạt chuẩn VietGAP.
+                </p>
+              </div>
+
+              <!-- Chặng 4: Sơ chế & Đóng gói -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[29px] top-0.5 w-3.5 h-3.5 bg-blue-600 rounded-full border-2 border-white ring-2 ring-blue-200"
+                ></span>
+                <div class="flex items-center justify-between">
+                  <h4
+                    class="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-1.5"
+                  >
+                    <i data-lucide="package" class="w-4 h-4 text-blue-600"></i>
+                    4. Sơ Chế, Khử Trùng & Đóng Gói
+                  </h4>
+                  <span
+                    class="text-[9px] bg-blue-50 text-blue-700 font-semibold px-2 py-0.5 rounded"
+                    >Nhà Máy Sơ Chế</span
+                  >[cite: 2]
+                </div>
+                <p class="text-gray-500 mt-0.5 text-[11px]">
+                  Khử khuẩn ozon, sấy khô nhiệt độ chuẩn, bọc màng bảo vệ và gắn
+                  tem mã hóa QR truy xuất nguồn gốc[cite: 5].
+                </p>
+              </div>
+
+              <!-- Chặng 5: Phân phối & Bán lẻ -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[29px] top-0.5 w-3.5 h-3.5 bg-amber-600 rounded-full border-2 border-white ring-2 ring-amber-200"
+                ></span>
+                <div class="flex items-center justify-between">
+                  <h4
+                    class="font-bold text-gray-800 text-xs sm:text-sm flex items-center gap-1.5"
+                  >
+                    <i data-lucide="store" class="w-4 h-4 text-amber-600"></i>
+                    5. Vận Chuyển Chuỗi Lạnh & Phân Phối
+                  </h4>
+                  <span
+                    class="text-[9px] bg-amber-50 text-amber-700 font-semibold px-2 py-0.5 rounded"
+                    >Hệ Thống Phân Phối</span
+                  >[cite: 4]
+                </div>
+                <p class="text-gray-500 mt-0.5 text-[11px]">
+                  Giám sát nhiệt độ xe tải lạnh suốt hành trình, lưu trữ kho mát
+                  trước khi chuyển đến tay người tiêu dùng[cite: 3, 4].
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- THÔNG SỐ CAM KẾT CHUỖI KHỐI -->
+          <div class="grid grid-cols-3 gap-2.5 text-center">
+            <div
+              class="bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-xs"
+            >
+              <span
+                class="text-[9px] text-gray-400 uppercase block font-semibold"
+                >Đồng thuận</span
+              >
+              <span class="font-extrabold text-xs text-emerald-700"
+                >100% Chữ Ký Số</span
+              >
+            </div>
+            <div
+              class="bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-xs"
+            >
+              <span
+                class="text-[9px] text-gray-400 uppercase block font-semibold"
+                >Bảo mật</span
+              >
+              <span class="font-extrabold text-xs text-gray-800"
+                >Không Thể Sửa Đổi</span
+              >
+            </div>
+            <div
+              class="bg-white p-2.5 rounded-2xl border border-gray-200/80 shadow-xs"
+            >
+              <span
+                class="text-[9px] text-gray-400 uppercase block font-semibold"
+                >Tốc độ tra cứu</span
+              >
+              <span class="font-extrabold text-xs text-blue-700"
+                >&lt; 0.5 Giây</span
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- CỘT BÊN PHẢI: KHU VỰC QUÉT QR CODE (MD: 5 CỘT | MOBILE: ORDER-1) -->
+        <!-- h-full kết hợp với items-stretch giúp khối này có chiều cao bằng đúng khối bên trái -->
+        <div class="md:col-span-5 order-1 md:order-2 flex flex-col">
+          <div
+            class="h-full bg-white border-2 border-emerald-500/30 rounded-3xl p-6 sm:p-7 shadow-md text-center relative overflow-hidden flex flex-col justify-between"
+          >
+            <div
+              class="absolute -top-10 -right-10 w-32 h-32 bg-emerald-50 rounded-full pointer-events-none"
+            ></div>
+
+            <div
+              class="relative z-10 flex flex-col justify-center flex-1 space-y-4 my-auto"
+            >
+              <!-- Biểu tượng máy quét -->
+              <div
+                class="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-2xl bg-emerald-50 border-2 border-emerald-200 flex items-center justify-center text-[#2d8647] shadow-inner"
+              >
+                <i data-lucide="scan" class="w-8 h-8 sm:w-10 sm:h-10"></i>
+              </div>
+
+              <div>
+                <span
+                  class="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider mb-1"
+                >
+                  Tra Cứu Tức Thì
+                </span>
+                <h3 class="text-base sm:text-lg font-extrabold text-gray-800">
+                  Kiểm Tra Nông Sản Bạn Đang Cầm
+                </h3>
+                <p class="text-xs text-gray-500 mt-1 max-w-xs mx-auto">
+                  Hướng camera quét mã QR dán trên tem quả hoặc thùng carton để
+                  mở hồ sơ chuỗi[cite: 5].
+                </p>
+              </div>
+
+              <!-- NÚT BẤM QUÉT QR CHÍNH -->
+              <button
+                onclick="openScannerModal()"
+                class="w-full bg-[#2d8647] hover:bg-[#236b38] text-white py-3.5 px-6 rounded-2xl font-bold text-sm shadow-lg shadow-emerald-700/20 flex items-center justify-center gap-2.5 transition transform active:scale-95"
+              >
+                <i data-lucide="qr-code" class="w-5 h-5"></i>
+                <span>Quét Mã QR Ngay</span>[cite: 5]
+              </button>
+
+              <!-- Hoặc nhập mã thủ công -->
+              <div class="pt-1">
+                <div class="relative flex py-2 items-center">
+                  <div class="flex-grow border-t border-gray-200"></div>
+                  <span
+                    class="flex-shrink mx-3 text-[11px] text-gray-400 uppercase font-medium"
+                    >Hoặc nhập mã tem</span
+                  >
+                  <div class="flex-grow border-t border-gray-200"></div>
+                </div>
+
+                <div class="flex gap-2 mt-1">
+                  <input
+                    type="text"
+                    id="input-batch-code"
+                    placeholder="Ví dụ: #SC-2026-001"
+                    value="#SC-2026-001"
+                    class="flex-1 bg-gray-50 border border-gray-300 text-xs rounded-xl px-3 py-2 outline-none focus:bg-white focus:border-green-600 font-mono"
+                  />
+                  <button
+                    onclick="triggerShowDetail()"
+                    class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold transition shrink-0"
+                  >
+                    Tra Cứu
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p class="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
+              Dữ liệu được bảo chứng bởi Smart Contract AgriChain[cite: 5].
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================= -->
+    <!-- NÚT BẤM QUÉT QR CỐ ĐỊNH Ở ĐÁY (CHỈ HIỆN TRÊN ĐIỆN THOẠI) -->
+    <!-- ======================================================= -->
+    <div
+      id="mobile-floating-bar"
+      class="md:hidden fixed bottom-3 inset-x-3 z-20"
+    >
+      <button
+        onclick="openScannerModal()"
+        class="w-full bg-[#2d8647] hover:bg-[#236b38] text-white py-3 px-4 rounded-2xl font-bold text-xs shadow-xl flex items-center justify-center gap-2 border border-white/40 active:scale-95 transition"
+      >
+        <i data-lucide="scan" class="w-4 h-4"></i>
+        <span>Bấm Quét Tem QR Ngay</span>[cite: 5]
+      </button>
+    </div>
+
+    <!-- ======================================================= -->
+    <!-- 3. MÀN HÌNH 2: GIAO DIỆN CHI TIẾT SẢN PHẨM               -->
+    <!-- ======================================================= -->
+    <section
+      id="screen-detail"
+      class="hidden flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 md:p-8 space-y-6"
+    >
+      <!-- THANH QUAY LẠI MÀN HÌNH QUÉT -->
+      <div
+        class="flex items-center justify-between bg-white px-4 py-3 rounded-2xl border border-gray-200 shadow-xs"
+      >
+        <button
+          onclick="backToLanding()"
+          class="flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#2d8647] transition"
+        >
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          <span>Quay Lại Giới Thiệu & Quét Mã Khác</span>[cite: 5]
+        </button>
+
+        <span
+          class="inline-flex items-center gap-1.5 bg-[#edf5f0] text-[#1c693a] text-xs font-bold px-3 py-1 rounded-full"
+        >
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
+          Đã Khớp Chữ Ký Chuỗi Khối[cite: 5]
+        </span>
+      </div>
+
+      <!-- KHUNG CHÍNH: CỘT TRÁI (THẺ SẢN PHẨM & BLOCKCHAIN) | CỘT PHẢI (DÒNG ĐỜI CHI TIẾT) -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        <!-- CỘT TRÁI (MD: 4 CỘT) -->
+        <div class="md:col-span-4 space-y-5">
+          <!-- Thẻ sản phẩm tóm tắt -->
+          <div
+            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs relative overflow-hidden"
+          >
+            <div class="flex items-start gap-4">
+              <div
+                class="w-20 h-20 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0"
+              >
+                <i data-lucide="citrus" class="w-12 h-12 text-amber-600"></i>
+              </div>
+
+              <div class="space-y-1">
+                <span
+                  class="bg-[#edf5f0] text-[#1c693a] text-[10px] font-bold px-2 py-0.5 rounded-sm"
+                  >#SC-2026-001</span
+                >
+                <h2 class="text-xl font-extrabold text-gray-800 leading-tight">
+                  Quýt Đường Đóng Thùng
+                </h2>
+                <p class="text-xs text-gray-500">
+                  Giống thuần canh tác tại Trà Vinh[cite: 1]
+                </p>
+                <div
+                  class="flex items-center gap-1 text-xs text-emerald-700 font-semibold pt-0.5"
+                >
+                  <i
+                    data-lucide="shield-check"
+                    class="w-4 h-4 text-emerald-600"
+                  ></i>
+                  <span>Đạt Chứng Nhận VietGAP</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-gray-100 text-center"
+            >
+              <div class="bg-[#edf5f0] p-2 rounded-xl">
+                <span class="text-[10px] text-gray-500 block font-medium"
+                  >Độ ngọt</span
+                >
+                <span class="font-extrabold text-sm text-emerald-800"
+                  >11.8° Brix</span
+                >
+              </div>
+              <div class="bg-[#edf5f0] p-2 rounded-xl">
+                <span class="text-[10px] text-gray-500 block font-medium"
+                  >Dư lượng</span
+                >
+                <span class="font-extrabold text-sm text-emerald-800"
+                  >An Toàn</span
+                >
+              </div>
+              <div class="bg-[#edf5f0] p-2 rounded-xl">
+                <span class="text-[10px] text-gray-500 block font-medium"
+                  >Bảo quản</span
+                >
+                <span class="font-extrabold text-sm text-blue-800"
+                  >8°C Kho Lạnh</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Thẻ bằng chứng Blockchain -->
+          <div
+            class="bg-gradient-to-br from-[#1d5c31] to-[#2d8647] text-white rounded-2xl p-5 shadow-sm space-y-4"
+          >
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-xs uppercase tracking-wider"
+                >Xác Thực Chuỗi Khối</span
+              >[cite: 5]
+              <span
+                class="text-[10px] bg-white/20 px-2 py-0.5 rounded font-mono"
+                >Verified 100%</span
+              >
+            </div>
+
+            <div class="bg-black/25 p-3 rounded-xl space-y-2 text-xs font-mono">
+              <div>
+                <span class="text-[10px] text-gray-300 block uppercase"
+                  >Transaction Hash[cite: 5]:</span
+                >
+                <span class="text-emerald-300 font-bold break-all"
+                  >0x7c49f821e9ba0029b3014fec6491a381e9b2a74c</span
+                >
+              </div>
+              <div
+                class="flex justify-between border-t border-white/10 pt-1.5 text-[11px]"
+              >
+                <div>
+                  <span class="text-[10px] text-gray-300 block"
+                    >Block Number[cite: 5]:</span
+                  >
+                  <span class="text-white font-bold">#18,924,102</span>
+                </div>
+                <div class="text-right">
+                  <span class="text-[10px] text-gray-300 block"
+                    >Smart Contract[cite: 5]:</span
+                  >
+                  <span class="text-emerald-300 font-bold"
+                    >0xAgriSupplyTraceV2</span
+                  >
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CỘT PHẢI (MD: 8 CỘT): CHI TIẾT DÒNG ĐỜI NÔNG SẢN -->
+        <div
+          class="md:col-span-8 bg-white border border-gray-200 rounded-3xl p-6 shadow-xs space-y-7"
+        >
+          <div class="border-b border-gray-100 pb-3">
+            <h3 class="text-lg font-bold text-gray-800">
+              Hồ Sơ Dòng Đời Sản Phẩm Chi Tiết
+            </h3>
+            [cite: 5]
+            <p class="text-xs text-gray-500">
+              Minh bạch đầy đủ nhật ký phân thuốc, phòng kiểm nghiệm, sơ chế và
+              phân phối
+            </p>
+          </div>
+
+          <!-- TIMELINE DÒNG ĐỜI SẢN PHẨM -->
+          <div
+            class="relative border-l-2 border-emerald-500 ml-4 pl-6 space-y-9 text-xs"
+          >
+            <!-- MỤC 1: NÔNG TRẠI CANH TÁC & THU HOẠCH -->
+            <div class="relative space-y-3">
+              <span
+                class="absolute -left-[33px] top-0 w-4 h-4 bg-emerald-600 rounded-full border-2 border-white ring-2 ring-emerald-200"
+              ></span>
+
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+              >
+                <div>
+                  <h4
+                    class="font-bold text-gray-800 text-sm flex items-center gap-1.5"
+                  >
+                    <i
+                      data-lucide="sprout"
+                      class="w-4 h-4 text-emerald-600"
+                    ></i>
+                    1. Nông Trại Canh Tác & Thu Hoạch
+                  </h4>
+                  <p class="text-emerald-700 font-semibold text-xs mt-0.5">
+                    Vườn Cam A1 (#FARM-01111) - Nông dân: Nguyễn Văn A (Trà
+                    Vinh)[cite: 1]
+                  </p>
+                </div>
+                <span
+                  class="text-[10px] bg-emerald-50 text-emerald-800 font-bold px-2 py-0.5 rounded w-fit"
+                  >Hoàn Tất</span
+                >
+              </div>
+
+              <div
+                class="bg-gray-50 rounded-2xl p-4 border border-gray-200/80 space-y-3"
+              >
+                <div
+                  class="grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-gray-200 pb-2.5"
+                >
+                  <div>
+                    <span class="text-gray-400 block text-[10px]"
+                      >Ngày bắt đầu mùa vụ[cite: 1]:</span
+                    >
+                    <span class="font-bold text-gray-800">18/06/2025</span
+                    >[cite: 1]
+                  </div>
+                  <div>
+                    <span class="text-gray-400 block text-[10px]"
+                      >Thửa đất canh tác[cite: 1]:</span
+                    >
+                    <span class="font-bold text-gray-800"
+                      >Thửa A1-1 (Tuổi: 4 năm)</span
+                    >[cite: 1]
+                  </div>
+                  <div>
+                    <span class="text-gray-400 block text-[10px]"
+                      >Ngày thu hoạch[cite: 1]:</span
+                    >
+                    <span class="font-bold text-emerald-700">20/09/2026</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-400 block text-[10px]"
+                      >Sản lượng thu:</span
+                    >
+                    <span class="font-bold text-gray-800"
+                      >1,500 kg (Lô #LH-8824)</span
+                    >
+                  </div>
+                </div>
+
+                <!-- Danh mục phân bón & thuốc BVTV sử dụng -->
+                <div>
+                  <p class="font-bold text-gray-700 mb-1.5">
+                    Nhật ký sử dụng phân bón & thuốc BVTV:[cite: 1]
+                  </p>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-[11px]">
+                      <thead
+                        class="bg-gray-200/60 text-gray-600 uppercase text-[10px]"
+                      >
+                        <tr>
+                          <th class="p-1.5 pl-2">Ngày sử dụng</th>
+                          <th class="p-1.5">
+                            Loại phân bón / Thuốc BVTV[cite: 1]
+                          </th>
+                          <th class="p-1.5">Liều lượng</th>
+                          <th class="p-1.5">Thời gian cách ly</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-200">
+                        <tr>
+                          <td class="p-1.5 pl-2 font-medium">10/08/2026</td>
+                          <td class="p-1.5 font-semibold text-gray-800">
+                            Phân NPK Đầu Trâu 20-20-15[cite: 1]
+                          </td>
+                          <td class="p-1.5">250g / gốc</td>
+                          <td class="p-1.5 text-gray-500">Bón lót nuôi quả</td>
+                        </tr>
+                        <tr>
+                          <td class="p-1.5 pl-2 font-medium">25/08/2026</td>
+                          <td class="p-1.5 font-semibold text-gray-800">
+                            Thuốc trừ sâu Decis 2.5EC[cite: 1]
+                          </td>
+                          <td class="p-1.5">15ml / bình 16L</td>
+                          <td class="p-1.5 font-bold text-emerald-700">
+                            Cách ly 26 ngày (Chuẩn &ge; 14 ngày)
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MỤC 2: KIỂM ĐỊNH CHẤT LƯỢNG -->
+            <div class="relative space-y-3">
+              <span
+                class="absolute -left-[33px] top-0 w-4 h-4 bg-purple-600 rounded-full border-2 border-white ring-2 ring-purple-200"
+              ></span>
+
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+              >
+                <div>
+                  <h4
+                    class="font-bold text-gray-800 text-sm flex items-center gap-1.5"
+                  >
+                    <i data-lucide="award" class="w-4 h-4 text-purple-600"></i>
+                    2. Kiểm Định & Giám Định Chất Lượng
+                  </h4>
+                  <p class="text-purple-700 font-semibold text-xs mt-0.5">
+                    Trung Tâm Giám Định Nông Nghiệp Vùng 2 - Chứng thư VietGAP:
+                    VG-2026-8812
+                  </p>
+                </div>
+                <span
+                  class="text-[10px] bg-purple-50 text-purple-800 font-bold px-2 py-0.5 rounded w-fit"
+                  >Đạt Chuẩn An Toàn</span
+                >
+              </div>
+
+              <div
+                class="bg-purple-50/40 rounded-2xl p-4 border border-purple-100 space-y-3"
+              >
+                <div
+                  class="grid grid-cols-3 gap-2 border-b border-purple-200/60 pb-2.5"
+                >
+                  <div>
+                    <span class="text-gray-500 block text-[10px]"
+                      >Ngày lấy mẫu tại vườn:</span
+                    >
+                    <span class="font-bold text-gray-800"
+                      >22/09/2026 (08:30)</span
+                    >
+                  </div>
+                  <div>
+                    <span class="text-gray-500 block text-[10px]"
+                      >Ngày kiểm nghiệm Lab:</span
+                    >
+                    <span class="font-bold text-gray-800">24/09/2026</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500 block text-[10px]"
+                      >Ngày cấp phép chứng chỉ:</span
+                    >
+                    <span class="font-bold text-purple-800">25/09/2026</span>
+                  </div>
+                </div>
+
+                <!-- Bảng liệt kê dư lượng các hoạt chất đối chiếu ngưỡng an toàn -->
+                <div>
+                  <p class="font-bold text-gray-700 mb-1.5">
+                    Kết quả kiểm nghiệm chỉ số an toàn thực phẩm:
+                  </p>
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-[11px]">
+                      <thead
+                        class="bg-purple-100/60 text-purple-900 uppercase text-[10px]"
+                      >
+                        <tr>
+                          <th class="p-1.5 pl-2">Hoạt chất phân tích</th>
+                          <th class="p-1.5">Hàm lượng thực đo</th>
+                          <th class="p-1.5">Ngưỡng tối đa cho phép (MRL)</th>
+                          <th class="p-1.5">Đánh giá</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-purple-100">
+                        <tr>
+                          <td class="p-1.5 pl-2 font-medium">Nitrate (NO3)</td>
+                          <td class="p-1.5 font-bold text-gray-800">
+                            0.02 mg/kg
+                          </td>
+                          <td class="p-1.5 text-gray-500">&le; 50 mg/kg</td>
+                          <td class="p-1.5 text-emerald-700 font-bold">
+                            Đạt chuẩn
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="p-1.5 pl-2 font-medium">
+                            Deltamethrin (trong Decis)[cite: 1]
+                          </td>
+                          <td class="p-1.5 font-bold text-gray-800">
+                            &lt; 0.005 mg/kg
+                          </td>
+                          <td class="p-1.5 text-gray-500">&le; 0.05 mg/kg</td>
+                          <td class="p-1.5 text-emerald-700 font-bold">
+                            Không phát hiện tồn dư
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="p-1.5 pl-2 font-medium">
+                            Kim loại nặng (Chì Pb, Cadmi Cd)
+                          </td>
+                          <td class="p-1.5 font-bold text-gray-800">Âm tính</td>
+                          <td class="p-1.5 text-gray-500">&le; 0.1 mg/kg</td>
+                          <td class="p-1.5 text-emerald-700 font-bold">
+                            Đạt chuẩn VietGAP
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MỤC 3: SƠ CHẾ & ĐÓNG GÓI -->
+            <div class="relative space-y-3">
+              <span
+                class="absolute -left-[33px] top-0 w-4 h-4 bg-blue-600 rounded-full border-2 border-white ring-2 ring-blue-200"
+              ></span>
+
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+              >
+                <div>
+                  <h4
+                    class="font-bold text-gray-800 text-sm flex items-center gap-1.5"
+                  >
+                    <i data-lucide="package" class="w-4 h-4 text-blue-600"></i>
+                    3. Cơ Sở Sơ Chế & Đóng Gói
+                  </h4>
+                  <p class="text-blue-700 font-semibold text-xs mt-0.5">
+                    HTX Sơ Chế & Chế Biến Mekong - Mã lô sơ chế:
+                    #SC-2026-001[cite: 2]
+                  </p>
+                </div>
+                <span
+                  class="text-[10px] bg-blue-50 text-blue-800 font-bold px-2 py-0.5 rounded w-fit"
+                  >Đã Đóng Thùng</span
+                >
+              </div>
+
+              <div
+                class="bg-blue-50/40 rounded-2xl p-4 border border-blue-100 space-y-3"
+              >
+                <div
+                  class="flex flex-wrap gap-x-6 gap-y-1 border-b border-blue-200/60 pb-2 text-[11px]"
+                >
+                  <p>
+                    <span class="text-gray-500"
+                      >Ngày tiếp nhận lô từ vườn[cite: 2]:</span
+                    >
+                    <b class="text-gray-800">26/09/2026 (14:00)</b>
+                  </p>
+                  <p>
+                    <span class="text-gray-500"
+                      >Khối lượng sơ chế[cite: 2]:</span
+                    >
+                    <b class="text-blue-900">1,200 kg (120 thùng carton)</b>
+                  </p>
+                  <p>
+                    <span class="text-gray-500">Quy cách:</span>
+                    <b class="text-gray-800"
+                      >Thùng 10kg, dán tem QR truy xuất[cite: 5]</b
+                    >
+                  </p>
+                </div>
+
+                <!-- Các quá trình xử lý kỹ thuật, nhiệt độ và ngày thực hiện -->
+                <div>
+                  <p class="font-bold text-gray-700 mb-1.5">
+                    Chi tiết các công đoạn sơ chế & kỹ thuật bảo quản:
+                  </p>
+                  <div class="space-y-1.5 text-[11px]">
+                    <div
+                      class="flex items-center justify-between bg-white p-2 rounded-lg border border-blue-100"
+                    >
+                      <div>
+                        <span class="font-bold text-gray-800"
+                          >1. Rửa sạch & Sục khí Ozon diệt khuẩn</span
+                        >
+                        <p class="text-gray-500">
+                          Nồng độ ozon 0.5 ppm trong 15 phút, loại bỏ vi nấm bề
+                          mặt vỏ.
+                        </p>
+                      </div>
+                      <span class="text-gray-500 shrink-0"
+                        >Ngày 27/09/2026</span
+                      >
+                    </div>
+
+                    <div
+                      class="flex items-center justify-between bg-white p-2 rounded-lg border border-blue-100"
+                    >
+                      <div>
+                        <span class="font-bold text-gray-800"
+                          >2. Sấy ráo cưỡng bức bề mặt quả</span
+                        >
+                        <p class="text-gray-500">
+                          Nhiệt độ sấy gió mát: <b>35°C</b> liên tục trong 45
+                          phút.
+                        </p>
+                      </div>
+                      <span class="text-gray-500 shrink-0"
+                        >Ngày 27/09/2026</span
+                      >
+                    </div>
+
+                    <div
+                      class="flex items-center justify-between bg-white p-2 rounded-lg border border-blue-100"
+                    >
+                      <div>
+                        <span class="font-bold text-gray-800"
+                          >3. Bọc màng bảo vệ & Đóng thùng dán tem QR[cite:
+                          5]</span
+                        >
+                        <p class="text-gray-500">
+                          Bọc từng quả bằng màng thoáng khí, niêm phong thùng
+                          10kg.
+                        </p>
+                      </div>
+                      <span class="text-gray-500 shrink-0"
+                        >Ngày 28/09/2026</span
+                      >
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MỤC 4: VẬN CHUYỂN, PHÂN PHỐI & ĐIỂM BÁN LẺ -->
+            <div class="relative space-y-3">
+              <span
+                class="absolute -left-[33px] top-0 w-4 h-4 bg-amber-600 rounded-full border-2 border-white ring-2 ring-amber-200"
+              ></span>
+
+              <div
+                class="flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+              >
+                <div>
+                  <h4
+                    class="font-bold text-gray-800 text-sm flex items-center gap-1.5"
+                  >
+                    <i data-lucide="store" class="w-4 h-4 text-amber-600"></i>
+                    4. Hệ Thống Phân Phối & Đại Lý Bán Lẻ
+                  </h4>
+                  <p class="text-amber-800 font-semibold text-xs mt-0.5">
+                    Tổng Kho Phân Phối Nông Sản Bách Hóa Sài Gòn (AgriHub
+                    Central #01)[cite: 4]
+                  </p>
+                </div>
+                <span
+                  class="text-[10px] bg-amber-50 text-amber-800 font-bold px-2 py-0.5 rounded w-fit"
+                  >Đang Bán Lẻ</span
+                >
+              </div>
+
+              <div
+                class="bg-amber-50/40 rounded-2xl p-4 border border-amber-100 space-y-3 text-[11px]"
+              >
+                <div
+                  class="grid grid-cols-2 sm:grid-cols-4 gap-2 border-b border-amber-200/60 pb-2.5"
+                >
+                  <div>
+                    <span class="text-gray-500 block text-[10px]"
+                      >Ngày nhận lô vào kho[cite: 4]:</span
+                    >
+                    <span class="font-bold text-gray-800"
+                      >29/09/2026 (16:30)</span
+                    >
+                  </div>
+                  <div>
+                    <span class="text-gray-500 block text-[10px]"
+                      >Nhiệt độ bảo quản kho mát[cite: 4]:</span
+                    >
+                    <span class="font-bold text-blue-700 font-mono"
+                      >8.0°C (Độ ẩm 85%)</span
+                    >
+                  </div>
+                  <div>
+                    <span class="text-gray-500 block text-[10px]"
+                      >Trạng thái phân tách lô[cite: 2]:</span
+                    >
+                    <span class="font-bold text-emerald-800"
+                      >Có tách 30 thùng</span
+                    >[cite: 2]
+                  </div>
+                  <div>
+                    <span class="text-gray-500 block text-[10px]"
+                      >Ngày xuất giao bán lẻ[cite: 4]:</span
+                    >
+                    <span class="font-bold text-amber-900"
+                      >30/09/2026 (08:00)</span
+                    >
+                  </div>
+                </div>
+
+                <!-- Chi tiết thông tin tách lô và xuất cho đơn vị bán lẻ nào -->
+                <div
+                  class="bg-white p-3 rounded-xl border border-amber-100 space-y-1.5"
+                >
+                  <p class="font-bold text-gray-800">
+                    Lịch sử điều phối & Đại lý bán lẻ thụ hưởng:
+                  </p>
+                  <p class="text-gray-600">
+                    • <b>Tách lô xuất bán:</b> Tách 30 thùng (300 kg) từ lô gốc
+                    #SC-2026-001 để giao nhanh phục vụ kệ hàng trái cây tươi
+                    trong ngày[cite: 2, 4].
+                  </p>
+                  <p class="text-gray-600">
+                    • <b>Đơn vị bán lẻ nhận hàng[cite: 4]:</b>
+                    <b class="text-emerald-900"
+                      >Siêu thị Co.opMart - Chi nhánh Lý Thường Kiệt (Quận 10,
+                      TP.HCM)</b
+                    >
+                    và hệ thống bán lẻ đối tác liên kết.
+                  </p>
+                  <p class="text-gray-600">
+                    • <b>Phương tiện vận chuyển[cite: 3]:</b> Xe tải lạnh
+                    65C-128.45 (Bác tài Nguyễn Văn Hùng - Mekong Express)[cite:
+                    3].
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================== -->
+    <!-- MODAL: CAMERA QUÉT MÃ QR (MÔ PHỎNG TIA LASER)  -->
+    <!-- ============================================== -->
+    <div
+      id="modal-scanner"
+      class="fixed inset-0 bg-black/85 backdrop-blur-sm flex flex-col justify-between hidden z-50 p-6 text-white"
+    >
+      <div
+        class="flex justify-between items-center max-w-md mx-auto w-full pt-4"
+      >
+        <span class="text-sm font-semibold"
+          >Hướng camera vào mã QR tem nông sản[cite: 5]</span
+        >
+        <button
+          onclick="closeScannerModal()"
+          class="p-1.5 rounded-full bg-white/20 hover:bg-white/30 transition"
+        >
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Khung quét laser -->
+      <div
+        class="relative w-64 h-64 mx-auto my-auto border-2 border-emerald-400 rounded-3xl flex items-center justify-center"
+      >
+        <div
+          class="absolute inset-x-2 top-4 h-0.5 bg-emerald-400 shadow-[0_0_15px_#34d399] animate-bounce"
+        ></div>
+        <i data-lucide="qr-code" class="w-28 h-28 text-white/20"></i>
+      </div>
+
+      <div class="max-w-md mx-auto w-full space-y-3 pb-8 text-center">
+        <p class="text-xs text-gray-300">
+          Hệ thống đang đối chiếu chữ ký số mật mã trên chuỗi AgriChain...
+        </p>
+        <button
+          onclick="simulateScanAndShowDetail()"
+          class="w-full bg-[#2d8647] hover:bg-[#236b38] text-white py-3.5 rounded-2xl text-xs font-bold transition shadow-lg flex items-center justify-center gap-2"
+        >
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>Nhận Diện Mã Thành Công (Mô Phỏng)[cite: 5]</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- JAVASCRIPT LOGIC                               -->
+    <!-- ============================================== -->
+    <script>
+      lucide.createIcons();
+
+      function openScannerModal() {
+        document.getElementById("modal-scanner").classList.remove("hidden");
+      }
+
+      function closeScannerModal() {
+        document.getElementById("modal-scanner").classList.add("hidden");
+      }
+
+      function simulateScanAndShowDetail() {
+        closeScannerModal();
+        triggerShowDetail();
+      }
+
+      function triggerShowDetail() {
+        document.getElementById("screen-landing").classList.add("hidden");
+        document.getElementById("screen-detail").classList.remove("hidden");
+        document.getElementById("mobile-floating-bar").classList.add("hidden");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        lucide.createIcons();
+      }
+
+      function backToLanding() {
+        document.getElementById("screen-detail").classList.add("hidden");
+        document.getElementById("screen-landing").classList.remove("hidden");
+        document
+          .getElementById("mobile-floating-bar")
+          .classList.remove("hidden");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        lucide.createIcons();
+      }
+    </script>
+  </body>
+</html>

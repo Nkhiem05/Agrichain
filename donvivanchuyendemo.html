@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AGRICHAIN - Đơn Vị Vận Chuyển & Logistics</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  </head>
+  <body
+    class="bg-[#f8faf9] text-gray-800 font-sans antialiased overflow-hidden select-none"
+  >
+    <div class="flex h-screen w-full">
+      <!-- 1. SIDEBAR ĐIỀU HƯỚNG -->
+      <aside
+        class="w-64 bg-[#f0f2f1] flex flex-col border-r border-gray-200 shrink-0"
+      >
+        <div
+          class="p-4 text-xs font-semibold text-gray-500 uppercase tracking-wider"
+        >
+          Nghiệp vụ logistics
+        </div>
+        <nav class="flex-1 space-y-1.5 px-3">
+          <!-- Tab 1: Quản lý vận chuyển -->
+          <button
+            onclick="switchTab('shipping')"
+            id="btn-tab-shipping"
+            class="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg bg-[#67ac7d] text-white shadow-sm transition"
+          >
+            <i data-lucide="truck" class="w-5 h-5"></i>
+            <span>Quản lý vận chuyển</span>
+          </button>
+
+          <!-- Tab 2: Xác nhận lấy hàng đi -->
+          <button
+            onclick="switchTab('pickup')"
+            id="btn-tab-pickup"
+            class="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200/80 transition"
+          >
+            <i data-lucide="package-check" class="w-5 h-5"></i>
+            <span>Xác nhận lấy hàng đi</span>
+          </button>
+
+          <!-- Tab 3: Ghi lại hành trình -->
+          <button
+            onclick="switchTab('journey')"
+            id="btn-tab-journey"
+            class="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200/80 transition"
+          >
+            <i data-lucide="map-pin" class="w-5 h-5"></i>
+            <span>Ghi lại hành trình</span>
+          </button>
+
+          <!-- Tab 4: Xác nhận giao hàng đến -->
+          <button
+            onclick="switchTab('delivery')"
+            id="btn-tab-delivery"
+            class="w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200/80 transition"
+          >
+            <i data-lucide="clipboard-check" class="w-5 h-5"></i>
+            <span>Xác nhận giao hàng đến</span>
+          </button>
+        </nav>
+
+        <!-- Footer GPS & Blockchain -->
+        <div
+          class="p-4 border-t border-gray-200 text-[11px] text-gray-500 space-y-1"
+        >
+          <div class="flex items-center gap-2">
+            <span
+              class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"
+            ></span>
+            <span>Hệ thống IoT Lạnh: <b>Đang đồng bộ</b></span>
+          </div>
+          <p class="text-[10px] text-gray-400">
+            GPS Tracker Active #MekongLog-01
+          </p>
+        </div>
+      </aside>
+
+      <!-- 2. MAIN LAYOUT -->
+      <div class="flex-1 flex flex-col overflow-y-auto no-scrollbar">
+        <!-- HEADER -->
+        <header
+          class="h-16 bg-[#2d8647] flex items-center justify-between px-6 shrink-0 shadow-sm sticky top-0 z-20"
+        >
+          <!-- Logo -->
+          <div class="flex items-center gap-3">
+            <div
+              class="w-8 h-8 rounded-full border-2 border-white/80 border-dashed flex items-center justify-center"
+            >
+              <div class="w-3 h-3 bg-white rounded-full"></div>
+            </div>
+            <span class="text-white font-bold text-lg tracking-wide"
+              >AGRICHAIN</span
+            >
+          </div>
+
+          <!-- Ô Tìm Kiếm -->
+          <div class="relative w-96">
+            <input
+              type="text"
+              placeholder="Tìm biển số xe, mã đơn vận chuyển, mã lô..."
+              class="w-full bg-white text-sm rounded-full py-1.5 pl-4 pr-10 outline-none text-gray-700 shadow-inner focus:ring-2 focus:ring-green-400"
+            />
+            <i
+              data-lucide="search"
+              class="absolute right-3 top-2 w-4 h-4 text-gray-400"
+            ></i>
+          </div>
+
+          <!-- Actor Info -->
+          <div class="flex items-center gap-3">
+            <div
+              class="w-10 h-10 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center font-bold text-gray-700"
+            >
+              VC
+            </div>
+            <div class="text-left text-white leading-tight">
+              <p class="font-semibold text-sm">
+                Công Ty Vận Tải Lạnh Mekong Express
+              </p>
+              <p class="text-xs text-green-100 font-light">
+                Đơn vị vận chuyển / Logistics
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <!-- ============================================== -->
+        <!-- TAB 1: QUẢN LÝ VẬN CHUYỂN (TỔNG QUAN) -->
+        <!-- ============================================== -->
+        <main id="view-shipping" class="p-8 max-w-7xl mx-auto w-full space-y-6">
+          <!-- METRIC CARDS -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+            <div
+              class="bg-[#edf5f0] p-4 rounded-xl border border-gray-100 min-h-[90px] flex flex-col justify-between"
+            >
+              <span class="text-[11px] font-semibold text-gray-500 uppercase"
+                >Chuyến xe đang lăn bánh</span
+              >
+              <p class="text-2xl font-bold text-gray-900 leading-none">
+                3
+                <span class="text-xs font-normal text-gray-500"
+                  >CHUYẾN ĐANG CHẠY</span
+                >
+              </p>
+            </div>
+
+            <div
+              class="bg-[#edf5f0] p-4 rounded-xl border border-gray-100 min-h-[90px] flex flex-col justify-between"
+            >
+              <span class="text-[11px] font-semibold text-gray-500 uppercase"
+                >Đơn chờ tiếp nhận lấy hàng</span
+              >
+              <p class="text-2xl font-bold text-gray-900 leading-none">
+                2 <span class="text-xs font-normal text-gray-500">ĐƠN MỚI</span>
+              </p>
+            </div>
+
+            <div
+              class="bg-[#edf5f0] p-4 rounded-xl border border-gray-100 min-h-[90px] flex flex-col justify-between"
+            >
+              <span class="text-[11px] font-semibold text-gray-500 uppercase"
+                >Giao thành công tuần này</span
+              >
+              <p class="text-2xl font-bold text-gray-900 leading-none">
+                16
+                <span class="text-xs font-normal text-gray-500"
+                  >CHUYẾN HOÀN TẤT</span
+                >
+              </p>
+            </div>
+
+            <!-- Bộ lọc & Thao tác nhanh -->
+            <div class="flex flex-col gap-2">
+              <div class="relative">
+                <select
+                  class="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-600 appearance-none pr-8 cursor-pointer focus:outline-none"
+                >
+                  <option>-- Tất cả đội xe --</option>
+                  <option>Đội xe tải lạnh chuyên dụng (5°C)</option>
+                  <option>Đội xe tải thùng mui bạt nông sản</option>
+                </select>
+                <i
+                  data-lucide="chevron-down"
+                  class="w-4 h-4 text-gray-400 absolute right-2.5 top-2.5 pointer-events-none"
+                ></i>
+              </div>
+              <button
+                onclick="openModal('modal-create-trip')"
+                class="bg-[#337a4e] hover:bg-[#28633f] text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition"
+              >
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Tạo Lộ Trình Vận Chuyển Mới</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- DANH SÁCH CHUYẾN XE VẬN CHUYỂN -->
+          <div class="space-y-4 pt-1">
+            <!-- Card 1: Đang di chuyển trên đường -->
+            <div
+              class="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-xs flex items-start justify-between relative hover:border-gray-300 transition"
+            >
+              <div class="flex items-start gap-5">
+                <div
+                  class="w-16 h-16 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0"
+                >
+                  <i data-lucide="navigation" class="w-8 h-8 text-blue-600"></i>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex items-center gap-3">
+                    <h3 class="text-lg font-bold text-gray-800">
+                      Chuyến Vận Chuyển: Quýt Đường Xuất Khẩu
+                    </h3>
+                    <span
+                      class="bg-[#b3b9b4] text-white text-xs font-semibold px-2 py-0.5 rounded-sm"
+                      >#VC-2026-8801</span
+                    >
+                    <span
+                      class="bg-[#52e396] text-[#064e28] text-xs font-semibold px-2.5 py-0.5 rounded-sm"
+                      >Lô sơ chế #SC-2026-001</span
+                    >
+                  </div>
+
+                  <div
+                    class="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-700 font-medium"
+                  >
+                    <p>
+                      Xe tải & Tài xế:
+                      <span class="font-normal"
+                        >65C-128.45 (Bác tài Nguyễn Văn Hùng)</span
+                      >
+                    </p>
+                    <p>
+                      Lộ trình:
+                      <span class="font-normal"
+                        >HTX Sơ Chế Trà Vinh ➔ Trung Tâm Phân Phối Bách Hóa Xanh
+                        (TP.HCM)</span
+                      >
+                    </p>
+                    <p>
+                      Khối lượng hàng:
+                      <span class="font-semibold text-emerald-700"
+                        >1,200 kg (120 thùng)</span
+                      >
+                    </p>
+                    <p>
+                      Nhiệt độ thùng xe:
+                      <span class="font-semibold text-blue-600 font-mono"
+                        >6.2°C (Chuẩn lạnh)</span
+                      >
+                    </p>
+                  </div>
+
+                  <div class="text-xs text-gray-600">
+                    <p class="font-semibold text-gray-700">
+                      Vị trí cập nhật gần nhất:
+                    </p>
+                    <p class="text-gray-500">
+                      Trạm dừng chân Cao tốc Trung Lương - Mỹ Tho (Cách điểm
+                      giao 45km - Dự kiến đến: 17:30)
+                    </p>
+                  </div>
+
+                  <div class="pt-1">
+                    <span
+                      class="inline-block bg-blue-100 text-blue-800 text-[11px] font-semibold px-2.5 py-0.5 rounded-sm"
+                    >
+                      Trạng thái: Đang vận chuyển trên đường
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="flex flex-col gap-2 shrink-0">
+                <button
+                  onclick="openJourneyModal('#VC-2026-8801', '65C-128.45')"
+                  class="flex items-center gap-1.5 bg-[#edf5f0] text-[#1c693a] border border-[#a2d8b5] hover:bg-[#d8f2e2] px-3.5 py-2 rounded-lg text-xs font-semibold transition"
+                >
+                  <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
+                  <span>Ghi nhật ký hành trình</span>
+                </button>
+                <button
+                  onclick="openDeliveryModal('#VC-2026-8801')"
+                  class="flex items-center gap-1.5 bg-[#337a4e] text-white hover:bg-[#28633f] px-3.5 py-2 rounded-lg text-xs font-semibold transition"
+                >
+                  <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+                  <span>Xác nhận giao hàng đến</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Card 2: Chờ nhận hàng từ nông trại -->
+            <div
+              class="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-xs flex items-start justify-between relative hover:border-gray-300 transition"
+            >
+              <div class="flex items-start gap-5">
+                <div
+                  class="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0"
+                >
+                  <i
+                    data-lucide="package-search"
+                    class="w-8 h-8 text-amber-600"
+                  ></i>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex items-center gap-3">
+                    <h3 class="text-lg font-bold text-gray-800">
+                      Chuyển Giao Nông Sản: Cam Sành VietGAP
+                    </h3>
+                    <span
+                      class="bg-[#b3b9b4] text-white text-xs font-semibold px-2 py-0.5 rounded-sm"
+                      >#VC-2026-8802</span
+                    >
+                    <span
+                      class="bg-[#52e396] text-[#064e28] text-xs font-semibold px-2.5 py-0.5 rounded-sm"
+                      >Lô thu hoạch #LH-8824</span
+                    >
+                  </div>
+
+                  <div
+                    class="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-700 font-medium"
+                  >
+                    <p>
+                      Điểm lấy:
+                      <span class="font-normal">Vườn Cam A1 (#FARM-01111)</span>
+                    </p>
+                    <p>
+                      Điểm chuyển đến:
+                      <span class="font-normal"
+                        >Khu Sơ Chế Chế Biến Mekong</span
+                      >
+                    </p>
+                    <p>
+                      Khối lượng dự kiến:
+                      <span class="font-semibold text-emerald-700"
+                        >1,500 kg</span
+                      >
+                    </p>
+                  </div>
+
+                  <div class="pt-1">
+                    <span
+                      class="inline-block bg-amber-100 text-amber-800 text-[11px] font-semibold px-2.5 py-0.5 rounded-sm"
+                    >
+                      Trạng thái: Xe đã đến điểm lấy hàng - Chờ xác nhận bốc xếp
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action -->
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  onclick="openPickupModal('#VC-2026-8802', '#LH-8824')"
+                  class="flex items-center gap-1.5 bg-[#337a4e] text-white hover:bg-[#28633f] px-4 py-2 rounded-lg text-xs font-semibold transition"
+                >
+                  <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+                  <span>Xác nhận lấy hàng đi</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- ============================================== -->
+        <!-- TAB 2: XÁC NHẬN LẤY HÀNG ĐI (PICKUP) -->
+        <!-- ============================================== -->
+        <main
+          id="view-pickup"
+          class="hidden p-8 max-w-7xl mx-auto w-full space-y-6"
+        >
+          <div
+            class="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200"
+          >
+            <div>
+              <h2 class="text-base font-bold text-gray-800">
+                Biên Bản Nhận Hàng & Xuất Phát
+              </h2>
+              <p class="text-xs text-gray-500">
+                Xác nhận trực tiếp giữa tài xế và bên bàn giao (Nhà vườn hoặc Cơ
+                sở sơ chế), lưu thời gian thực lên chuỗi.
+              </p>
+            </div>
+            <button
+              onclick="openModal('modal-pickup-action')"
+              class="bg-[#337a4e] text-white hover:bg-[#28633f] px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition"
+            >
+              <i data-lucide="qr-code" class="w-4 h-4"></i>
+              <span>Quét QR Mã Lô Lấy Hàng</span>
+            </button>
+          </div>
+
+          <div
+            class="bg-white border border-gray-200 rounded-2xl p-5 space-y-3"
+          >
+            <div class="flex justify-between items-center border-b pb-3">
+              <span class="font-bold text-sm text-gray-800"
+                >Danh Sách Lô Hàng Đã Lấy Đi Gần Đây</span
+              >
+              <span class="text-xs text-gray-500">Có chữ ký số 2 bên</span>
+            </div>
+
+            <div class="divide-y divide-gray-100 text-xs">
+              <div class="py-3 flex justify-between items-center">
+                <div>
+                  <p class="font-bold text-gray-800">
+                    Lô #SC-2026-001 (1,200 kg Quýt Đường)
+                  </p>
+                  <p class="text-gray-500">
+                    Lấy từ: Cơ sở Sơ Chế Mekong ➔ Tài xế Nguyễn Văn Hùng nhận
+                    lúc 13:00 - 30/09/2026
+                  </p>
+                </div>
+                <span
+                  class="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-semibold text-[11px]"
+                  >Đã ký xác nhận nhận hàng</span
+                >
+              </div>
+              <div class="py-3 flex justify-between items-center">
+                <div>
+                  <p class="font-bold text-gray-800">
+                    Lô #LH-8809 (800 kg Cam Sành)
+                  </p>
+                  <p class="text-gray-500">
+                    Lấy từ: Nông trại Vườn Cam A1 ➔ Tài xế Lê Thành Đạt lúc
+                    07:15 - 28/09/2026
+                  </p>
+                </div>
+                <span
+                  class="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded font-semibold text-[11px]"
+                  >Đã hoàn thành chuyến</span
+                >
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- ============================================== -->
+        <!-- TAB 3: GHI LẠI HÀNH TRÌNH (JOURNEY TRACKING) -->
+        <!-- ============================================== -->
+        <main
+          id="view-journey"
+          class="hidden p-8 max-w-7xl mx-auto w-full space-y-6"
+        >
+          <div
+            class="bg-white p-5 rounded-2xl border border-gray-200 space-y-4"
+          >
+            <div class="flex justify-between items-center">
+              <div>
+                <h2 class="text-base font-bold text-gray-800">
+                  Hành Trình Di Chuyển Chuyến Xe #VC-2026-8801
+                </h2>
+                <p class="text-xs text-gray-500">
+                  Theo dõi định vị GPS và thông số bảo quản nông sản liên tục
+                </p>
+              </div>
+              <button
+                onclick="openJourneyModal('#VC-2026-8801', '65C-128.45')"
+                class="bg-[#337a4e] text-white hover:bg-[#28633f] px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+              >
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Thêm Điểm Dừng / Cập Nhật GPS</span>
+              </button>
+            </div>
+
+            <!-- TIMELINE HÀNH TRÌNH -->
+            <div
+              class="relative border-l-2 border-emerald-500 ml-4 pl-6 space-y-6 text-xs"
+            >
+              <!-- Điểm 1 -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[31px] top-0 w-4 h-4 bg-emerald-600 rounded-full border-2 border-white ring-2 ring-emerald-200"
+                ></span>
+                <p class="font-bold text-sm text-gray-800">
+                  13:15 - 30/09/2026: Rời Xưởng Sơ Chế Trà Vinh
+                </p>
+                <p class="text-gray-500 mt-0.5">
+                  Xuất phát với thùng xe làm lạnh ổn định ở mức 6.0°C. Niêm
+                  phong seal mã #SEAL-LOG-119.
+                </p>
+              </div>
+
+              <!-- Điểm 2 -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[31px] top-0 w-4 h-4 bg-emerald-600 rounded-full border-2 border-white ring-2 ring-emerald-200"
+                ></span>
+                <p class="font-bold text-sm text-gray-800">
+                  15:00 - 30/09/2026: Qua Cầu Mỹ Thuận 2
+                </p>
+                <p class="text-gray-500 mt-0.5">
+                  Tốc độ trung bình 60km/h. Cảm biến nhiệt độ đo được: 6.2°C, độ
+                  ẩm 85%.
+                </p>
+              </div>
+
+              <!-- Điểm 3 (Hiện tại) -->
+              <div class="relative">
+                <span
+                  class="absolute -left-[31px] top-0 w-4 h-4 bg-blue-600 rounded-full border-2 border-white ring-2 ring-blue-200 animate-ping"
+                ></span>
+                <span
+                  class="absolute -left-[31px] top-0 w-4 h-4 bg-blue-600 rounded-full border-2 border-white"
+                ></span>
+                <p class="font-bold text-sm text-blue-700">
+                  16:45 - 30/09/2026: Trạm Dừng Nghỉ Cao Tốc Trung Lương
+                </p>
+                <p class="text-gray-600 mt-0.5">
+                  Tài xế kiểm tra thùng xe: Niêm phong nguyên vẹn, nhiệt độ duy
+                  trì tốt 6.1°C.
+                </p>
+              </div>
+            </div>
+          </div>
+        </main>
+
+        <!-- ============================================== -->
+        <!-- TAB 4: XÁC NHẬN GIAO HÀNG ĐẾN (DELIVERY) -->
+        <!-- ============================================== -->
+        <main
+          id="view-delivery"
+          class="hidden p-8 max-w-7xl mx-auto w-full space-y-6"
+        >
+          <div
+            class="flex items-center justify-between bg-white p-4 rounded-xl border border-gray-200"
+          >
+            <div>
+              <h2 class="text-base font-bold text-gray-800">
+                Xác Nhận Bàn Giao Hàng Đến Điểm Đích
+              </h2>
+              <p class="text-xs text-gray-500">
+                Chốt trạng thái hoàn thành chuyến đi, bàn giao sản phẩm cho siêu
+                thị/đối tác bán lẻ kèm chữ ký nhận.
+              </p>
+            </div>
+          </div>
+
+          <div
+            class="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs space-y-4"
+          >
+            <div class="flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 class="font-bold text-sm text-gray-800">
+                  Đơn Bàn Giao #VC-2026-8801 - Lô Quýt Đường
+                </h3>
+                <p class="text-xs text-gray-500">
+                  Điểm giao: Kho Phân Phối Bách Hóa Xanh Bình Tân
+                </p>
+              </div>
+              <button
+                onclick="openDeliveryModal('#VC-2026-8801')"
+                class="bg-[#337a4e] text-white hover:bg-[#28633f] px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition"
+              >
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>Lập Biên Bản Giao Nhận</span>
+              </button>
+            </div>
+
+            <div
+              class="grid grid-cols-3 gap-3 text-xs bg-gray-50 p-3 rounded-xl border border-gray-100"
+            >
+              <div>
+                <span class="text-gray-500 block">Số lượng bàn giao:</span>
+                <span class="font-bold text-gray-800"
+                  >120 thùng carton (1,200 kg)</span
+                >
+              </div>
+              <div>
+                <span class="text-gray-500 block">Tình trạng niêm phong:</span>
+                <span class="font-bold text-emerald-700"
+                  >Nguyên seal không rách vỡ</span
+                >
+              </div>
+              <div>
+                <span class="text-gray-500 block"
+                  >Nhiệt độ thùng khi mở cửa:</span
+                >
+                <span class="font-bold text-blue-700">6.0°C</span>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- ============================================== -->
+    <!-- HỆ THỐNG MODAL THAO TÁC -->
+    <!-- ============================================== -->
+
+    <!-- MODAL 1: TẠO LỘ TRÌNH CHUYẾN XE MỚI -->
+    <div
+      id="modal-create-trip"
+      class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4"
+    >
+      <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="font-bold text-base text-gray-800 flex items-center gap-2">
+            <i data-lucide="truck" class="w-5 h-5 text-emerald-600"></i>
+            Khởi Tạo Chuyến Vận Chuyển Mới
+          </h3>
+          <button
+            onclick="closeModal('modal-create-trip')"
+            class="text-gray-400 hover:text-gray-600"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Chọn Lô Hàng Cần Chở (*)</label
+            >
+            <select
+              class="w-full border border-gray-300 rounded-lg p-2.5 outline-none focus:border-green-600"
+            >
+              <option>Lô #SC-2026-002 - Cam Sành Đóng Thùng (800 kg)</option>
+              <option>Lô #LH-8824 - Quýt Đường Mới Thu Hoạch (1,500 kg)</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-gray-700 mb-1"
+                >Xe Tải Chuyên Dụng (*)</label
+              >
+              <input
+                type="text"
+                placeholder="65C-128.45 (Xe Lạnh 2.5T)"
+                class="w-full border border-gray-300 rounded-lg p-2 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-gray-700 mb-1"
+                >Tài Xế Phụ Trách</label
+              >
+              <input
+                type="text"
+                placeholder="Nguyễn Văn Hùng"
+                class="w-full border border-gray-300 rounded-lg p-2 outline-none"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-gray-700 mb-1"
+                >Điểm Nhận Hàng (Bắt Đầu)</label
+              >
+              <input
+                type="text"
+                value="HTX Sơ Chế Mekong"
+                class="w-full border border-gray-300 rounded-lg p-2 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-gray-700 mb-1"
+                >Điểm Giao Đến (Đích)</label
+              >
+              <input
+                type="text"
+                placeholder="Kho Siêu Thị Co.opMart Cần Thơ"
+                class="w-full border border-gray-300 rounded-lg p-2 outline-none"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t">
+          <button
+            onclick="closeModal('modal-create-trip')"
+            class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-600 hover:bg-gray-100"
+          >
+            Hủy
+          </button>
+          <button
+            onclick="
+              alert('Đã tạo chuyến vận chuyển mới thành công!');
+              closeModal('modal-create-trip');
+            "
+            class="px-4 py-2 bg-[#337a4e] text-white rounded-lg text-xs font-semibold hover:bg-[#28633f]"
+          >
+            Tạo Chuyến Đi
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 2: XÁC NHẬN LẤY HÀNG ĐI (PICKUP ACTION) -->
+    <div
+      id="modal-pickup-action"
+      class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4"
+    >
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="font-bold text-base text-gray-800 flex items-center gap-2">
+            <i data-lucide="package-check" class="w-5 h-5 text-emerald-600"></i>
+            Xác Nhận Lấy Hàng Lên Xe
+          </h3>
+          <button
+            onclick="closeModal('modal-pickup-action')"
+            class="text-gray-400"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <p class="text-gray-600">
+            Chuyến xe:
+            <b id="pickup-modal-trip" class="text-emerald-700">#VC-2026-8802</b>
+          </p>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Khối Lượng Cân Thực Tế Lên Xe (kg)</label
+            >
+            <input
+              type="number"
+              value="1500"
+              class="w-full border border-gray-300 rounded-lg p-2.5 outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Mã Niêm Phong Seal Khóa Thùng</label
+            >
+            <input
+              type="text"
+              value="SEAL-TRUCK-9901"
+              class="w-full border border-gray-300 rounded-lg p-2.5 font-mono outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Nhiệt Độ Thùng Xe Ban Đầu (°C)</label
+            >
+            <input
+              type="text"
+              value="5.8°C"
+              class="w-full border border-gray-300 rounded-lg p-2.5 outline-none"
+            />
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t">
+          <button
+            onclick="closeModal('modal-pickup-action')"
+            class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-600"
+          >
+            Hủy
+          </button>
+          <button
+            onclick="confirmPickupDone()"
+            class="px-4 py-2 bg-[#337a4e] text-white rounded-lg text-xs font-semibold hover:bg-[#28633f]"
+          >
+            Xác Nhận & Xuất Phát
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 3: GHI LẠI HÀNH TRÌNH (JOURNEY LOG) -->
+    <div
+      id="modal-journey-log"
+      class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4"
+    >
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="font-bold text-base text-gray-800 flex items-center gap-2">
+            <i data-lucide="map-pin" class="w-5 h-5 text-emerald-600"></i>
+            Ghi Lại Chặng Hành Trình
+          </h3>
+          <button
+            onclick="closeModal('modal-journey-log')"
+            class="text-gray-400"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Vị Trí / Địa Điểm Hiện Tại (*)</label
+            >
+            <input
+              type="text"
+              placeholder="Ví dụ: Trạm thu phí Long Phước..."
+              class="w-full border border-gray-300 rounded-lg p-2.5 outline-none"
+            />
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-semibold text-gray-700 mb-1"
+                >Nhiệt Độ Thùng (°C)</label
+              >
+              <input
+                type="text"
+                value="6.0"
+                class="w-full border border-gray-300 rounded-lg p-2 outline-none"
+              />
+            </div>
+            <div>
+              <label class="block font-semibold text-gray-700 mb-1"
+                >Độ Ẩm Thùng (%)</label
+              >
+              <input
+                type="text"
+                value="85%"
+                class="w-full border border-gray-300 rounded-lg p-2 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Ghi Chú Trình Trạng Nông Sản</label
+            >
+            <textarea
+              rows="2"
+              class="w-full border border-gray-300 rounded-lg p-2 outline-none"
+            >
+Hàng hóa cố định tốt, không rung lắc mạnh, nhiệt độ bảo quản chuẩn.</textarea
+            >
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t">
+          <button
+            onclick="closeModal('modal-journey-log')"
+            class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-600"
+          >
+            Hủy
+          </button>
+          <button
+            onclick="
+              alert('Đã cập nhật tọa độ GPS và thông số lạnh lên AgriChain!');
+              closeModal('modal-journey-log');
+            "
+            class="px-4 py-2 bg-[#337a4e] text-white rounded-lg text-xs font-semibold hover:bg-[#28633f]"
+          >
+            Ghi Lên Chuỗi
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL 4: XÁC NHẬN GIAO HÀNG ĐẾN (DELIVERY CONFIRM) -->
+    <div
+      id="modal-delivery-confirm"
+      class="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center hidden z-50 p-4"
+    >
+      <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+        <div class="flex justify-between items-center border-b pb-3">
+          <h3 class="font-bold text-base text-gray-800 flex items-center gap-2">
+            <i
+              data-lucide="check-circle-2"
+              class="w-5 h-5 text-emerald-600"
+            ></i>
+            Xác Nhận Giao Hàng Đến Nơi
+          </h3>
+          <button
+            onclick="closeModal('modal-delivery-confirm')"
+            class="text-gray-400"
+          >
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3 text-xs">
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Người Nhận Hàng (*)</label
+            >
+            <input
+              type="text"
+              placeholder="Phạm Thị Mai (Thủ kho Bách Hóa Xanh)"
+              class="w-full border border-gray-300 rounded-lg p-2.5 outline-none"
+            />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Kết Quả Kiểm Tra Hàng Khi Mở Thùng</label
+            >
+            <select
+              class="w-full border border-gray-300 rounded-lg p-2.5 outline-none font-semibold text-emerald-700"
+            >
+              <option>
+                Đầy đủ số lượng - Không dập hỏng - Đạt chuẩn nghiệm thu
+              </option>
+              <option>
+                Có phát sinh hao hụt & dập nát (Lập biên bản riêng)
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-gray-700 mb-1"
+              >Ký Nhận Điện Tử (Mã OTP / Chữ ký số)</label
+            >
+            <input
+              type="text"
+              value="OTP-CONFIRM-8219"
+              class="w-full border border-gray-300 rounded-lg p-2.5 font-mono outline-none"
+            />
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2 border-t">
+          <button
+            onclick="closeModal('modal-delivery-confirm')"
+            class="px-4 py-2 border border-gray-300 rounded-lg text-xs font-semibold text-gray-600"
+          >
+            Đóng
+          </button>
+          <button
+            onclick="confirmDeliveryDone()"
+            class="px-4 py-2 bg-[#337a4e] text-white rounded-lg text-xs font-semibold hover:bg-[#28633f]"
+          >
+            Hoàn Tất Bàn Giao
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+      lucide.createIcons();
+
+      // 1. Chuyển Tab
+      function switchTab(tabName) {
+        const views = {
+          shipping: document.getElementById("view-shipping"),
+          pickup: document.getElementById("view-pickup"),
+          journey: document.getElementById("view-journey"),
+          delivery: document.getElementById("view-delivery"),
+        };
+
+        const buttons = {
+          shipping: document.getElementById("btn-tab-shipping"),
+          pickup: document.getElementById("btn-tab-pickup"),
+          journey: document.getElementById("btn-tab-journey"),
+          delivery: document.getElementById("btn-tab-delivery"),
+        };
+
+        Object.keys(views).forEach((key) => {
+          views[key].classList.add("hidden");
+          buttons[key].className =
+            "w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-200/80 transition";
+        });
+
+        views[tabName].classList.remove("hidden");
+        buttons[tabName].className =
+          "w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-lg bg-[#67ac7d] text-white shadow-sm transition";
+
+        lucide.createIcons();
+      }
+
+      // 2. Quản lý Modal
+      function openModal(id) {
+        document.getElementById(id).classList.remove("hidden");
+      }
+
+      function closeModal(id) {
+        document.getElementById(id).classList.add("hidden");
+      }
+
+      function openPickupModal(tripCode, batchCode) {
+        document.getElementById("pickup-modal-trip").innerText =
+          `${tripCode} (${batchCode})`;
+        openModal("modal-pickup-action");
+      }
+
+      function confirmPickupDone() {
+        alert(
+          "Đã xác nhận lấy hàng thành công và kích hoạt thiết bị giám sát hành trình!",
+        );
+        closeModal("modal-pickup-action");
+        switchTab("journey");
+      }
+
+      function openJourneyModal(tripCode, truck) {
+        openModal("modal-journey-log");
+      }
+
+      function openDeliveryModal(tripCode) {
+        openModal("modal-delivery-confirm");
+      }
+
+      function confirmDeliveryDone() {
+        alert(
+          "Đã hoàn tất bàn giao hàng đến điểm đích và ký biên bản giao nhận điện tử!",
+        );
+        closeModal("modal-delivery-confirm");
+        switchTab("shipping");
+      }
+    </script>
+  </body>
+</html>
