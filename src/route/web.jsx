@@ -6,6 +6,9 @@ import DangNhap from "../view/dangnhap";
 import Nongdan from "../view/nongdan";
 import Chitietnongtrai from "../view/chitietnongtrai";
 import Chitietthuhoach from "../view/chitietthuhoach";
+import Coquankiemdinh from "../view/coquankiemdinh";
+import ChiTietKiemDinh from "../view/chitietkiemdinh";
+import Donvivanchuyen from "../view/donvivanchuyen";
 
 const AppRoutes = () => {
   return (
@@ -21,6 +24,15 @@ const AppRoutes = () => {
 
       {/* Trang chi tiết thu hoạch */}
       <Route path="/chi-tiet-thu-hoach" element={<Chitietthuhoach />} />
+
+      {/* Trang cơ quan kiểm định */}
+      <Route path="/co-quan-kiem-dinh" element={<Coquankiemdinh />} />
+
+      {/* Trang cơ quan kiểm định */}
+      <Route path="/chi-tiet-kiem-dinh" element={<ChiTietKiemDinh />} />
+
+      {/* Trang cơ quan kiểm định */}
+      <Route path="/van-chuyen" element={<Donvivanchuyen />} />
 
       {/* Điều hướng mặc định khi sai link */}
       <Route path="*" element={<Navigate to="/" replace />} />
