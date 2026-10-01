@@ -19,7 +19,7 @@ import {
   Download,
   FileSpreadsheet,
 } from "lucide-react";
-import "../public/css/donvivanchuyen.css";
+import "../../css/donvivanchuyen.css";
 
 export default function AgriChainLogistics() {
   const [currentTab, setCurrentTab] = useState("shipping");

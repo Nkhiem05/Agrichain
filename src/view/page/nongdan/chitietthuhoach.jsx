@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
-import "../public/css/chitietthuhoach.css"; // Lưu ý chỉnh lại đường dẫn cho đúng thư mục đặt file CSS của bạn
+import "../../css/chitietthuhoach.css"; // Lưu ý chỉnh lại đường dẫn cho đúng thư mục đặt file CSS của bạn
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";

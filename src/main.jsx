@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import AppRoutes from "../../route/web"; // đường dẫn tới file route vừa tạo
+import AppRoutes from "../src/app"; // đường dẫn tới file route vừa tạo
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

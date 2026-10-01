@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import "../public/css/nongdan.css";
+import "../../css/nongdan.css";
 import { useNavigate } from "react-router-dom";
 
 const DEFAULT_FARM_IMG =

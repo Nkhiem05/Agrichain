@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "../public/css/chitietnongtrai.css";
+import "../../css/chitietnongtrai.css";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";

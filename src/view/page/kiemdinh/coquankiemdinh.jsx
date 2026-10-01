@@ -23,7 +23,7 @@ import {
   Check,
   Trash2,
 } from "lucide-react";
-import "../public/css/coquankiemdinh.css";
+import "../../css/coquankiemdinh.css";
 import { useNavigate } from "react-router-dom";
 
 function Coquankiemdinh() {

@@ -1,5 +1,5 @@
 import React from "react";
-import "../public/css/dangnhap.css";
+import "../css/dangnhap.css";
 import { useNavigate } from "react-router-dom";
 
 // Đổi đường dẫn ảnh máy cày và logo tại đây

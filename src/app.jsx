@@ -2,13 +2,13 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import DangNhap from "../view/dangnhap";
-import Nongdan from "../view/nongdan";
-import Chitietnongtrai from "../view/chitietnongtrai";
-import Chitietthuhoach from "../view/chitietthuhoach";
-import Coquankiemdinh from "../view/coquankiemdinh";
-import ChiTietKiemDinh from "../view/chitietkiemdinh";
-import Donvivanchuyen from "../view/donvivanchuyen";
+import DangNhap from "../src/view/page/dangnhap";
+import Nongdan from "./view/page/nongdan/nongdan";
+import Chitietnongtrai from "./view/page/nongdan/chitietnongtrai";
+import Chitietthuhoach from "./view/page/nongdan/chitietthuhoach";
+import Coquankiemdinh from "../src/view/page/kiemdinh/coquankiemdinh";
+import ChiTietKiemDinh from "../src/view/page/kiemdinh/chitietkiemdinh";
+import Donvivanchuyen from "../src/view/page/vanchuyen/donvivanchuyen";
 
 const AppRoutes = () => {
   return (
