@@ -1,0 +1,233 @@
+.profile-dashboard {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f7f9fa;
+  color: #333333;
+  box-sizing: border-box;
+}
+
+.profile-dashboard * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif;
+}
+
+.profile-dashboard .dashboard-header {
+  height: 56px;
+  background-color: #278d49;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  color: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.profile-dashboard .header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-dashboard .header-logo-icon {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+}
+
+.profile-dashboard .header-brand-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: white;
+}
+
+.profile-dashboard .profile-content-wrap {
+  max-width: 820px;
+  width: 100%;
+  margin: 32px auto;
+  padding: 0 20px;
+}
+
+.profile-dashboard .profile-main-card {
+  background-color: #ffffff;
+  border: 1px solid #e8edf3;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.profile-dashboard .profile-header-banner {
+  padding: 28px;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.profile-dashboard .profile-avatar-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+}
+
+.profile-dashboard .profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  object-fit: cover;
+  border: 2px solid #a7f3d0;
+}
+
+.profile-dashboard .online-status-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  background-color: #10b981;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+}
+
+.profile-dashboard .profile-info-grid {
+  padding: 28px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.profile-dashboard .profile-field {
+  display: flex;
+  gap: 12px;
+}
+
+.profile-dashboard .profile-field-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background-color: #ecfdf5;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.profile-dashboard .profile-field-label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.profile-dashboard .profile-field-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* Modal Chỉnh Sửa */
+.profile-dashboard .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.profile-dashboard .modal-container {
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 500px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  max-height: 90vh;
+}
+
+.profile-dashboard .modal-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.profile-dashboard .modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.profile-dashboard .form-group {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-dashboard .form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.profile-dashboard .form-group input,
+.profile-dashboard .form-group select,
+.profile-dashboard .form-group textarea {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+}
+
+.profile-dashboard .form-group input:focus,
+.profile-dashboard .form-group select:focus,
+.profile-dashboard .form-group textarea:focus {
+  border-color: #278d49;
+}
+
+.profile-dashboard .modal-footer {
+  padding: 14px 24px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid #f3f4f6;
+}
+
+.profile-dashboard .btn-cancel {
+  background-color: #e5e7eb;
+  color: #4b5563;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.profile-dashboard .btn-save {
+  background-color: #278d49;
+  color: #ffffff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}

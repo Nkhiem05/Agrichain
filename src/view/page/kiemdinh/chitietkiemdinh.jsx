@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import "../../css/coquankiemdinh.css";
+import "../../css/chitietkiemdinh.css";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";

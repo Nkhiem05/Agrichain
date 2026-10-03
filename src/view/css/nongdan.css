@@ -58,6 +58,7 @@
     font-size: 18px;
     font-weight: 700;
     letter-spacing: 1.5px;
+    color: white;
   }
 
   .header-search-bar {
@@ -105,6 +106,7 @@
   .profile-name {
     font-size: 14px;
     font-weight: 600;
+    color: white;
   }
 
   .profile-role {
@@ -117,7 +119,6 @@
     display: flex;
     flex: 1;
     min-height: 0;
-    height: calc(100vh - 56px);
     overflow: hidden;
   }
 
@@ -210,7 +211,7 @@
     flex: 1;
     min-height: 0;
     height: 100%;
-    padding: 0 36px 40px; /* Bỏ padding-top để sticky bám sát mép trên */
+    padding: 0 36px 40px;
     max-width: 1300px;
     overflow-y: auto !important;
     overflow-x: hidden;
@@ -238,8 +239,8 @@
   .metrics-row {
     position: sticky;
     top: 0;
-    z-index: 20; /* Nằm trên thẻ nông trại và bảng khi cuộn */
-    background-color: #f7f9fa; /* Trùng màu nền trang để che nội dung cuộn bên dưới */
+    z-index: 20;
+    background-color: #f7f9fa;
     padding-top: 24px;
     padding-bottom: 20px;
     margin-bottom: 0;
@@ -383,6 +384,21 @@
   .tag-badge.gray {
     background-color: #cbd5e1;
     color: #334155;
+  }
+
+  .tag-badge.yellow {
+    background-color: #fef08a;
+    color: #854d0e;
+  }
+
+  .tag-badge.red {
+    background-color: #fecaca;
+    color: #991b1b;
+  }
+
+  .tag-badge.blue {
+    background-color: #bfdbfe;
+    color: #1e40af;
   }
 
   .farm-info-grid {
@@ -561,7 +577,7 @@
     font-weight: 700;
   }
 
-  /* ================= VIEW 3: QUẢN LÝ LÔ THU HOẠCH ================= */
+  /* ================= VIEW 3: QUẢN LÝ LÔ THU HOẠCH & CHUNG ================= */
   .table-container {
     background-color: #ffffff;
     border-radius: 8px;
@@ -585,7 +601,7 @@
 
   .batch-table th {
     position: sticky;
-    top: 164px; /* Ghim tiêu đề bảng ngay dưới khung metrics khi cuộn */
+    top: 0; /* ĐÃ CẬP NHẬT: cố định ở trên cùng mép bảng chuẩn xác */
     z-index: 10;
     background-color: #d1d5db;
     padding: 12px 14px;
@@ -642,6 +658,34 @@
   .status-icon.success {
     background-color: #dcfce7;
     color: #16a34a;
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .status-pill.success {
+    background-color: #dcfce7;
+    color: #15803d;
+  }
+
+  .status-pill.danger {
+    background-color: #fee2e2;
+    color: #b91c1c;
+  }
+
+  .status-pill.warning {
+    background-color: #fef3c7;
+    color: #b45309;
+  }
+
+  .status-pill.info {
+    background-color: #e0f2fe;
+    color: #0369a1;
   }
 
   /* ================= DROPDOWN MENU ================= */

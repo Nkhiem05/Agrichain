@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import "./css/dangnhap.css";
+import "../css/dangnhap.css";
 import { useNavigate } from "react-router-dom";
 
 // Ảnh nền và logo
@@ -7,7 +7,7 @@ const FARM_BG_IMAGE =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg";
 
 const LOGO_IMAGE =
-  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790603730/logo_hvpizf.png";
+  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
 const LoginPage = () => {
   const navigate = useNavigate();
