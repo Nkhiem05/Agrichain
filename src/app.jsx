@@ -14,7 +14,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Đường dẫn mặc định: Trang Đăng Nhập */}
-      <Route path="/" element={<DangNhap />} />
+      <Route path="/dang-nhap" element={<DangNhap />} />
 
       {/* Đường dẫn xem giao diện Nông Dân */}
       <Route path="/nong-dan" element={<Nongdan />} />
@@ -35,7 +35,7 @@ const AppRoutes = () => {
       <Route path="/van-chuyen" element={<Donvivanchuyen />} />
 
       {/* Điều hướng mặc định khi sai link */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/dang-nhap" replace />} />
     </Routes>
   );
 };
