@@ -14,7 +14,7 @@ UPLOAD ẢNH NÔNG TRẠI
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, "../upload/farms "));
+    cb(null, path.join(__dirname, "../upload/farms"));
   },
 
   filename: function (req, file, cb) {
