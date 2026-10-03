@@ -456,6 +456,7 @@
   font-weight: 600;
   color: #4a5568;
   cursor: pointer;
+  align-self: flex-start;
 }
 
 .btn-submit {
@@ -467,6 +468,7 @@
   font-weight: 600;
   color: #ffffff;
   cursor: pointer;
+  align-self: flex-start;
 }
 
 /* Responsive */

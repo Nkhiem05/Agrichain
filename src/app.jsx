@@ -2,10 +2,10 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import DangNhap from "../src/view/page/dangnhap";
+import DangNhap from "./view/dangnhap";
 import Nongdan from "./view/page/nongdan/nongdan";
 import Chitietnongtrai from "./view/page/nongdan/chitietnongtrai";
-import Chitietthuhoach from "./view/page/nongdan/chitietthuhoach";
+import Chitietmuavu from "./view/page/nongdan/chitietmuavu";
 import Coquankiemdinh from "../src/view/page/kiemdinh/coquankiemdinh";
 import ChiTietKiemDinh from "../src/view/page/kiemdinh/chitietkiemdinh";
 import Donvivanchuyen from "../src/view/page/vanchuyen/donvivanchuyen";
@@ -23,7 +23,7 @@ const AppRoutes = () => {
       <Route path="/chi-tiet-nong-trai" element={<Chitietnongtrai />} />
 
       {/* Trang chi tiết thu hoạch */}
-      <Route path="/chi-tiet-thu-hoach" element={<Chitietthuhoach />} />
+      <Route path="/chi-tiet-mua-vu" element={<Chitietmuavu />} />
 
       {/* Trang cơ quan kiểm định */}
       <Route path="/co-quan-kiem-dinh" element={<Coquankiemdinh />} />

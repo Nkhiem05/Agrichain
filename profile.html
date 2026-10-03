@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hồ Sơ Cá Nhân - AGRICHAIN</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Be Vietnam Pro -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    />
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              agri: {
+                DEFAULT: "#207446",
+                dark: "#165b35",
+                light: "#2d945b",
+                surface: "#eaf6ef",
+                subtle: "#f4faf6",
+                border: "#d2ebd9",
+              },
+            },
+            fontFamily: {
+              sans: ['"Be Vietnam Pro"', "Inter", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      body {
+        background-color: #f7f9fa;
+        font-family: "Be Vietnam Pro", sans-serif;
+      }
+      /* Hiệu ứng chuyển động mượt cho modal */
+      .modal-backdrop {
+        transition: opacity 0.25s ease-out;
+      }
+      .modal-content {
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+    </style>
+  </head>
+  <body
+    class="min-h-screen py-8 px-4 sm:px-6 lg:px-8 text-slate-800 flex flex-col justify-between"
+  >
+    <div class="max-w-3xl mx-auto w-full">
+      <!-- Thanh thao tác trên cùng: Nút Quay lại và Huy hiệu hệ thống -->
+      <div class="mb-6 flex items-center justify-between">
+        <button
+          type="button"
+          onclick="handleGoBack()"
+          class="inline-flex items-center gap-2.5 px-4 py-2 text-sm font-semibold text-slate-700 bg-white hover:text-agri hover:bg-agri-subtle rounded-xl border border-slate-200/80 shadow-xs transition-all duration-200 active:scale-95 group"
+        >
+          <i
+            class="fa-solid fa-arrow-left text-xs transition-transform duration-200 group-hover:-translate-x-1 text-slate-400 group-hover:text-agri"
+          ></i>
+          <span>Quay lại</span>
+        </button>
+
+        <!-- Nhãn thương hiệu tối giản -->
+        <div
+          class="inline-flex items-center gap-2 text-xs font-semibold text-agri px-3 py-1.5 bg-agri-surface rounded-full border border-agri-border"
+        >
+          <i class="fa-solid fa-leaf text-agri"></i>
+          <span>Hồ sơ AGRICHAIN</span>
+        </div>
+      </div>
+
+      <!-- Card Hồ sơ chính (Sạch sẽ, không ảnh bìa) -->
+      <div
+        class="bg-white rounded-2xl shadow-sm border border-slate-200/70 overflow-hidden"
+      >
+        <!-- Phần Đầu Profile: Avatar + Tên + Nút Chỉnh sửa duy nhất -->
+        <div
+          class="p-6 sm:p-8 border-b border-slate-100 flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6"
+        >
+          <div
+            class="flex flex-col sm:flex-row items-center gap-5 text-center sm:text-left"
+          >
+            <!-- Avatar Bo tròn trang nhã -->
+            <div class="relative">
+              <img
+                id="view-avatar"
+                src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260"
+                alt="Ảnh đại diện"
+                class="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover ring-4 ring-agri-surface border border-agri-border shadow-sm"
+              />
+              <span
+                class="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white"
+                title="Trạng thái: Hoạt động"
+              ></span>
+            </div>
+
+            <!-- Thông tin tiêu đề -->
+            <div>
+              <div
+                class="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 mb-1.5"
+              >
+                <h1
+                  id="view-name"
+                  class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight"
+                >
+                  Nguyễn Văn A
+                </h1>
+                <!-- Vai trò Actor Badge -->
+                <span
+                  id="view-role-badge"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-agri-surface text-agri border border-agri-border"
+                >
+                  <i class="fa-solid fa-user-check text-[11px]"></i>
+                  <span id="view-role-text">Nông dân</span>
+                </span>
+              </div>
+
+              <p
+                id="view-email-sub"
+                class="text-sm font-medium text-slate-500 mb-2"
+              >
+                nguyenvana.agri@gmail.com
+              </p>
+
+              <div
+                class="inline-flex items-center gap-2 text-xs text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/60 font-mono"
+              >
+                <span class="text-slate-400 font-sans">Mã Actor:</span>
+                <strong id="view-actor-id" class="text-slate-800"
+                  >AGRI-VN-0942</strong
+                >
+              </div>
+            </div>
+          </div>
+
+          <!-- Nút bấm duy nhất: Chỉnh sửa thông tin -->
+          <button
+            type="button"
+            onclick="openEditModal()"
+            class="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 bg-agri hover:bg-agri-dark text-white rounded-xl text-sm font-semibold shadow-xs hover:shadow-md transition-all duration-200 active:scale-95"
+          >
+            <i class="fa-regular fa-pen-to-square text-xs"></i>
+            <span>Chỉnh sửa thông tin</span>
+          </button>
+        </div>
+
+        <!-- Danh sách chi tiết thông tin (Hiển thị text thuần túy, không input) -->
+        <div class="p-6 sm:p-8">
+          <h2
+            class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-5 flex items-center gap-2"
+          >
+            <i class="fa-solid fa-circle-info text-agri"></i>
+            Thông tin chi tiết tài khoản
+          </h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-y-6 gap-x-8">
+            <!-- Họ và tên -->
+            <div class="flex items-start gap-3.5">
+              <div
+                class="w-9 h-9 rounded-xl bg-agri-subtle text-agri flex items-center justify-center shrink-0 border border-agri-border/60"
+              >
+                <i class="fa-regular fa-user text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">Họ và tên</p>
+                <p
+                  id="view-name-detail"
+                  class="text-sm font-semibold text-slate-800 mt-0.5"
+                >
+                  Nguyễn Văn A
+                </p>
+              </div>
+            </div>
+
+            <!-- Vai trò Actor -->
+            <div class="flex items-start gap-3.5">
+              <div
+                class="w-9 h-9 rounded-xl bg-agri-subtle text-agri flex items-center justify-center shrink-0 border border-agri-border/60"
+              >
+                <i class="fa-solid fa-briefcase text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">
+                  Vai trò trong chuỗi (Actor)
+                </p>
+                <p
+                  id="view-role-detail"
+                  class="text-sm font-semibold text-slate-800 mt-0.5"
+                >
+                  Nông dân (Farmer)
+                </p>
+              </div>
+            </div>
+
+            <!-- Email liên hệ -->
+            <div class="flex items-start gap-3.5">
+              <div
+                class="w-9 h-9 rounded-xl bg-agri-subtle text-agri flex items-center justify-center shrink-0 border border-agri-border/60"
+              >
+                <i class="fa-regular fa-envelope text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">Email liên hệ</p>
+                <p
+                  id="view-email-detail"
+                  class="text-sm font-semibold text-slate-800 mt-0.5"
+                >
+                  nguyenvana.agri@gmail.com
+                </p>
+              </div>
+            </div>
+
+            <!-- Số điện thoại -->
+            <div class="flex items-start gap-3.5">
+              <div
+                class="w-9 h-9 rounded-xl bg-agri-subtle text-agri flex items-center justify-center shrink-0 border border-agri-border/60"
+              >
+                <i class="fa-solid fa-phone text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">Số điện thoại</p>
+                <p
+                  id="view-phone-detail"
+                  class="text-sm font-semibold text-slate-800 mt-0.5"
+                >
+                  0912 345 678
+                </p>
+              </div>
+            </div>
+
+            <!-- Mã định danh chuỗi -->
+            <div class="flex items-start gap-3.5">
+              <div
+                class="w-9 h-9 rounded-xl bg-agri-subtle text-agri flex items-center justify-center shrink-0 border border-agri-border/60"
+              >
+                <i class="fa-solid fa-fingerprint text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">
+                  Mã định danh Actor ID
+                </p>
+                <p
+                  class="text-sm font-semibold text-slate-800 font-mono mt-0.5"
+                >
+                  AGRI-VN-0942
+                </p>
+              </div>
+            </div>
+
+            <!-- Trạng thái tài khoản -->
+            <div class="flex items-start gap-3.5">
+              <div
+                class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-200"
+              >
+                <i class="fa-solid fa-shield-halved text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">
+                  Trạng thái hồ sơ
+                </p>
+                <p
+                  class="text-sm font-semibold text-emerald-700 flex items-center gap-1.5 mt-0.5"
+                >
+                  <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                  <span>Đã xác minh chuỗi khối</span>
+                </p>
+              </div>
+            </div>
+
+            <!-- Địa chỉ / Vùng canh tác (trải dài 2 cột) -->
+            <div
+              class="flex items-start gap-3.5 sm:col-span-2 pt-2 border-t border-slate-100"
+            >
+              <div
+                class="w-9 h-9 rounded-xl bg-agri-subtle text-agri flex items-center justify-center shrink-0 border border-agri-border/60"
+              >
+                <i class="fa-solid fa-location-dot text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">
+                  Địa chỉ / Khu vực canh tác
+                </p>
+                <p
+                  id="view-address-detail"
+                  class="text-sm font-medium text-slate-800 mt-0.5 leading-relaxed"
+                >
+                  Ấp 10, Xã Trí Phải, Huyện Thới Bình, Tỉnh Cà Mau
+                </p>
+              </div>
+            </div>
+
+            <!-- Ghi chú / Giới thiệu -->
+            <div class="flex items-start gap-3.5 sm:col-span-2">
+              <div
+                class="w-9 h-9 rounded-xl bg-agri-subtle text-agri flex items-center justify-center shrink-0 border border-agri-border/60"
+              >
+                <i class="fa-regular fa-file-lines text-sm"></i>
+              </div>
+              <div>
+                <p class="text-xs font-medium text-slate-400">
+                  Ghi chú & Lĩnh vực phụ trách
+                </p>
+                <p
+                  id="view-bio-detail"
+                  class="text-sm text-slate-700 mt-0.5 leading-relaxed"
+                >
+                  Thành viên hợp tác xã nông nghiệp VietGAP Cà Mau. Phụ trách
+                  giám sát và số hóa quy trình canh tác cây có múi trên nền tảng
+                  AGRICHAIN.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL / FORM POPUP CHỈNH SỬA THÔNG TIN -->
+    <div
+      id="edit-modal"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none modal-backdrop bg-slate-900/50 backdrop-blur-xs"
+    >
+      <div
+        id="modal-box"
+        class="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-100 overflow-hidden transform scale-95 modal-content"
+      >
+        <!-- Modal Header -->
+        <div
+          class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70"
+        >
+          <div class="flex items-center gap-2">
+            <div
+              class="w-7 h-7 rounded-lg bg-agri-surface text-agri flex items-center justify-center text-xs"
+            >
+              <i class="fa-solid fa-user-pen"></i>
+            </div>
+            <h3 class="font-bold text-slate-800 text-base">
+              Cập nhật hồ sơ cá nhân
+            </h3>
+          </div>
+          <button
+            type="button"
+            onclick="closeEditModal()"
+            class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center transition"
+          >
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <!-- Modal Body (Form) -->
+        <form
+          id="modal-form"
+          onsubmit="handleSaveProfile(event)"
+          class="p-6 space-y-4 max-h-[80vh] overflow-y-auto"
+        >
+          <!-- Ảnh đại diện upload nhanh trong popup -->
+          <div
+            class="flex items-center gap-4 p-3 bg-agri-subtle rounded-xl border border-agri-border/50"
+          >
+            <img
+              id="modal-preview-avatar"
+              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260"
+              class="w-14 h-14 rounded-xl object-cover border border-agri-border"
+            />
+            <div>
+              <label
+                class="inline-block text-xs font-semibold text-agri bg-white hover:bg-agri hover:text-white px-3 py-1.5 rounded-lg border border-agri-border cursor-pointer transition shadow-2xs"
+              >
+                <i class="fa-solid fa-camera mr-1"></i> Tải ảnh mới
+                <input
+                  type="file"
+                  id="modal-avatar-input"
+                  accept="image/*"
+                  class="hidden"
+                  onchange="previewNewAvatar(event)"
+                />
+              </label>
+              <p class="text-[11px] text-slate-500 mt-1">
+                Định dạng JPG, PNG dưới 2MB
+              </p>
+            </div>
+          </div>
+
+          <!-- Họ và tên -->
+          <div>
+            <label
+              for="input-name"
+              class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+            >
+              Họ và tên <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="input-name"
+              required
+              class="w-full px-3.5 py-2 text-sm bg-slate-50 hover:bg-white focus:bg-white rounded-xl border border-slate-200 focus:border-agri focus:ring-2 focus:ring-agri/15 outline-none transition"
+              placeholder="Nhập họ và tên..."
+            />
+          </div>
+
+          <!-- Vai trò Actor -->
+          <div>
+            <label
+              for="input-role"
+              class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+            >
+              Vai trò Actor <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <select
+                id="input-role"
+                class="w-full px-3.5 py-2 text-sm bg-slate-50 hover:bg-white focus:bg-white rounded-xl border border-slate-200 focus:border-agri focus:ring-2 focus:ring-agri/15 outline-none transition appearance-none cursor-pointer text-slate-800"
+              >
+                <option value="Nông dân">Nông dân (Farmer)</option>
+                <option value="Chủ trang trại">
+                  Chủ trang trại (Farm Owner)
+                </option>
+                <option value="Kỹ sư nông nghiệp">
+                  Kỹ sư nông nghiệp (Agronomist)
+                </option>
+                <option value="Hợp tác xã">Hợp tác xã (Cooperative)</option>
+                <option value="Đơn vị kiểm định">
+                  Đơn vị kiểm định (Auditor)
+                </option>
+                <option value="Thương lái">
+                  Thương lái thu mua (Distributor)
+                </option>
+              </select>
+              <span
+                class="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400"
+              >
+                <i class="fa-solid fa-chevron-down text-xs"></i>
+              </span>
+            </div>
+          </div>
+
+          <!-- Email và SĐT -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label
+                for="input-email"
+                class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+              >
+                Email <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="email"
+                id="input-email"
+                required
+                class="w-full px-3.5 py-2 text-sm bg-slate-50 hover:bg-white focus:bg-white rounded-xl border border-slate-200 focus:border-agri focus:ring-2 focus:ring-agri/15 outline-none transition"
+                placeholder="name@example.com"
+              />
+            </div>
+            <div>
+              <label
+                for="input-phone"
+                class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+              >
+                Số điện thoại <span class="text-red-500">*</span>
+              </label>
+              <input
+                type="tel"
+                id="input-phone"
+                required
+                class="w-full px-3.5 py-2 text-sm bg-slate-50 hover:bg-white focus:bg-white rounded-xl border border-slate-200 focus:border-agri focus:ring-2 focus:ring-agri/15 outline-none transition"
+                placeholder="09xx xxx xxx"
+              />
+            </div>
+          </div>
+
+          <!-- Địa chỉ -->
+          <div>
+            <label
+              for="input-address"
+              class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+            >
+              Địa chỉ / Vùng canh tác
+            </label>
+            <input
+              type="text"
+              id="input-address"
+              class="w-full px-3.5 py-2 text-sm bg-slate-50 hover:bg-white focus:bg-white rounded-xl border border-slate-200 focus:border-agri focus:ring-2 focus:ring-agri/15 outline-none transition"
+              placeholder="Ấp, Xã, Huyện, Tỉnh..."
+            />
+          </div>
+
+          <!-- Giới thiệu -->
+          <div>
+            <label
+              for="input-bio"
+              class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+            >
+              Ghi chú / Giới thiệu
+            </label>
+            <textarea
+              id="input-bio"
+              rows="3"
+              class="w-full px-3.5 py-2 text-sm bg-slate-50 hover:bg-white focus:bg-white rounded-xl border border-slate-200 focus:border-agri focus:ring-2 focus:ring-agri/15 outline-none transition resize-none"
+              placeholder="Ghi chú kinh nghiệm hoặc chức trách..."
+            ></textarea>
+          </div>
+
+          <!-- Nút thao tác trong Modal -->
+          <div
+            class="pt-4 border-t border-slate-100 flex items-center justify-end gap-2.5"
+          >
+            <button
+              type="button"
+              onclick="closeEditModal()"
+              class="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 rounded-xl border border-slate-200 transition active:scale-95"
+            >
+              Hủy
+            </button>
+            <button
+              type="submit"
+              class="px-5 py-2 text-sm font-semibold text-white bg-agri hover:bg-agri-dark rounded-xl shadow-xs transition active:scale-95 flex items-center gap-1.5"
+            >
+              <i class="fa-solid fa-check text-xs"></i>
+              <span>Lưu thay đổi</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TOAST THÔNG BÁO -->
+    <div
+      id="toast"
+      class="fixed bottom-6 right-6 z-50 transform translate-y-16 opacity-0 transition-all duration-300 pointer-events-none"
+    >
+      <div
+        class="bg-slate-900/90 backdrop-blur-md text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-slate-700"
+      >
+        <div
+          class="w-6 h-6 rounded-lg bg-agri text-white flex items-center justify-center shrink-0 text-xs"
+        >
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <p id="toast-text" class="text-xs font-medium text-slate-200">
+          Đã cập nhật thông tin thành công!
+        </p>
+      </div>
+    </div>
+
+    <!-- Footer tinh gọn -->
+    <footer class="text-center text-xs text-slate-400 py-4">
+      <span>© 2026 Nền tảng AGRICHAIN</span>
+    </footer>
+
+    <script>
+      // Dữ liệu hồ sơ người dùng lưu trong trạng thái
+      const profileState = {
+        name: "Nguyễn Văn A",
+        role: "Nông dân",
+        email: "nguyenvana.agri@gmail.com",
+        phone: "0912 345 678",
+        address: "Ấp 10, Xã Trí Phải, Huyện Thới Bình, Tỉnh Cà Mau",
+        bio: "Thành viên hợp tác xã nông nghiệp VietGAP Cà Mau. Phụ trách giám sát và số hóa quy trình canh tác cây có múi trên nền tảng AGRICHAIN.",
+        avatar:
+          "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=260",
+      };
+
+      let tempAvatar = profileState.avatar;
+
+      // Xử lý nút quay lại
+      function handleGoBack() {
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          showToast("Đang trở lại trang chủ...");
+        }
+      }
+
+      // Hiển thị Toast
+      function showToast(msg) {
+        const toast = document.getElementById("toast");
+        const text = document.getElementById("toast-text");
+        text.textContent = msg;
+
+        toast.classList.remove("translate-y-16", "opacity-0");
+        toast.classList.add("translate-y-0", "opacity-100");
+
+        setTimeout(() => {
+          toast.classList.remove("translate-y-0", "opacity-100");
+          toast.classList.add("translate-y-16", "opacity-0");
+        }, 2600);
+      }
+
+      // Mở Modal và nạp giá trị hiện tại vào Form
+      function openEditModal() {
+        document.getElementById("input-name").value = profileState.name;
+        document.getElementById("input-role").value = profileState.role;
+        document.getElementById("input-email").value = profileState.email;
+        document.getElementById("input-phone").value = profileState.phone;
+        document.getElementById("input-address").value = profileState.address;
+        document.getElementById("input-bio").value = profileState.bio;
+
+        tempAvatar = profileState.avatar;
+        document.getElementById("modal-preview-avatar").src = tempAvatar;
+
+        const modal = document.getElementById("edit-modal");
+        const box = document.getElementById("modal-box");
+
+        modal.classList.remove("opacity-0", "pointer-events-none");
+        modal.classList.add("opacity-100", "pointer-events-auto");
+        box.classList.remove("scale-95");
+        box.classList.add("scale-100");
+      }
+
+      // Đóng Modal
+      function closeEditModal() {
+        const modal = document.getElementById("edit-modal");
+        const box = document.getElementById("modal-box");
+
+        modal.classList.remove("opacity-100", "pointer-events-auto");
+        modal.classList.add("opacity-0", "pointer-events-none");
+        box.classList.remove("scale-100");
+        box.classList.add("scale-95");
+      }
+
+      // Đóng modal khi bấm vào vùng ngoài modal-box
+      document
+        .getElementById("edit-modal")
+        .addEventListener("click", function (e) {
+          if (e.target === this) {
+            closeEditModal();
+          }
+        });
+
+      // Xem trước ảnh đại diện trong modal
+      function previewNewAvatar(event) {
+        const file = event.target.files[0];
+        if (file) {
+          if (!file.type.startsWith("image/")) {
+            showToast("Vui lòng chọn file hình ảnh hợp lệ!");
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            tempAvatar = e.target.result;
+            document.getElementById("modal-preview-avatar").src = tempAvatar;
+          };
+          reader.readAsDataURL(file);
+        }
+      }
+
+      // Xử lý Lưu thông tin từ Modal Form
+      function handleSaveProfile(event) {
+        event.preventDefault();
+
+        // Cập nhật state
+        profileState.name = document.getElementById("input-name").value.trim();
+        profileState.role = document.getElementById("input-role").value;
+        profileState.email = document
+          .getElementById("input-email")
+          .value.trim();
+        profileState.phone = document
+          .getElementById("input-phone")
+          .value.trim();
+        profileState.address =
+          document.getElementById("input-address").value.trim() ||
+          "Chưa cập nhật";
+        profileState.bio =
+          document.getElementById("input-bio").value.trim() ||
+          "Chưa có ghi chú";
+        profileState.avatar = tempAvatar;
+
+        // Cập nhật giao diện chính
+        document.getElementById("view-name").textContent = profileState.name;
+        document.getElementById("view-name-detail").textContent =
+          profileState.name;
+        document.getElementById("view-role-text").textContent =
+          profileState.role;
+        document.getElementById("view-role-detail").textContent =
+          `${profileState.role} (Đã chứng thực)`;
+        document.getElementById("view-email-sub").textContent =
+          profileState.email;
+        document.getElementById("view-email-detail").textContent =
+          profileState.email;
+        document.getElementById("view-phone-detail").textContent =
+          profileState.phone;
+        document.getElementById("view-address-detail").textContent =
+          profileState.address;
+        document.getElementById("view-bio-detail").textContent =
+          profileState.bio;
+        document.getElementById("view-avatar").src = profileState.avatar;
+
+        // Đóng modal & hiện thông báo
+        closeEditModal();
+        showToast("Hồ sơ đã được lưu thành công!");
+      }
+    </script>
+  </body>
+</html>

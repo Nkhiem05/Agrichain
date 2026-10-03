@@ -1,13 +1,14 @@
 {
   "name": "agrichain",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Blockchain-based agricultural supply chain traceability system",
+  "main": "src/server.js",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "node src/server.js",
+    "dev": "node ./server/server.js",
     "ui": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
@@ -16,22 +17,29 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "bugs": {
     "url": "https://github.com/Nkhiem05/Agrichain/issues"
   },
   "homepage": "https://github.com/Nkhiem05/Agrichain#readme",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
     "dotenv": "^18.0.4",
     "express": "^5.2.1",
     "lucide-react": "^1.49.0",
-    "nodemon": "^3.1.14",
+    "multer": "^2.4.0",
+    "mysql2": "^3.24.5",
+    "path": "^0.12.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.1.1",
+    "nodemon": "^3.1.14",
     "vite": "^8.3.1"
+  },
+  "overrides": {
+    "braces": "^3.0.3"
   }
 }
