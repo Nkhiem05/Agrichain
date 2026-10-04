@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Điều hướng trang dự án</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+      }
+
+      body {
+        background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+        min-height: 100vh;
+        padding: 40px 20px;
+        color: #1e293b;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+
+      .header h1 {
+        font-size: 28px;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 8px;
+      }
+
+      .header p {
+        color: #64748b;
+        font-size: 15px;
+      }
+
+      .control-panel {
+        background: #ffffff;
+        padding: 16px 20px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .control-panel label {
+        font-weight: 600;
+        font-size: 14px;
+        color: #334155;
+      }
+
+      .control-panel input {
+        flex: 1;
+        min-width: 220px;
+        padding: 8px 12px;
+        font-size: 14px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+
+      .control-panel input:focus {
+        border-color: #3b82f6;
+      }
+
+      .quick-ports {
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn-port {
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 6px;
+        cursor: pointer;
+        color: #475569;
+        transition: all 0.2s;
+      }
+
+      .btn-port:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 16px;
+      }
+
+      .card {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 18px 20px;
+        background: #ffffff;
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+        transition:
+          transform 0.18s ease,
+          box-shadow 0.18s ease,
+          border-color 0.18s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+        border-color: #3b82f6;
+      }
+
+      .icon-box {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        background: #f1f5f9;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        flex-shrink: 0;
+      }
+
+      .info {
+        flex: 1;
+        overflow: hidden;
+      }
+
+      .title {
+        font-weight: 600;
+        font-size: 15px;
+        color: #1e293b;
+        margin-bottom: 2px;
+      }
+
+      .path {
+        font-size: 12px;
+        color: #64748b;
+        font-family: Consolas, monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🚀 Danh Mục Điều Hướng Trang</h1>
+        <p>Chọn vào một mục bất kỳ để chuyển thẳng đến route tương ứng</p>
+      </div>
+
+      <!-- Thanh chỉnh host / port nhanh -->
+      <div class="control-panel">
+        <label for="baseUrlInput">Địa chỉ Web Server:</label>
+        <input
+          type="text"
+          id="baseUrlInput"
+          value="http://localhost:5173"
+          oninput="renderLinks()"
+        />
+        <div class="quick-ports">
+          <button class="btn-port" type="button" onclick="setPort(3000)">
+            Port 3000 (React)
+          </button>
+          <button class="btn-port" type="button" onclick="setPort(5173)">
+            Port 5173 (Vite)
+          </button>
+        </div>
+      </div>
+
+      <div class="grid" id="menuContainer"></div>
+    </div>
+
+    <script>
+      const routes = [
+        { name: "Đăng Nhập", path: "/dang-nhap", icon: "🔑" },
+        { name: "Nông Dân (Tổng quan)", path: "/nong-dan", icon: "🌾" },
+        { name: "Chi Tiết Nông Trại", path: "/chi-tiet-nong-trai", icon: "🏡" },
+        { name: "Chi Tiết Mùa Vụ", path: "/chi-tiet-mua-vu", icon: "🌱" },
+        { name: "Cơ Quan Kiểm Định", path: "/co-quan-kiem-dinh", icon: "🔬" },
+        { name: "Chi Tiết Kiểm Định", path: "/chi-tiet-kiem-dinh", icon: "📋" },
+        { name: "Đơn Vị Vận Chuyển", path: "/van-chuyen", icon: "🚚" },
+        { name: "Sơ Chế & Đóng Gói", path: "/so-che", icon: "📦" },
+        { name: "Người Dùng (User)", path: "/user", icon: "👤" },
+        { name: "Quản Trị Viên (Admin)", path: "/admin", icon: "⚙️" },
+        { name: "Trang Cá Nhân", path: "/trang-ca-nhan", icon: "💳" },
+      ];
+
+      function setPort(port) {
+        document.getElementById("baseUrlInput").value =
+          `http://localhost:${port}`;
+        renderLinks();
+      }
+
+      function renderLinks() {
+        const baseUrl = document
+          .getElementById("baseUrlInput")
+          .value.replace(/\/$/, "");
+        const container = document.getElementById("menuContainer");
+        container.innerHTML = "";
+
+        routes.forEach((item) => {
+          const url = `${baseUrl}${item.path}`;
+          const a = document.createElement("a");
+          a.href = url;
+          a.className = "card";
+          a.target = "_blank";
+          a.innerHTML = `
+          <div class="icon-box">${item.icon}</div>
+          <div class="info">
+            <div class="title">${item.name}</div>
+            <div class="path">${item.path}</div>
+          </div>
+        `;
+          container.appendChild(a);
+        });
+      }
+
+      renderLinks();
+    </script>
+  </body>
+</html>

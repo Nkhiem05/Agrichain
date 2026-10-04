@@ -5,6 +5,9 @@ import {
   PackageCheck,
   CalendarCheck,
   Truck,
+  Eye,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import "../../css/nongdan.css";
 import { useNavigate } from "react-router-dom";
@@ -870,7 +873,7 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              <div className="table-container">
+              <div className="table-container custom-scrollbar">
                 <table className="batch-table">
                   <thead>
                     <tr>
@@ -931,88 +934,90 @@ const DashboardPage = () => {
           )}
 
           {/* =================================================
-              TAB LỊCH HẸN KIỂM ĐỊNH (ĐÃ BỎ METRICS-ROW, THEAD CỐ ĐỊNH CHUẨN)
+              TAB LỊCH HẸN KIỂM ĐỊNH (TỰ FIT KHUNG, KHÔNG TRÀN)
           ================================================== */}
           {activeTab === "inspection" && (
-            <div style={{ paddingTop: "24px" }}>
-              <div className="table-container">
-                <table className="batch-table">
+            <div className="inspection-view-wrapper">
+              <div className="inspection-table-card">
+                <table className="inspection-table">
                   <thead>
                     <tr>
-                      <th>Mã lịch</th>
+                      <th className="col-code">Mã lịch</th>
                       <th>Mã lô kiểm định</th>
                       <th>Cơ quan kiểm định</th>
                       <th>Ngày hẹn kiểm tra</th>
                       <th>Ghi chú / Địa điểm</th>
                       <th>Trạng thái phê duyệt</th>
-                      <th>Thao tác</th>
+                      <th className="col-actions">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td>
-                        <strong>LH-2026-001</strong>
+                      <td className="col-code tracking-code">LH-2026-001</td>
+                      <td className="nowrap-cell">
+                        <span className="batch-code-badge">LA1-11111111</span>
                       </td>
-                      <td>LA1-11111111</td>
-                      <td>Trung tâm Kiểm nghiệm Nông nghiệp Vùng 2</td>
-                      <td>12/10/2026 (08:30)</td>
-                      <td>Kiểm định dư lượng thuốc BVTV tại vườn</td>
-                      <td>
+                      <td className="agency-name">
+                        Trung tâm Kiểm nghiệm Nông nghiệp Vùng 2
+                      </td>
+                      <td className="inspection-date">12/10/2026 (08:30)</td>
+                      <td className="inspection-note">
+                        Kiểm định dư lượng thuốc BVTV tại vườn
+                      </td>
+                      <td className="nowrap-cell">
                         <span className="status-pill success">
+                          <CheckCircle2 size={14} />
                           Đã chấp nhận
                         </span>
                       </td>
-                      <td>
-                        <button
-                          className="btn-update"
-                          style={{ padding: "5px 12px", fontSize: "12px" }}
-                        >
+                      <td className="col-actions">
+                        <button type="button" className="btn-action-view">
+                          <Eye size={14} />
                           Xem phiếu
                         </button>
                       </td>
                     </tr>
                     <tr>
-                      <td>
-                        <strong>LH-2026-002</strong>
+                      <td className="col-code tracking-code">LH-2026-002</td>
+                      <td className="nowrap-cell">
+                        <span className="batch-code-badge">LA2-22091104</span>
                       </td>
-                      <td>LA2-22091104</td>
-                      <td>Viện Tiêu chuẩn Chất lượng AgriCheck</td>
-                      <td>16/10/2026 (14:00)</td>
-                      <td>Lấy mẫu test độ ngọt và chuẩn VietGAP</td>
-                      <td>
+                      <td className="agency-name">
+                        Viện Tiêu chuẩn Chất lượng AgriCheck
+                      </td>
+                      <td className="inspection-date">16/10/2026 (14:00)</td>
+                      <td className="inspection-note">
+                        Lấy mẫu test độ ngọt và chuẩn VietGAP
+                      </td>
+                      <td className="nowrap-cell">
                         <span className="status-pill warning">
+                          <Clock size={14} />
                           Chờ phê duyệt
                         </span>
                       </td>
-                      <td>
-                        <button
-                          className="btn-map"
-                          style={{ padding: "5px 12px", fontSize: "12px" }}
-                        >
+                      <td className="col-actions">
+                        <button type="button" className="btn-action-edit">
                           Sửa lịch
                         </button>
                       </td>
                     </tr>
                     <tr>
-                      <td>
-                        <strong>LH-2026-003</strong>
+                      <td className="col-code tracking-code">LH-2026-003</td>
+                      <td className="nowrap-cell">
+                        <span className="batch-code-badge">LA1-09091801</span>
                       </td>
-                      <td>LA1-09091801</td>
-                      <td>Chi cục Trồng trọt & BVTV Tỉnh</td>
-                      <td>02/10/2026 (09:00)</td>
-                      <td>Hồ sơ canh tác chưa cập nhật đủ nhật ký</td>
-                      <td>
+                      <td className="agency-name">
+                        Chi cục Trồng trọt & BVTV Tỉnh
+                      </td>
+                      <td className="inspection-date">02/10/2026 (09:00)</td>
+                      <td className="inspection-note">
+                        Hồ sơ canh tác chưa cập nhật đủ nhật ký
+                      </td>
+                      <td className="nowrap-cell">
                         <span className="status-pill danger">Từ chối</span>
                       </td>
-                      <td>
-                        <button
-                          className="btn-update"
-                          style={{
-                            padding: "5px 12px",
-                            fontSize: "12px",
-                            backgroundColor: "#b91c1c",
-                          }}
-                        >
+                      <td className="col-actions">
+                        <button type="button" className="btn-action-retry">
                           Gửi lại đơn
                         </button>
                       </td>
@@ -1066,61 +1071,140 @@ const DashboardPage = () => {
                 </div>
               </div>
 
-              <div className="table-container">
-                <table className="batch-table">
+              <div className="shipping-table-card custom-scrollbar">
+                <table className="shipping-table">
                   <thead>
                     <tr>
-                      <th>Mã vận đơn</th>
-                      <th>Mã lô</th>
-                      <th>Tên lô hàng</th>
-                      <th>Đơn vị sơ chế đóng gói</th>
+                      <th className="col-code">Mã vận đơn</th>
+                      <th>Mã lô hàng</th>
+                      <th>Tên sản phẩm</th>
+                      <th>Đơn vị vận chuyển</th>
                       <th>Khối lượng</th>
-                      <th>Ngày xuất kho</th>
+                      <th>Thời gian xuất</th>
                       <th>Trạng thái</th>
-                      <th>Thao tác</th>
+                      <th className="col-actions">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
+                    {/* DÒNG 1 */}
                     <tr>
+                      <td className="col-code tracking-code">VD-LOG-9901</td>
                       <td>
-                        <strong>VD-AGRI-9912</strong>
+                        <span className="batch-code-badge">#SC-2026-002</span>
                       </td>
-                      <td>LA1-11111111</td>
-                      <td>Quýt đường loại 1 đợt 1</td>
-                      <td>Công ty Sơ chế & Đóng gói Nông sản Xanh</td>
-                      <td>5.000 kg</td>
-                      <td>04/10/2026</td>
+                      <td className="product-name">Cam Sành Đóng Thùng 10kg</td>
+                      <td>
+                        <div className="carrier-name">
+                          Mekong Cold Logistics
+                        </div>
+                        <div className="carrier-sub">
+                          Võ Minh Toàn (51D-891.22)
+                        </div>
+                      </td>
+                      <td className="package-weight">800 kg</td>
+                      <td className="export-time">04/10/2026 - 16:30</td>
                       <td>
                         <span className="status-pill info">
+                          <Truck size={14} />
                           Đang vận chuyển
                         </span>
                       </td>
-                      <td>
-                        <button
-                          className="btn-update"
-                          style={{ padding: "5px 12px", fontSize: "12px" }}
-                        >
-                          Biên bản
+                      <td className="col-actions">
+                        <button type="button" className="btn-action-detail">
+                          <Eye size={14} />
+                          Chi tiết
                         </button>
                       </td>
                     </tr>
+
+                    {/* DÒNG 2 */}
                     <tr>
+                      <td className="col-code tracking-code">VD-LOG-8812</td>
                       <td>
-                        <strong>VD-AGRI-8821</strong>
+                        <span className="batch-code-badge">#SC-2026-000</span>
                       </td>
-                      <td>LA0-98310022</td>
-                      <td>Xoài Cát Hòa Lộc tuyển chọn</td>
-                      <td>Xưởng Sơ chế Tiêu chuẩn Mekong</td>
-                      <td>7.200 kg</td>
-                      <td>28/09/2026</td>
+                      <td className="product-name">Xoài Cát Hòa Lộc Hộp Quà</td>
                       <td>
-                        <span className="status-pill success">Đã bàn giao</span>
+                        <div className="carrier-name">
+                          Giao Hàng Nhanh AgriShip
+                        </div>
+                        <div className="carrier-sub">
+                          Phạm Quốc Bảo (64A-012.89)
+                        </div>
+                      </td>
+                      <td className="package-weight">1,200 kg</td>
+                      <td className="export-time">02/10/2026 - 09:15</td>
+                      <td>
+                        <span className="status-pill success">
+                          <CheckCircle2 size={14} />
+                          Đã hoàn thành
+                        </span>
+                      </td>
+                      <td className="col-actions">
+                        <button type="button" className="btn-action-detail">
+                          <Eye size={14} />
+                          Chi tiết
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* DÒNG 3 */}
+                    <tr>
+                      <td className="col-code tracking-code">VD-LOG-7721</td>
+                      <td>
+                        <span className="batch-code-badge">#SC-2026-003</span>
+                      </td>
+                      <td className="product-name">Bưởi Năm Roi Xuất Khẩu</td>
+                      <td>
+                        <div className="carrier-name">
+                          Vận Tải Lạnh Miền Tây
+                        </div>
+                        <div className="carrier-sub">
+                          Lê Hoàng Phúc (65C-112.56)
+                        </div>
+                      </td>
+                      <td className="package-weight">2,000 kg</td>
+                      <td className="export-time">04/10/2026 - 17:00</td>
+                      <td>
+                        <span className="status-pill warning">
+                          <Clock size={14} />
+                          Chờ chấp nhận
+                        </span>
+                      </td>
+                      <td className="col-actions">
+                        <button type="button" className="btn-action-detail">
+                          <Eye size={14} />
+                          Chi tiết
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* DÒNG 4 */}
+                    <tr>
+                      <td className="col-code tracking-code">VD-LOG-6655</td>
+                      <td>
+                        <span className="batch-code-badge">#SC-2026-004</span>
+                      </td>
+                      <td className="product-name">
+                        Chanh Không Hạt Đóng Thùng
                       </td>
                       <td>
-                        <button
-                          className="btn-map"
-                          style={{ padding: "5px 12px", fontSize: "12px" }}
-                        >
+                        <div className="carrier-name">Mekong Logistics</div>
+                        <div className="carrier-sub">
+                          Nguyễn Văn Hưng (66B-098.33)
+                        </div>
+                      </td>
+                      <td className="package-weight">650 kg</td>
+                      <td className="export-time">04/10/2026 - 17:30</td>
+                      <td>
+                        <span className="status-pill purple">
+                          <Clock size={14} />
+                          Chờ tiếp nhận
+                        </span>
+                      </td>
+                      <td className="col-actions">
+                        <button type="button" className="btn-action-detail">
+                          <Eye size={14} />
                           Chi tiết
                         </button>
                       </td>

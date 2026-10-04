@@ -2,52 +2,63 @@
 import React from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
+// đăng nhập
 import DangNhap from "./view/page/dangnhap";
+
+//nông dân
 import Nongdan from "./view/page/nongdan/nongdan";
 import Chitietnongtrai from "./view/page/nongdan/chitietnongtrai";
 import Chitietmuavu from "./view/page/nongdan/chitietmuavu";
+
+//kiểm định
 import Coquankiemdinh from "../src/view/page/kiemdinh/coquankiemdinh";
 import ChiTietKiemDinh from "../src/view/page/kiemdinh/chitietkiemdinh";
+
+// vận chuyển
 import Donvivanchuyen from "../src/view/page/vanchuyen/donvivanchuyen";
+
+// sơ chế
 import Soche from "../src/view/page/sochedonggoi/soche";
+import Chitietsoche from "../src/view/page/sochedonggoi/chitietsoche";
+
+// profile
 import Trangcanhan from "./view/page/trangcanhan";
+
+// admin
 import Admin from "../src/view/page/admin/admin";
+
+// user
 import User from "../src/view/page/user/user";
 
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* Đường dẫn mặc định: Trang Đăng Nhập */}
+      {/* Đăng nhập*/}
       <Route path="/dang-nhap" element={<DangNhap />} />
 
-      {/* Đường dẫn xem giao diện Nông Dân */}
+      {/* Nông Dân */}
       <Route path="/nong-dan" element={<Nongdan />} />
-
-      {/* Trang chi tiết nông trại */}
       <Route path="/chi-tiet-nong-trai" element={<Chitietnongtrai />} />
-
-      {/* Trang chi tiết thu hoạch */}
       <Route path="/chi-tiet-mua-vu" element={<Chitietmuavu />} />
 
-      {/* Trang cơ quan kiểm định */}
+      {/*kiểm định */}
       <Route path="/co-quan-kiem-dinh" element={<Coquankiemdinh />} />
-
-      {/* Trang cơ quan kiểm định */}
       <Route path="/chi-tiet-kiem-dinh" element={<ChiTietKiemDinh />} />
 
-      {/* Trang cơ quan kiểm định */}
+      {/*Vận chuyển */}
       <Route path="/van-chuyen" element={<Donvivanchuyen />} />
 
-      {/* Trang cơ quan kiểm định */}
+      {/*Sơ chế*/}
       <Route path="/so-che" element={<Soche />} />
+      <Route path="/chi-tiet-so-che" element={<Chitietsoche />} />
 
-      {/* Trang cơ quan kiểm định */}
+      {/*User */}
       <Route path="/user" element={<User />} />
 
-      {/* Trang cơ quan kiểm định */}
+      {/*Admin*/}
       <Route path="/admin" element={<Admin />} />
 
-      {/* Trang cơ quan kiểm định */}
+      {/*Profile*/}
       <Route path="/trang-ca-nhan" element={<Trangcanhan />} />
 
       {/* Điều hướng mặc định khi sai link */}

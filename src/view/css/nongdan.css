@@ -577,12 +577,13 @@
     font-weight: 700;
   }
 
-  /* ================= VIEW 3: QUẢN LÝ LÔ THU HOẠCH & CHUNG ================= */
+  /* ================= VIEW 3: BẢNG LÔ THU HOẠCH ================= */
   .table-container {
     background-color: #ffffff;
     border-radius: 8px;
     border: 1px solid #e5e7eb;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: visible;
     margin-bottom: 40px;
   }
 
@@ -601,12 +602,13 @@
 
   .batch-table th {
     position: sticky;
-    top: 0; /* ĐÃ CẬP NHẬT: cố định ở trên cùng mép bảng chuẩn xác */
+    top: 0;
     z-index: 10;
     background-color: #d1d5db;
     padding: 12px 14px;
     font-weight: 600;
     border-bottom: 2px solid #cbd5e1;
+    white-space: nowrap;
   }
 
   .batch-table thead tr:first-child th:first-child {
@@ -661,11 +663,14 @@
   }
 
   .status-pill {
-    display: inline-block;
-    padding: 4px 10px;
-    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
+    white-space: nowrap;
   }
 
   .status-pill.success {
@@ -686,6 +691,321 @@
   .status-pill.info {
     background-color: #e0f2fe;
     color: #0369a1;
+  }
+
+  .status-pill.purple {
+    background-color: #ede9fe;
+    color: #6d28d9;
+  }
+
+  /* ================= TÙY BIẾN THANH CUỘN CHO BẢNG ================= */
+  .custom-scrollbar::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  /* ================= VIEW 4: BẢNG LỊCH HẸN KIỂM ĐỊNH (KHÔNG TRÀN, TỰ FIT) ================= */
+  .inspection-view-wrapper {
+    padding-top: 24px;
+  }
+
+  .inspection-table-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #eef2f6;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+    margin-bottom: 40px;
+  }
+
+  .inspection-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13px;
+  }
+
+  .inspection-table thead tr {
+    background-color: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    color: #475569;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .inspection-table th {
+    padding: 14px 10px;
+    white-space: nowrap;
+  }
+
+  .inspection-table th.col-code {
+    padding-left: 18px;
+    width: 110px;
+  }
+
+  .inspection-table th.col-actions {
+    padding-right: 18px;
+    text-align: center;
+    width: 110px;
+  }
+
+  .inspection-table tbody tr {
+    border-bottom: 1px solid #f8fafc;
+    transition: background-color 0.15s ease;
+  }
+
+  .inspection-table tbody tr:hover {
+    background-color: #fcfdfe;
+  }
+
+  .inspection-table td {
+    padding: 13px 10px;
+    vertical-align: middle;
+  }
+
+  .inspection-table td.col-code {
+    padding-left: 18px;
+    white-space: nowrap;
+  }
+
+  .inspection-table td.col-actions {
+    padding-right: 18px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .inspection-table .nowrap-cell {
+    white-space: nowrap;
+  }
+
+  .agency-name {
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1.35;
+    max-width: 200px;
+  }
+
+  .inspection-date {
+    color: #334155;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .inspection-note {
+    color: #64748b;
+    font-size: 12.5px;
+    line-height: 1.35;
+  }
+
+  /* NÚT THAO TÁC CỦA LỊCH HẸN */
+  .btn-action-view {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background-color: #ecfdf5;
+    color: #059669;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action-view:hover {
+    background-color: #d1fae5;
+  }
+
+  .btn-action-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background-color: #eff6ff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action-edit:hover {
+    background-color: #dbeafe;
+  }
+
+  .btn-action-retry {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background-color: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action-retry:hover {
+    background-color: #fee2e2;
+  }
+
+  /* ================= VIEW 5: BẢNG VẬN CHUYỂN & BÀN GIAO ================= */
+  .shipping-table-card {
+    background-color: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #eef2f6;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-bottom: 40px;
+  }
+
+  .shipping-table {
+    width: 100%;
+    min-width: 960px;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 13.5px;
+  }
+
+  .shipping-table thead tr {
+    background-color: #ffffff;
+    border-bottom: 1px solid #f1f5f9;
+    color: #475569;
+    font-weight: 600;
+    font-size: 13px;
+  }
+
+  .shipping-table th {
+    padding: 16px 16px;
+    white-space: nowrap;
+  }
+
+  .shipping-table th.col-code {
+    padding-left: 20px;
+  }
+
+  .shipping-table th.col-actions {
+    padding-right: 20px;
+    text-align: center;
+    width: 110px;
+  }
+
+  .shipping-table tbody tr {
+    border-bottom: 1px solid #f8fafc;
+    transition: background-color 0.15s ease;
+  }
+
+  .shipping-table tbody tr:hover {
+    background-color: #fcfdfe;
+  }
+
+  .shipping-table td {
+    padding: 16px 16px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .shipping-table td.col-code {
+    padding-left: 20px;
+  }
+
+  .shipping-table td.col-actions {
+    padding-right: 20px;
+    text-align: center;
+  }
+
+  .tracking-code {
+    color: #1d4ed8;
+    font-weight: 700;
+  }
+
+  .batch-code-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background-color: #f1f5f9;
+    color: #475569;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .product-name {
+    color: #1e293b;
+    font-weight: 500;
+  }
+
+  .carrier-name {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .carrier-sub {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 2px;
+  }
+
+  .package-weight {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .export-time {
+    color: #334155;
+  }
+
+  .btn-action-detail {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    background-color: #ffffff;
+    color: #2563eb;
+    border: 1px solid #bfdbfe;
+    border-radius: 6px;
+    padding: 6px 14px;
+    font-size: 12.5px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+  }
+
+  .btn-action-detail:hover {
+    background-color: #eff6ff;
+    border-color: #93c5fd;
   }
 
   /* ================= DROPDOWN MENU ================= */
