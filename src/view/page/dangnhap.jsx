@@ -102,6 +102,11 @@ const LoginPage = () => {
     }
   };
 
+  const handleresgister = (e) => {
+    e.preventDefault();
+    navigate("/dang-ky");
+  };
+
   return (
     <div className="login-wrapper">
       <div className="login-container">
@@ -209,7 +214,7 @@ const LoginPage = () => {
 
           <div className="register-link">
             Chưa có tài khoản?{" "}
-            <a href="#" onClick={(e) => e.preventDefault()}>
+            <a href="#" onClick={handleresgister}>
               yêu cầu cấp tài khoản
             </a>
           </div>

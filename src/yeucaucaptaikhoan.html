@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AgriChain - Yêu cầu cấp tài khoản</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Clean Font: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['"Plus Jakarta Sans"', "sans-serif"],
+            },
+            colors: {
+              agri: {
+                50: "#f0fdf4",
+                100: "#dcfce7",
+                600: "#16a34a",
+                700: "#15803d",
+                800: "#166534", // Tone xanh tương đồng nút Đăng Nhập
+                900: "#14532d",
+              },
+            },
+          },
+        },
+      };
+    </script>
+    <style>
+      body {
+        background-color: #f1f3f5;
+        font-family: "Plus Jakarta Sans", sans-serif;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: #166534;
+        box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.12);
+      }
+      /* Minimal modal scrollbar */
+      .custom-scroll::-webkit-scrollbar {
+        width: 5px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+
+  <body
+    class="min-h-screen flex items-center justify-center p-4 sm:p-6 text-gray-800 antialiased"
+  >
+    <!-- Main Minimal Card (single column) -->
+    <div
+      class="w-full max-w-[560px] bg-white rounded-2xl shadow-sm border border-gray-200/80 p-6 sm:p-8 transition-all duration-300"
+    >
+      <!-- Header: Minimal brand & title -->
+      <div class="text-center mb-6">
+        <div
+          class="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-agri-50 text-agri-800 mb-2.5"
+        >
+          <i class="fa-solid fa-leaf text-lg"></i>
+        </div>
+        <h1 class="text-xs font-bold tracking-widest text-agri-800 uppercase">
+          AGRICHAIN
+        </h1>
+        <h2 class="text-2xl font-bold text-gray-900 mt-1">
+          Yêu cầu cấp tài khoản
+        </h2>
+        <p class="text-xs sm:text-sm text-gray-500 mt-1">
+          Chọn vai trò tham gia chuỗi cung ứng để đăng ký định danh số
+        </p>
+      </div>
+
+      <!-- 1. Actor Selector (Segmented buttons) -->
+      <div class="mb-5">
+        <label class="block text-xs font-semibold text-gray-600 mb-2">
+          Vai trò của bạn trong chuỗi <span class="text-red-500">*</span>
+        </label>
+        <div class="grid grid-cols-3 gap-2">
+          <!-- Nông dân -->
+          <button
+            type="button"
+            onclick="setActor('farmer')"
+            id="actor-btn-farmer"
+            class="actor-tab flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border text-center transition-all text-xs font-semibold"
+          >
+            <i class="fa-solid fa-wheat-awn text-sm mb-1"></i>
+            <span>Nông dân</span>
+          </button>
+
+          <!-- Vận chuyển -->
+          <button
+            type="button"
+            onclick="setActor('transporter')"
+            id="actor-btn-transporter"
+            class="actor-tab flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border text-center transition-all text-xs font-semibold"
+          >
+            <i class="fa-solid fa-truck-fast text-sm mb-1"></i>
+            <span>Vận chuyển</span>
+          </button>
+
+          <!-- Phân phối -->
+          <button
+            type="button"
+            onclick="setActor('distributor')"
+            id="actor-btn-distributor"
+            class="actor-tab flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border text-center transition-all text-xs font-semibold"
+          >
+            <i class="fa-solid fa-store text-sm mb-1"></i>
+            <span>Phân phối</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Concise Role Explanation Box -->
+      <div
+        class="mb-5 p-3.5 bg-gray-50 border border-gray-200/90 rounded-xl transition-all"
+      >
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-start gap-2.5">
+            <i class="fa-solid fa-circle-info text-agri-800 text-sm mt-0.5"></i>
+            <div>
+              <span
+                class="text-xs font-bold text-gray-900 block"
+                id="role-title"
+                >Vai trò: Nông dân (Producer)</span
+              >
+              <p
+                class="text-xs text-gray-600 mt-0.5 leading-relaxed"
+                id="role-description"
+              >
+                Chịu trách nhiệm ghi chép nhật ký gieo trồng, sử dụng phân bón,
+                thuốc BVTV, thời gian cách ly và phát hành mã lô hàng gốc (Batch
+                ID) lên chuỗi khối.
+              </p>
+            </div>
+          </div>
+        </div>
+        <!-- Terms trigger link -->
+        <div
+          class="mt-2.5 pt-2 border-t border-gray-200/60 flex items-center justify-end"
+        >
+          <button
+            type="button"
+            onclick="openTermsModal()"
+            class="text-xs font-semibold text-agri-800 hover:text-agri-900 inline-flex items-center gap-1.5 transition"
+          >
+            <i class="fa-solid fa-file-shield text-[11px]"></i>
+            <span id="role-terms-link-text"
+              >Xem chi tiết điều khoản & trách nhiệm của Nông dân</span
+            >
+            <i class="fa-solid fa-chevron-right text-[10px]"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Form Fields -->
+      <form
+        id="accountRequestForm"
+        onsubmit="handleFormSubmit(event)"
+        class="space-y-3.5"
+      >
+        <!-- Full Name -->
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">
+            Họ và tên người đại diện <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="fullName"
+            required
+            placeholder="VD: Nguyễn Văn An"
+            class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-gray-300 rounded-lg text-gray-900 transition"
+          />
+        </div>
+
+        <!-- Email & Phone in 2 cols -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              Email liên hệ <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="email"
+              id="email"
+              required
+              placeholder="example@agrichain.vn"
+              class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-gray-300 rounded-lg text-gray-900 transition"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">
+              Số điện thoại <span class="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              id="phone"
+              required
+              pattern="[0-9]{10,11}"
+              placeholder="0987 654 321"
+              class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-gray-300 rounded-lg text-gray-900 transition"
+            />
+          </div>
+        </div>
+
+        <!-- Org Name -->
+        <div>
+          <label
+            id="lbl-orgName"
+            class="block text-xs font-medium text-gray-700 mb-1"
+          >
+            Tên Trang trại / Hợp tác xã <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="orgName"
+            required
+            placeholder="VD: Nông trại Xanh Mộc Châu"
+            class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-gray-300 rounded-lg text-gray-900 transition"
+          />
+        </div>
+
+        <!-- Dynamic Field: Specific to Selected Actor -->
+        <div id="dynamic-field-container">
+          <label
+            id="lbl-dynamicField"
+            class="block text-xs font-medium text-gray-700 mb-1"
+          >
+            Địa chỉ vùng trồng & diện tích canh tác
+            <span class="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            id="dynamicInput"
+            required
+            placeholder="VD: Xã Lóng Luông, Huyện Vân Hồ, Sơn La (~3.5 ha)"
+            class="w-full px-3.5 py-2 text-xs sm:text-sm bg-white border border-gray-300 rounded-lg text-gray-900 transition"
+          />
+        </div>
+
+        <!-- Agreement Checkbox -->
+        <div class="pt-1">
+          <label class="flex items-start gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              id="agreeCheckbox"
+              required
+              class="mt-0.5 w-4 h-4 rounded text-agri-800 border-gray-300 focus:ring-agri-800 cursor-pointer"
+            />
+            <span class="text-xs text-gray-600 leading-snug">
+              Tôi cam kết dữ liệu cung cấp là trung thực và đồng ý với các
+              <button
+                type="button"
+                onclick="openTermsModal()"
+                class="text-agri-800 font-semibold hover:underline"
+              >
+                quy định & điều khoản của
+                <span id="lbl-checkbox-actor">Nông dân</span></button
+              >.
+            </span>
+          </label>
+        </div>
+
+        <!-- Submit Button (Consistent with Login design) -->
+        <button
+          type="submit"
+          id="btnSubmit"
+          class="w-full py-2.5 px-4 bg-agri-800 hover:bg-agri-900 text-white font-semibold text-sm rounded-lg transition duration-150 shadow-sm active:scale-[0.99] flex items-center justify-center gap-2 mt-2"
+        >
+          <span>Gửi yêu cầu cấp tài khoản</span>
+        </button>
+      </form>
+
+      <!-- Footer: Login navigation link -->
+      <div
+        class="mt-5 pt-4 border-t border-gray-100 text-center text-xs text-gray-600"
+      >
+        Đã có tài khoản?
+        <a
+          href="#dang-nhap"
+          onclick="mockReturnLogin(event)"
+          class="text-agri-800 font-bold hover:underline ml-1"
+        >
+          Đăng nhập
+        </a>
+      </div>
+    </div>
+
+    <!-- MODAL: Clean Terms & Responsibilities Dialog -->
+    <div
+      id="termsModal"
+      class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs hidden items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-xl w-full max-w-lg shadow-xl border border-gray-200 overflow-hidden flex flex-col max-h-[85vh]"
+      >
+        <!-- Modal Header -->
+        <div
+          class="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between bg-gray-50"
+        >
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-agri-800 text-sm"></i>
+            <h3 class="text-sm font-bold text-gray-900" id="modalActorTitle">
+              Điều khoản cho Nông dân
+            </h3>
+          </div>
+          <button
+            onclick="closeTermsModal()"
+            class="text-gray-400 hover:text-gray-600 p-1"
+          >
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div
+          class="p-5 overflow-y-auto custom-scroll text-xs sm:text-sm text-gray-600 space-y-3.5 leading-relaxed"
+          id="modalTermsBody"
+        >
+          <!-- Content will be injected dynamically -->
+        </div>
+
+        <!-- Modal Footer -->
+        <div
+          class="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2"
+        >
+          <button
+            type="button"
+            onclick="closeTermsModal()"
+            class="px-3.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-xs font-medium hover:bg-gray-100 transition"
+          >
+            Đóng
+          </button>
+          <button
+            type="button"
+            onclick="acceptTermsModal()"
+            class="px-4 py-1.5 rounded-lg bg-agri-800 hover:bg-agri-900 text-white text-xs font-semibold transition"
+          >
+            Đồng ý điều khoản này
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: Simple Success Notification -->
+    <div
+      id="successModal"
+      class="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs hidden items-center justify-center p-4"
+    >
+      <div
+        class="bg-white rounded-xl w-full max-w-sm p-6 text-center shadow-xl border border-gray-200"
+      >
+        <div
+          class="w-12 h-12 bg-agri-50 text-agri-800 rounded-full mx-auto flex items-center justify-center text-xl mb-3"
+        >
+          <i class="fa-solid fa-check"></i>
+        </div>
+        <h3 class="text-base font-bold text-gray-900">
+          Đã gửi yêu cầu thành công
+        </h3>
+        <p class="text-xs text-gray-600 mt-1 leading-relaxed">
+          Yêu cầu cấp tài khoản cho vai trò
+          <strong id="successActorName" class="text-agri-800"></strong> đã được
+          gửi tới quản trị viên. Kết quả sẽ gửi về email của bạn trong 24 giờ.
+        </p>
+        <div class="mt-4 pt-3 border-t border-gray-100">
+          <button
+            onclick="closeSuccessModal()"
+            class="w-full py-2 bg-agri-800 hover:bg-agri-900 text-white rounded-lg text-xs font-semibold transition"
+          >
+            Quay lại Đăng nhập
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Actor metadata and detailed terms
+      const actorData = {
+        farmer: {
+          key: "farmer",
+          name: "Nông dân",
+          title: "Vai trò: Nông dân (Nhà sản xuất / HTX)",
+          desc: "Chịu trách nhiệm ghi chép nhật ký gieo trồng, sử dụng phân bón, thuốc BVTV, thời gian cách ly và phát hành mã lô hàng gốc (Batch ID) lên chuỗi khối.",
+          orgLabel:
+            'Tên Trang trại / Hợp tác xã <span class="text-red-500">*</span>',
+          orgPlaceholder: "VD: Nông trại Xanh Mộc Châu, HTX Rau an toàn",
+          dynamicLabel:
+            'Địa chỉ vùng trồng & Quy mô canh tác <span class="text-red-500">*</span>',
+          dynamicPlaceholder:
+            "VD: Xã Lóng Luông, Huyện Vân Hồ, Sơn La (~3.5 ha)",
+          termsTitle: "Quy định & Trách nhiệm: Nông dân (Producer)",
+          termsContent: `
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">1. Tính trung thực dữ liệu canh tác</h4>
+            <p>Nông dân cam kết mọi thông tin về ngày gieo cấy, liều lượng phân bón, danh mục thuốc BVTV và thời gian cách ly trước thu hoạch được ghi nhận trung thực. Dữ liệu khi đã đồng bộ lên sổ cái AgriChain sẽ không thể tẩy xóa.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">2. Tiêu chuẩn an toàn và mẫu đối chứng</h4>
+            <p>Tuân thủ cam kết về dư lượng theo chuẩn VietGAP/GlobalGAP. Chấp thuận cho đơn vị quản lý và bên thu mua lấy mẫu ngẫu nhiên tại ruộng để kiểm tra chéo với dữ liệu chuỗi khối.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">3. Quản lý mã lô hàng (Batch ID)</h4>
+            <p>Chỉ phát hành tem QR truy xuất cho đúng sản lượng và chủng loại cây trồng đã được đăng ký và xác nhận trên hệ thống.</p>
+          </div>
+        `,
+        },
+        transporter: {
+          key: "transporter",
+          name: "Bên vận chuyển",
+          title: "Vai trò: Đơn vị vận chuyển (Logistics / Cold-Chain)",
+          desc: "Chịu trách nhiệm bảo quản nông sản trong quá trình di chuyển, cập nhật lộ trình xe, giám sát nhiệt độ thùng hàng và ký xác nhận chuyển giao số.",
+          orgLabel:
+            'Tên Đơn vị Vận tải / Logistics <span class="text-red-500">*</span>',
+          orgPlaceholder: "VD: Công ty TNHH Vận tải Chuỗi Lạnh FastAgri",
+          dynamicLabel:
+            'Loại phương tiện & Tuyến vận chuyển chính <span class="text-red-500">*</span>',
+          dynamicPlaceholder:
+            "VD: 5 xe thùng lạnh chuyên dụng (2-5 tấn), tuyến Tây Bắc - Hà Nội",
+          termsTitle: "Quy định & Trách nhiệm: Đơn vị vận chuyển (Logistics)",
+          termsContent: `
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">1. Bảo đảm điều kiện bảo quản nhiệt độ</h4>
+            <p>Duy trì đúng dải nhiệt độ tiêu chuẩn (đặc biệt đối với chuỗi cung ứng lạnh). Không tự ý tắt thiết bị định vị và cảm biến nhiệt độ trong suốt hành trình.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">2. Nguyên vẹn niêm phong kiện hàng</h4>
+            <p>Không mở niêm phong hoặc thay đổi cơ cấu lô hàng sau khi đã ký xác nhận nhận hàng từ nông dân hoặc trạm thu gom.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">3. Ký biên bản giao nhận số (e-POD)</h4>
+            <p>Thực hiện thao tác quét mã và xác nhận chuyển giao ngay khi giao hàng cho điểm phân phối hoặc kho tiếp nhận.</p>
+          </div>
+        `,
+        },
+        distributor: {
+          key: "distributor",
+          name: "Bên phân phối",
+          title: "Vai trò: Bên phân phối (Siêu thị / Bán lẻ)",
+          desc: "Chịu trách nhiệm nghiệm thu hàng từ bên vận chuyển, bảo quản nông sản tại kệ hàng chuẩn quy định và công khai mã QR truy xuất tới tay người tiêu dùng.",
+          orgLabel:
+            'Tên Doanh nghiệp Phân phối / Chuỗi cửa hàng <span class="text-red-500">*</span>',
+          orgPlaceholder: "VD: Hệ thống Siêu thị Nông sản Sạch EcoMart",
+          dynamicLabel:
+            'Địa chỉ kho / Hệ thống cửa hàng tiêu thụ <span class="text-red-500">*</span>',
+          dynamicPlaceholder:
+            "VD: Kho tổng Cầu Giấy và chuỗi 6 cửa hàng tại Hà Nội",
+          termsTitle: "Quy định & Trách nhiệm: Bên phân phối (Distributor)",
+          termsContent: `
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">1. Nghiệm thu và kích hoạt mã phân phối</h4>
+            <p>Kiểm tra tình trạng seal niêm phong, quét mã QR nhận hàng trên ứng dụng để hoàn thành chu trình vận chuyển trước khi đưa lên quầy kệ.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">2. Chống trà trộn hàng không rõ nguồn gốc</h4>
+            <p>Cam kết chỉ dán và trưng bày mã QR AgriChain cho đúng lô hàng được ghi nhận từ hệ thống, tuyệt đối không trà trộn nông sản ngoài luồng.</p>
+          </div>
+          <div>
+            <h4 class="font-bold text-gray-900 text-xs uppercase mb-1">3. Hỗ trợ đối soát và phản hồi khách hàng</h4>
+            <p>Cung cấp nhật ký lưu kho và phối hợp giải quyết nhanh chóng khi người tiêu dùng quét mã và gửi phản ánh chất lượng.</p>
+          </div>
+        `,
+        },
+      };
+
+      let selectedActor = "farmer";
+
+      // Switch actor function
+      function setActor(key) {
+        selectedActor = key;
+        const data = actorData[key];
+
+        // Update button visual styles
+        ["farmer", "transporter", "distributor"].forEach((item) => {
+          const btn = document.getElementById(`actor-btn-${item}`);
+          if (item === key) {
+            btn.className =
+              "actor-tab flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border border-agri-800 bg-agri-50 text-agri-800 text-center font-semibold text-xs shadow-xs";
+          } else {
+            btn.className =
+              "actor-tab flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border border-gray-200 bg-white text-gray-600 hover:border-gray-300 text-center font-semibold text-xs transition";
+          }
+        });
+
+        // Update description box
+        document.getElementById("role-title").textContent = data.title;
+        document.getElementById("role-description").textContent = data.desc;
+        document.getElementById("role-terms-link-text").textContent =
+          `Xem chi tiết điều khoản & trách nhiệm của ${data.name}`;
+
+        // Update form dynamic labels & placeholders
+        document.getElementById("lbl-orgName").innerHTML = data.orgLabel;
+        document.getElementById("orgName").placeholder = data.orgPlaceholder;
+        document.getElementById("lbl-dynamicField").innerHTML =
+          data.dynamicLabel;
+        document.getElementById("dynamicInput").placeholder =
+          data.dynamicPlaceholder;
+        document.getElementById("lbl-checkbox-actor").textContent = data.name;
+      }
+
+      // Modal Handlers
+      function openTermsModal() {
+        const data = actorData[selectedActor];
+        document.getElementById("modalActorTitle").textContent =
+          data.termsTitle;
+        document.getElementById("modalTermsBody").innerHTML = data.termsContent;
+
+        const modal = document.getElementById("termsModal");
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      }
+
+      function closeTermsModal() {
+        const modal = document.getElementById("termsModal");
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+      }
+
+      function acceptTermsModal() {
+        document.getElementById("agreeCheckbox").checked = true;
+        closeTermsModal();
+      }
+
+      // Close when clicking modal backdrop
+      window.addEventListener("click", (e) => {
+        const termsModal = document.getElementById("termsModal");
+        if (e.target === termsModal) closeTermsModal();
+      });
+
+      // Form submission
+      function handleFormSubmit(e) {
+        e.preventDefault();
+        const current = actorData[selectedActor];
+
+        document.getElementById("successActorName").textContent = current.name;
+        const modal = document.getElementById("successModal");
+        modal.classList.remove("hidden");
+        modal.classList.add("flex");
+      }
+
+      function closeSuccessModal() {
+        document.getElementById("successModal").classList.add("hidden");
+        mockReturnLogin();
+      }
+
+      function mockReturnLogin(e) {
+        if (e) e.preventDefault();
+        // Toast notice redirecting back
+        const toast = document.createElement("div");
+        toast.className =
+          "fixed bottom-5 inset-x-0 mx-auto w-max max-w-xs px-4 py-2 bg-gray-900 text-white text-xs rounded-lg shadow-lg flex items-center gap-2 z-50";
+        toast.innerHTML = `<i class="fa-solid fa-arrow-left"></i><span>Đang chuyển hướng về <strong>Đăng nhập</strong>...</span>`;
+        document.body.appendChild(toast);
+        setTimeout(() => toast.remove(), 2000);
+      }
+
+      // Initialize default actor
+      document.addEventListener("DOMContentLoaded", () => {
+        setActor("farmer");
+      });
+    </script>
+  </body>
+</html>

@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 
 // đăng nhập
 import DangNhap from "./view/page/dangnhap";
+import Dangky from "./view/page/dangky";
 
 //nông dân
 import Nongdan from "./view/page/nongdan/nongdan";
@@ -35,6 +36,7 @@ const AppRoutes = () => {
     <Routes>
       {/* Đăng nhập*/}
       <Route path="/dang-nhap" element={<DangNhap />} />
+      <Route path="/dang-ky" element={<Dangky />} />
 
       {/* Nông Dân */}
       <Route path="/nong-dan" element={<Nongdan />} />

@@ -6,6 +6,7 @@ require("./config/db"); // nạp file để kết nối MySQL khi khởi động
 
 const authRoutes = require("./routes/authRoutes");
 const farmerRoutes = require("./routes/farmerRoutes");
+const registerRoutes = require("./routes/registerRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -20,6 +21,9 @@ app.get("/", (req, res) => {
 
 // Login
 app.use("/api", authRoutes);
+
+//resgister
+app.use("/api/register", registerRoutes);
 
 // Nông dân
 app.use("/api/farmer", farmerRoutes);

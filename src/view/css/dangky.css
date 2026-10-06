@@ -1,0 +1,477 @@
+/* Container bao bọc */
+.req-container {
+  min-height: 100vh;
+  background-color: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, sans-serif;
+  color: #1f2937;
+  box-sizing: border-box;
+}
+
+.req-container * {
+  box-sizing: border-box;
+}
+
+/* Card chính - Tăng max-width từ 580px lên 700px, padding dày dặn */
+.req-card {
+  width: 100%;
+  max-width: 700px;
+  background-color: #ffffff;
+  border-radius: 20px;
+  box-shadow:
+    0 12px 30px -5px rgba(0, 0, 0, 0.08),
+    0 8px 16px -6px rgba(0, 0, 0, 0.04);
+  padding: 2.75rem 2.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+/* Header */
+.req-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.req-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  background-color: #ecfdf5;
+  color: #166534;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.85rem;
+}
+
+.req-title {
+  font-size: 1.85rem; /* Chữ to rõ */
+  font-weight: 800;
+  color: #111827;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+}
+
+.req-subtitle {
+  font-size: 1rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* Chọn Actor */
+.req-actor-section {
+  margin-bottom: 1.5rem;
+}
+
+.req-label {
+  display: block;
+  font-size: 0.95rem; /* Nhãn to dễ đọc */
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 0.75rem;
+}
+
+.req-required {
+  color: #ef4444;
+}
+
+.req-actor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.req-actor-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.1rem 0.75rem;
+  background-color: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #4b5563;
+}
+
+.req-actor-btn:hover {
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+}
+
+.req-actor-btn.active {
+  border-color: #166534;
+  background-color: #f0fdf4;
+  color: #14532d;
+  box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.15);
+}
+
+.req-actor-btn .icon {
+  margin-bottom: 0.5rem;
+}
+
+.req-actor-btn.active .icon {
+  color: #166534;
+}
+
+.req-actor-btn span {
+  font-size: 0.95rem; /* Cỡ chữ tên vai trò */
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Hộp giải thích vai trò */
+.req-role-info {
+  background-color: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 14px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.req-role-title {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #14532d;
+  margin-bottom: 0.35rem;
+}
+
+.req-role-desc {
+  font-size: 0.9rem;
+  color: #166534;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.req-link-terms {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: #166534;
+  text-decoration: underline;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.req-link-terms:hover {
+  color: #052e16;
+}
+
+/* Các trường Form */
+.req-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.req-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.req-input-label {
+  display: block;
+  font-size: 0.925rem; /* Nhãn input to rõ */
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.req-input {
+  width: 100%;
+  padding: 0.75rem 1rem; /* Ô nhập cao, rộng rãi */
+  font-size: 1rem; /* Chữ gõ vào to rõ (16px) */
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: #111827;
+  outline: none;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.req-input:focus {
+  border-color: #166534;
+  box-shadow: 0 0 0 3.5px rgba(22, 101, 52, 0.15);
+}
+
+.req-input::placeholder {
+  color: #9ca3af;
+  font-size: 0.95rem;
+}
+
+/* Checkbox điều khoản */
+.req-terms-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 1.25rem 0 1.75rem 0;
+  cursor: pointer;
+}
+
+.req-terms-checkbox input[type="checkbox"] {
+  margin-top: 0.25rem;
+  accent-color: #166534;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.req-terms-checkbox span {
+  font-size: 0.925rem;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+/* Nút Submit */
+.req-submit-btn {
+  width: 100%;
+  padding: 0.95rem;
+  background-color: #166534;
+  color: #ffffff;
+  font-size: 1.05rem; /* Nút to nổi bật */
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    transform 0.1s;
+  box-shadow: 0 4px 10px rgba(22, 101, 52, 0.25);
+}
+
+.req-submit-btn:hover {
+  background-color: #14532d;
+}
+
+.req-submit-btn:active {
+  background-color: #052e16;
+  transform: translateY(1px);
+}
+
+/* Link quay lại */
+.req-footer-link {
+  text-align: center;
+  font-size: 0.925rem;
+  color: #6b7280;
+  margin-top: 1.25rem;
+}
+
+.req-footer-link a {
+  color: #166534;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.req-footer-link a:hover {
+  text-decoration: underline;
+}
+
+/* Thành công */
+.req-success-view {
+  text-align: center;
+  padding: 2.5rem 1rem;
+}
+
+.req-success-icon {
+  width: 76px;
+  height: 76px;
+  background-color: #dcfce7;
+  color: #15803d;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1.25rem auto;
+}
+
+.req-success-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 0.75rem;
+}
+
+.req-success-desc {
+  font-size: 1rem;
+  color: #4b5563;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+}
+
+.req-back-btn {
+  display: inline-block;
+  padding: 0.8rem 2rem;
+  background-color: #166534;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: background-color 0.2s;
+}
+
+.req-back-btn:hover {
+  background-color: #14532d;
+}
+
+/* Modal Popup - Tăng kích thước rộng hơn */
+.req-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background-color: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.req-modal-content {
+  background-color: #ffffff;
+  border-radius: 20px;
+  width: 100%;
+  max-width: 620px; /* Modal rộng hơn */
+  padding: 2rem;
+  box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.15);
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.req-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.req-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #111827;
+}
+
+.req-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.85rem;
+  line-height: 1;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+}
+
+.req-modal-close:hover {
+  color: #374151;
+}
+
+.req-modal-body {
+  margin: 1.25rem 0;
+  max-height: 320px;
+  overflow-y: auto;
+  font-size: 0.925rem;
+  color: #4b5563;
+  line-height: 1.6;
+}
+
+.req-terms-list {
+  padding-left: 1.5rem;
+  margin: 0.75rem 0;
+}
+
+.req-terms-list li {
+  margin-bottom: 0.6rem;
+}
+
+.req-modal-note {
+  background-color: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  padding: 0.85rem;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  margin-top: 1rem;
+}
+
+.req-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-secondary {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+  border: 1px solid #e5e7eb;
+  background-color: #ffffff;
+  color: #4b5563;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.btn-secondary:hover {
+  background-color: #f9fafb;
+}
+
+.btn-primary {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: none;
+  background-color: #166534;
+  color: #ffffff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background-color: #14532d;
+}
+
+/* Responsive khi xem trên điện thoại */
+@media (max-width: 640px) {
+  .req-card {
+    padding: 1.75rem 1.25rem;
+  }
+  .req-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .req-actor-grid {
+    grid-template-columns: 1fr;
+  }
+  .req-title {
+    font-size: 1.5rem;
+  }
+}
