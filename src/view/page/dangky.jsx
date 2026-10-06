@@ -30,8 +30,6 @@ const ACTOR_DATA = {
       "Chịu trách nhiệm hoàn toàn về tính xác thực của dữ liệu nhật ký khi ký số ghi lên chuỗi khối.",
       "Sẵn sàng đối soát mẫu thực địa khi có yêu cầu kiểm tra ngẫu nhiên từ hệ thống.",
     ],
-    fieldLabel: "Quy mô diện tích / Loại nông sản chính",
-    fieldPlaceholder: "VD: 3.5 ha - Xoài Cát Hòa Lộc",
   },
   TRANSPORTER: {
     id: "TRANSPORTER",
@@ -61,8 +59,6 @@ const ACTOR_DATA = {
       "Cập nhật đúng mốc thời gian giao nhận; báo cáo sự cố hư hại, chậm trễ tức thời.",
       "Chịu trách nhiệm bảo quản nguyên vẹn hàng hoá trong phạm vi phụ trách.",
     ],
-    fieldLabel: "Biển số xe / Phương tiện vận chuyển chính",
-    fieldPlaceholder: "VD: 65C-123.45 (Xe tải lạnh 2.5 tấn)",
   },
   DISTRIBUTOR: {
     id: "DISTRIBUTOR",
@@ -92,8 +88,6 @@ const ACTOR_DATA = {
       "Không tự ý làm giả, can thiệp hoặc thay thế nhãn mác truy xuất nguồn gốc.",
       "Phối hợp xử lý và thu hồi nhanh chóng lô hàng khi phát hiện vi phạm tiêu chuẩn an toàn.",
     ],
-    fieldLabel: "Loại hình điểm bán / Mã số thuế",
-    fieldPlaceholder: "VD: Hệ thống cửa hàng sạch / MST: 1801234567",
   },
 };
 
@@ -102,13 +96,14 @@ export const DangKy = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     fullName: "",
     phone: "",
     email: "",
     facilityName: "",
-    extraInfo: "",
+    address: "",
   });
 
   const currentActor = ACTOR_DATA[selectedRole];
@@ -119,50 +114,72 @@ export const DangKy = () => {
   };
 
   const handleSubmit = async (e) => {
-    console.log("123", selectedRole);
     e.preventDefault();
     if (
       !selectedRole ||
-      !formData.email ||
+      !formData.fullName ||
       !formData.phone ||
       !formData.email ||
       !formData.facilityName ||
-      !formData.extraInfo ||
-      !formData.fullName
+      !formData.address
     ) {
-      alert("thiếu thông tin ");
+      alert("Vui lòng điền đầy đủ các trường thông tin bắt buộc!");
       return;
     }
 
-    const fetyeucau = await fetch("http://localhost:3000/api/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-
-      body: JSON.stringify({
-        role: selectedRole,
-        dulieu: formData,
-      }),
-    });
-    const res = await fetyeucau.json();
-    console.log(res);
-
-    if (!res.ok) {
-      alert("có lỗi xảy ra vui lòng thử lại");
+    if (!agreedTerms) {
+      alert("Bạn cần đồng ý với các điều khoản trước khi gửi yêu cầu!");
+      return;
     }
-    // setSubmitted(true);
+
+    setIsSubmitting(true);
+    try {
+      const fetyeucau = await fetch("http://localhost:3000/api/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          role: selectedRole,
+          dulieu: formData,
+        }),
+      });
+      const res = await fetyeucau.json();
+
+      if (!res.ok) {
+        console.log(res);
+
+        alert("Có lỗi xảy ra, vui lòng thử lại!");
+        return;
+      }
+      setSubmitted(true);
+    } catch (error) {
+      console.error(error);
+      alert("Có lỗi kết nối đến máy chủ, vui lòng thử lại!");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="req-container">
       <div className="req-card">
-        {/* Header */}
+        {/* Header với Logo Badge nâng cấp */}
         <div className="req-header">
-          <div className="req-logo-badge">AG</div>
+          <div className="req-brand-wrapper">
+            <div className="req-logo-badge">
+              <img
+                src="https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png"
+                alt="AgriChain Logo"
+                className="req-logo-img"
+              />
+            </div>
+            <span className="req-system-tag">Hệ thống Chuỗi khối</span>
+          </div>
           <h1 className="req-title">Yêu Cầu Cấp Tài Khoản</h1>
           <p className="req-subtitle">
-            Hệ thống truy xuất nguồn gốc chuỗi khối AgriChain
+            Hệ thống truy xuất nguồn gốc nông sản chuẩn quốc gia{" "}
+            <strong>AgriChain</strong>
           </p>
         </div>
 
@@ -303,18 +320,17 @@ export const DangKy = () => {
               />
             </div>
 
-            {/* Trường linh hoạt theo Actor */}
+            {/* Ô Địa chỉ */}
             <div className="req-form-group">
               <label className="req-input-label">
-                {currentActor.fieldLabel}{" "}
-                <span className="req-required">*</span>
+                Địa chỉ hoạt động <span className="req-required">*</span>
               </label>
               <input
                 type="text"
-                name="extraInfo"
+                name="address"
                 required
-                placeholder={currentActor.fieldPlaceholder}
-                value={formData.extraInfo}
+                placeholder="VD: Số 123 Đường 3/2, P. Xuân Khánh, Q. Ninh Kiều, Cần Thơ"
+                value={formData.address}
                 onChange={handleInputChange}
                 className="req-input"
               />
@@ -342,8 +358,14 @@ export const DangKy = () => {
             </label>
 
             {/* Nút gửi */}
-            <button type="submit" className="req-submit-btn">
-              Gửi Yêu Cầu Cấp Tài Khoản
+            <button
+              type="submit"
+              className="req-submit-btn"
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? "Đang gửi yêu cầu..."
+                : "Gửi Yêu Cầu Cấp Tài Khoản"}
             </button>
 
             {/* Quay về đăng nhập */}

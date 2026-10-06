@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sơ đồ CSDL Truy Xuất Nông Sản (ERD Diagram)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      body {
+        background-color: #0b1120;
+        color: #e2e8f0;
+        user-select: none;
+        overflow: hidden;
+      }
+      .canvas-grid {
+        background-size: 24px 24px;
+        background-image: radial-gradient(
+          circle,
+          rgba(255, 255, 255, 0.08) 1px,
+          transparent 1px
+        );
+      }
+      .table-card {
+        position: absolute;
+        width: 290px;
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        font-size: 11px;
+        transition:
+          border-color 0.15s ease,
+          box-shadow 0.15s ease;
+      }
+      .mode-select .table-card {
+        cursor: grab;
+      }
+      .mode-select .table-card:active {
+        cursor: grabbing;
+      }
+      .mode-pan #viewport {
+        cursor: grab !important;
+      }
+      .mode-pan #viewport.is-dragging {
+        cursor: grabbing !important;
+      }
+      .table-card.active-table {
+        border-color: #38bdf8 !important;
+        box-shadow:
+          0 0 0 2px rgba(56, 189, 248, 0.5),
+          0 20px 25px -5px rgba(0, 0, 0, 0.7);
+        z-index: 40 !important;
+      }
+      .fk-line {
+        fill: none;
+        stroke-width: 2;
+        stroke: #64748b;
+        transition:
+          stroke 0.2s,
+          stroke-width 0.2s;
+      }
+      .fk-line.highlighted {
+        stroke: #38bdf8;
+        stroke-width: 3.5;
+        filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.7));
+      }
+      .field-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 3px 8px;
+        border-bottom: 1px solid #182234;
+      }
+      .field-row:hover {
+        background: rgba(255, 255, 255, 0.04);
+      }
+      .field-badge-pk {
+        background: #eab308;
+        color: #000;
+        font-weight: 700;
+        border-radius: 3px;
+        padding: 1px 4px;
+        font-size: 9px;
+      }
+      .field-badge-fk {
+        background: #0284c7;
+        color: #fff;
+        font-weight: 700;
+        border-radius: 3px;
+        padding: 1px 4px;
+        font-size: 9px;
+      }
+      .custom-scroll::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+      }
+      .custom-scroll::-webkit-scrollbar-thumb {
+        background: #475569;
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body class="h-screen w-screen flex flex-col font-sans mode-pan">
+    <!-- Header Bar -->
+    <header
+      class="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-50 shrink-0"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="w-8 h-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-base border border-emerald-500/30"
+        >
+          <i class="fa-solid fa-leaf"></i>
+        </div>
+        <div>
+          <h1
+            class="text-sm font-semibold tracking-wide text-slate-100 flex items-center gap-2"
+          >
+            DATABASE SCHEMA:
+            <span class="text-emerald-400 font-mono">truy_xuat_nong_san</span>
+          </h1>
+          <p class="text-[11px] text-slate-400">
+            11 Bảng • 14 Khóa ngoại (FK) • Chuỗi truy xuất lô & Blockchain
+            Outbox
+          </p>
+        </div>
+      </div>
+
+      <!-- Controls & Tool Modes -->
+      <div class="flex items-center gap-3">
+        <!-- Mode Toggle Buttons -->
+        <div
+          class="flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700"
+        >
+          <button
+            id="btnModePan"
+            class="px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition bg-indigo-600 text-white shadow"
+            title="Kéo sơ đồ qua lại"
+          >
+            <i class="fa-solid fa-hand"></i> Kéo sơ đồ (Pan)
+          </button>
+          <button
+            id="btnModeSelect"
+            class="px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition text-slate-300 hover:text-white"
+            title="Di chuyển vị trí từng bảng"
+          >
+            <i class="fa-solid fa-arrow-pointer"></i> Di chuyển bảng
+          </button>
+        </div>
+
+        <div class="h-5 w-[1px] bg-slate-700"></div>
+
+        <!-- Zoom Controls -->
+        <div
+          class="flex items-center bg-slate-800/90 rounded-lg p-0.5 border border-slate-700"
+        >
+          <button
+            id="btnZoomOut"
+            class="px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700 rounded transition"
+            title="Thu nhỏ"
+          >
+            <i class="fa-solid fa-minus text-xs"></i>
+          </button>
+          <span
+            id="zoomLabel"
+            class="text-xs font-mono px-2 text-slate-200 min-w-[50px] text-center"
+            >85%</span
+          >
+          <button
+            id="btnZoomIn"
+            class="px-2.5 py-1 text-slate-300 hover:text-white hover:bg-slate-700 rounded transition"
+            title="Phóng to"
+          >
+            <i class="fa-solid fa-plus text-xs"></i>
+          </button>
+          <button
+            id="btnFitCenter"
+            class="px-2.5 py-1 text-sky-400 hover:text-sky-300 hover:bg-slate-700 rounded transition ml-1 text-xs font-medium flex items-center gap-1"
+            title="Căn toàn bộ sơ đồ vào giữa màn hình"
+          >
+            <i class="fa-solid fa-compress"></i> Căn giữa
+          </button>
+        </div>
+
+        <!-- Action -->
+        <button
+          id="btnResetPositions"
+          class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
+        >
+          <i class="fa-solid fa-table-cells-large"></i> Sắp xếp lưới
+        </button>
+      </div>
+    </header>
+
+    <!-- Canvas Viewport -->
+    <main id="viewport" class="flex-1 relative overflow-hidden canvas-grid">
+      <div
+        id="canvas"
+        class="absolute inset-0 origin-top-left"
+        style="
+          width: 3200px;
+          height: 2400px;
+          transform: matrix(0.85, 0, 0, 0.85, 0, 0);
+        "
+      >
+        <!-- SVG Lines Canvas for FK Relations -->
+        <svg
+          id="svgCanvas"
+          class="absolute inset-0 pointer-events-none w-full h-full"
+          style="z-index: 10"
+        >
+          <defs>
+            <marker
+              id="arrow"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b" />
+            </marker>
+            <marker
+              id="arrow-active"
+              viewBox="0 0 10 10"
+              refX="8"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+            </marker>
+          </defs>
+        </svg>
+
+        <!-- Tables Layer -->
+        <div id="tablesLayer" class="absolute inset-0 z-20"></div>
+      </div>
+
+      <!-- Mode Floating Status -->
+      <div
+        class="absolute bottom-4 left-4 bg-slate-900/95 backdrop-blur border border-slate-700 rounded-lg px-3 py-2 text-[11px] text-slate-300 shadow-2xl flex items-center gap-3 z-50"
+      >
+        <div class="flex items-center gap-1.5">
+          <span
+            class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"
+          ></span>
+          <span id="statusModeText"
+            >Đang ở chế độ: <b>Kéo sơ đồ (Pan)</b> - Giữ chuột trái kéo tự
+            do.</span
+          >
+        </div>
+      </div>
+    </main>
+
+    <script>
+      // Database Schema Model
+      const DB_SCHEMA = {
+        tables: [
+          {
+            id: "nguoi_dung",
+            name: "nguoi_dung",
+            title: "Người Dùng (Tài Khoản)",
+            color: "border-sky-500",
+            headerBg: "bg-sky-950/80",
+            x: 40,
+            y: 40,
+            columns: [
+              { name: "ma_nguoi_dung", type: "varchar(50)", pk: true },
+              { name: "ho_ten", type: "varchar(150)", nullable: false },
+              { name: "ten_dang_nhap", type: "varchar(50)", uq: true },
+              { name: "mat_khau", type: "varchar(255)" },
+              { name: "vai_tro", type: "enum(ADMIN, FARMER...)" },
+              { name: "so_dien_thoai", type: "varchar(20)" },
+              { name: "trang_thai", type: "tinyint(1)", def: "1" },
+              { name: "created_at", type: "datetime" },
+              { name: "updated_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "yeu_cau_cap_tai_khoan",
+            name: "yeu_cau_cap_tai_khoan",
+            title: "Yêu Cầu Cấp Tài Khoản",
+            color: "border-amber-400",
+            headerBg: "bg-amber-950/80",
+            x: 40,
+            y: 400,
+            columns: [
+              { name: "ma_yeu_cau", type: "bigint(20) unsigned", pk: true },
+              { name: "vai_tro_yeu_cau", type: "enum('FARMER',...)" },
+              { name: "ho_ten", type: "varchar(150)" },
+              { name: "so_dien_thoai", type: "varchar(20)" },
+              { name: "email", type: "varchar(150)" },
+              { name: "ten_co_so", type: "varchar(255)" },
+              { name: "thong_tin_bo_sung", type: "text" },
+              { name: "cam_ket_dieu_khoan", type: "tinyint(1)", def: "1" },
+              {
+                name: "trang_thai_duyet",
+                type: "enum('PENDING',...)",
+                def: "'PENDING'",
+              },
+              { name: "ly_do_tu_choi", type: "text", nullable: true },
+              {
+                name: "nguoi_duyet_id",
+                type: "varchar(50)",
+                fk: "nguoi_dung.ma_nguoi_dung",
+                nullable: true,
+              },
+              { name: "thoi_diem_duyet", type: "datetime", nullable: true },
+              { name: "created_at", type: "datetime" },
+              { name: "updated_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "vi_blockchain",
+            name: "vi_blockchain",
+            title: "Ví Blockchain",
+            color: "border-purple-500",
+            headerBg: "bg-purple-950/80",
+            x: 40,
+            y: 840,
+            columns: [
+              { name: "dia_chi_vi", type: "char(42)", pk: true },
+              {
+                name: "ma_nguoi_dung",
+                type: "varchar(50)",
+                fk: "nguoi_dung.ma_nguoi_dung",
+                uq: true,
+              },
+              { name: "thoi_diem_dang_ky", type: "datetime" },
+              { name: "trang_thai", type: "tinyint(1)", def: "1" },
+            ],
+          },
+          {
+            id: "nong_trai",
+            name: "nong_trai",
+            title: "Nông Trại",
+            color: "border-emerald-500",
+            headerBg: "bg-emerald-950/80",
+            x: 400,
+            y: 40,
+            columns: [
+              { name: "ma_nong_trai", type: "varchar(50)", pk: true },
+              {
+                name: "ma_nguoi_dung",
+                type: "varchar(50)",
+                fk: "nguoi_dung.ma_nguoi_dung",
+              },
+              { name: "ten_nong_trai", type: "varchar(150)", nullable: false },
+              { name: "dia_diem_nong_trai", type: "varchar(255)" },
+              { name: "dien_tich_nong_trai", type: "decimal(12,2)" },
+              { name: "anh_nong_trai", type: "varchar(500)" },
+              { name: "trang_thai", type: "tinyint(1)", def: "1" },
+              { name: "created_at", type: "datetime" },
+              { name: "updated_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "thua_dat",
+            name: "thua_dat",
+            title: "Thửa Đất Canh Tác",
+            color: "border-emerald-600",
+            headerBg: "bg-emerald-950/60",
+            x: 400,
+            y: 400,
+            columns: [
+              { name: "ma_thua_dat", type: "varchar(50)", pk: true },
+              {
+                name: "ma_nong_trai",
+                type: "varchar(50)",
+                fk: "nong_trai.ma_nong_trai",
+              },
+              { name: "ten_thua_dat", type: "varchar(150)", nullable: false },
+              { name: "dien_tich", type: "decimal(12,2)" },
+              { name: "loai_dat", type: "varchar(100)" },
+              { name: "trang_thai", type: "enum(DAT_TRONG...)" },
+              { name: "created_at", type: "datetime" },
+              { name: "updated_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "mua_vu",
+            name: "mua_vu",
+            title: "Mùa Vụ Canh Tác",
+            color: "border-teal-500",
+            headerBg: "bg-teal-950/80",
+            x: 760,
+            y: 40,
+            columns: [
+              { name: "ma_mua_vu", type: "varchar(50)", pk: true },
+              {
+                name: "ma_nong_trai",
+                type: "varchar(50)",
+                fk: "nong_trai.ma_nong_trai",
+              },
+              {
+                name: "ma_thua_dat",
+                type: "varchar(50)",
+                fk: "thua_dat.ma_thua_dat",
+                nullable: true,
+              },
+              { name: "loai_cay_trong", type: "varchar(100)", nullable: false },
+              { name: "giong_cay", type: "varchar(100)" },
+              { name: "thua_dat", type: "varchar(100)" },
+              { name: "ngay_gieo_trong", type: "date" },
+              { name: "ngay_thu_hoach_du_kien", type: "date" },
+              { name: "trang_thai", type: "tinyint(1)", def: "1" },
+              { name: "created_at", type: "datetime" },
+              { name: "updated_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "san_pham_nong_san",
+            name: "san_pham_nong_san",
+            title: "Sản Phẩm Nông Sản",
+            color: "border-amber-500",
+            headerBg: "bg-amber-950/80",
+            x: 760,
+            y: 400,
+            columns: [
+              { name: "ma_san_pham", type: "varchar(50)", pk: true },
+              { name: "ten_san_pham", type: "varchar(150)", nullable: false },
+              { name: "loai_san_pham", type: "varchar(100)", nullable: false },
+              { name: "mo_ta_san_pham", type: "text" },
+              {
+                name: "don_vi_tinh_mac_dinh",
+                type: "varchar(30)",
+                nullable: false,
+              },
+              { name: "trang_thai", type: "tinyint(1)", def: "1" },
+              { name: "created_at", type: "datetime" },
+              { name: "updated_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "lo_nong_san",
+            name: "lo_nong_san",
+            title: "Lô Nông Sản (Trung Tâm)",
+            color: "border-emerald-400",
+            headerBg: "bg-emerald-900/90",
+            x: 1120,
+            y: 40,
+            columns: [
+              { name: "ma_lo_nong_san", type: "varchar(64)", pk: true },
+              {
+                name: "ma_mua_vu",
+                type: "varchar(50)",
+                fk: "mua_vu.ma_mua_vu",
+              },
+              {
+                name: "ma_san_pham",
+                type: "varchar(50)",
+                fk: "san_pham_nong_san.ma_san_pham",
+              },
+              {
+                name: "ma_nguoi_quan_ly",
+                type: "varchar(50)",
+                fk: "nguoi_dung.ma_nguoi_dung",
+              },
+              { name: "ngay_thu_hoach", type: "date" },
+              { name: "so_luong_hien_tai", type: "decimal(18,3)" },
+              { name: "don_vi_tinh", type: "varchar(30)" },
+              { name: "giai_doan_hien_tai", type: "enum('CREATED',...)" },
+              { name: "tinh_trang_su_dung", type: "enum('ACTIVE',...)" },
+              { name: "latest_event_sequence", type: "bigint(20) unsigned" },
+              { name: "latest_event_hash", type: "char(66)" },
+              { name: "blockchain_sync_status", type: "enum('QUEUED',...)" },
+              { name: "integrity_status", type: "enum('NOT_CHECKED',...)" },
+              { name: "created_at", type: "datetime" },
+              { name: "updated_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "quyen_thao_tac_lo",
+            name: "quyen_thao_tac_lo",
+            title: "Phân Quyền Thao Tác Lô",
+            color: "border-blue-500",
+            headerBg: "bg-blue-950/80",
+            x: 1120,
+            y: 530,
+            columns: [
+              { name: "ma_quyen", type: "bigint(20) unsigned", pk: true },
+              {
+                name: "ma_nguoi_dung",
+                type: "varchar(50)",
+                fk: "nguoi_dung.ma_nguoi_dung",
+              },
+              {
+                name: "ma_lo_nong_san",
+                type: "varchar(64)",
+                fk: "lo_nong_san.ma_lo_nong_san",
+              },
+              { name: "loai_quyen_duoc_cap", type: "enum('WRITE_EVENT',...)" },
+              { name: "trang_thai_quyen", type: "tinyint(1)", def: "1" },
+              { name: "thoi_diem_cap_quyen", type: "datetime" },
+            ],
+          },
+          {
+            id: "lien_ket_nguon_goc_lo",
+            name: "lien_ket_nguon_goc_lo",
+            title: "Liên Kết Nguồn Gốc (Tách/Gộp)",
+            color: "border-orange-500",
+            headerBg: "bg-orange-950/80",
+            x: 1480,
+            y: 40,
+            columns: [
+              { name: "ma_lien_ket", type: "varchar(64)", pk: true },
+              { name: "relation_group_id", type: "varchar(64)" },
+              {
+                name: "ma_lo_nguon",
+                type: "varchar(64)",
+                fk: "lo_nong_san.ma_lo_nong_san",
+              },
+              {
+                name: "ma_lo_duoc_tao_ra",
+                type: "varchar(64)",
+                fk: "lo_nong_san.ma_lo_nong_san",
+              },
+              {
+                name: "loai_lien_ket",
+                type: "enum('SPLIT','MERGE','TRANSFORM')",
+              },
+              { name: "so_luong_tham_gia", type: "decimal(18,3)" },
+              { name: "don_vi_tinh", type: "varchar(30)" },
+              { name: "thoi_diem_tao_lien_ket", type: "datetime" },
+            ],
+          },
+          {
+            id: "lich_su_truy_xuat_lo",
+            name: "lich_su_truy_xuat_lo",
+            title: "Lịch Sử Sự Kiện Truy Xuất",
+            color: "border-violet-500",
+            headerBg: "bg-violet-950/80",
+            x: 1480,
+            y: 380,
+            columns: [
+              { name: "ma_lich_su", type: "varchar(64)", pk: true },
+              {
+                name: "ma_lo_nong_san",
+                type: "varchar(64)",
+                fk: "lo_nong_san.ma_lo_nong_san",
+              },
+              {
+                name: "ma_nguoi_dung",
+                type: "varchar(50)",
+                fk: "nguoi_dung.ma_nguoi_dung",
+              },
+              { name: "so_thu_tu_su_kien", type: "bigint(20) unsigned" },
+              { name: "loai_hoat_dong", type: "enum('HARVEST_CONFIRMED',...)" },
+              { name: "thoi_diem_xay_ra", type: "datetime(3)" },
+              { name: "du_lieu_chi_tiet", type: "longtext JSON" },
+              { name: "ma_bam_du_lieu", type: "char(66)" },
+              { name: "ma_bam_su_kien_truoc", type: "char(66)" },
+              { name: "ma_bam_su_kien_hien_tai", type: "char(66)", uq: true },
+              { name: "ma_giao_dich_blockchain", type: "char(66)" },
+              { name: "blockchain_sync_status", type: "enum('QUEUED',...)" },
+              { name: "integrity_status", type: "enum('NOT_CHECKED',...)" },
+              { name: "created_at", type: "datetime" },
+            ],
+          },
+          {
+            id: "blockchain_outbox",
+            name: "blockchain_outbox",
+            title: "Hàng Đợi Blockchain Outbox",
+            color: "border-pink-500",
+            headerBg: "bg-pink-950/80",
+            x: 1840,
+            y: 380,
+            columns: [
+              { name: "outbox_id", type: "bigint(20) unsigned", pk: true },
+              {
+                name: "event_id",
+                type: "varchar(64)",
+                fk: "lich_su_truy_xuat_lo.ma_lich_su",
+                uq: true,
+              },
+              {
+                name: "aggregate_type",
+                type: "enum('BATCH','TRACE_EVENT',...)",
+              },
+              { name: "aggregate_id", type: "varchar(64)" },
+              { name: "payload", type: "longtext JSON" },
+              { name: "status", type: "enum('QUEUED','SUBMITTED'...)" },
+              { name: "retry_count", type: "int(10) unsigned" },
+              { name: "next_retry_at", type: "datetime" },
+              { name: "last_error", type: "text" },
+              { name: "tx_hash", type: "char(66)" },
+              { name: "created_at", type: "datetime" },
+              { name: "submitted_at", type: "datetime" },
+              { name: "confirmed_at", type: "datetime" },
+            ],
+          },
+        ],
+        relations: [
+          {
+            from: "yeu_cau_cap_tai_khoan",
+            fromCol: "nguoi_duyet_id",
+            to: "nguoi_dung",
+            toCol: "ma_nguoi_dung",
+            name: "fk_yeu_cau_nguoi_duyet",
+          },
+          {
+            from: "vi_blockchain",
+            fromCol: "ma_nguoi_dung",
+            to: "nguoi_dung",
+            toCol: "ma_nguoi_dung",
+            name: "fk_vi_blockchain_nguoi_dung",
+          },
+          {
+            from: "nong_trai",
+            fromCol: "ma_nguoi_dung",
+            to: "nguoi_dung",
+            toCol: "ma_nguoi_dung",
+            name: "fk_nong_trai_nguoi_dung",
+          },
+          {
+            from: "thua_dat",
+            fromCol: "ma_nong_trai",
+            to: "nong_trai",
+            toCol: "ma_nong_trai",
+            name: "fk_thua_dat_nong_trai",
+          },
+          {
+            from: "mua_vu",
+            fromCol: "ma_nong_trai",
+            to: "nong_trai",
+            toCol: "ma_nong_trai",
+            name: "fk_mua_vu_nong_trai",
+          },
+          {
+            from: "mua_vu",
+            fromCol: "ma_thua_dat",
+            to: "thua_dat",
+            toCol: "ma_thua_dat",
+            name: "fk_mua_vu_thua_dat",
+          },
+          {
+            from: "lo_nong_san",
+            fromCol: "ma_mua_vu",
+            to: "mua_vu",
+            toCol: "ma_mua_vu",
+            name: "fk_lo_nong_san_mua_vu",
+          },
+          {
+            from: "lo_nong_san",
+            fromCol: "ma_san_pham",
+            to: "san_pham_nong_san",
+            toCol: "ma_san_pham",
+            name: "fk_lo_nong_san_san_pham",
+          },
+          {
+            from: "lo_nong_san",
+            fromCol: "ma_nguoi_quan_ly",
+            to: "nguoi_dung",
+            toCol: "ma_nguoi_dung",
+            name: "fk_lo_nong_san_nguoi_quan_ly",
+          },
+          {
+            from: "quyen_thao_tac_lo",
+            fromCol: "ma_nguoi_dung",
+            to: "nguoi_dung",
+            toCol: "ma_nguoi_dung",
+            name: "fk_quyen_nguoi_dung",
+          },
+          {
+            from: "quyen_thao_tac_lo",
+            fromCol: "ma_lo_nong_san",
+            to: "lo_nong_san",
+            toCol: "ma_lo_nong_san",
+            name: "fk_quyen_lo_nong_san",
+          },
+          {
+            from: "lien_ket_nguon_goc_lo",
+            fromCol: "ma_lo_nguon",
+            to: "lo_nong_san",
+            toCol: "ma_lo_nong_san",
+            name: "fk_lien_ket_lo_nguon",
+          },
+          {
+            from: "lien_ket_nguon_goc_lo",
+            fromCol: "ma_lo_duoc_tao_ra",
+            to: "lo_nong_san",
+            toCol: "ma_lo_nong_san",
+            name: "fk_lien_ket_lo_duoc_tao_ra",
+          },
+          {
+            from: "lich_su_truy_xuat_lo",
+            fromCol: "ma_lo_nong_san",
+            to: "lo_nong_san",
+            toCol: "ma_lo_nong_san",
+            name: "fk_lich_su_lo_nong_san",
+          },
+          {
+            from: "lich_su_truy_xuat_lo",
+            fromCol: "ma_nguoi_dung",
+            to: "nguoi_dung",
+            toCol: "ma_nguoi_dung",
+            name: "fk_lich_su_nguoi_dung",
+          },
+          {
+            from: "blockchain_outbox",
+            fromCol: "event_id",
+            to: "lich_su_truy_xuat_lo",
+            toCol: "ma_lich_su",
+            name: "fk_blockchain_outbox_event",
+          },
+        ],
+      };
+
+      // State
+      let currentMode = "pan"; // "pan" | "select"
+      let zoom = 0.65;
+      let panX = 60;
+      let panY = 40;
+      let isPanning = false;
+      let startMouseX = 0;
+      let startMouseY = 0;
+      let startPanX = 0;
+      let startPanY = 0;
+
+      let draggedTable = null;
+      let dragStartX = 0;
+      let dragStartY = 0;
+      let tableOrigX = 0;
+      let tableOrigY = 0;
+      let activeTableId = null;
+
+      const viewport = document.getElementById("viewport");
+      const canvas = document.getElementById("canvas");
+      const tablesLayer = document.getElementById("tablesLayer");
+      const svgCanvas = document.getElementById("svgCanvas");
+      const zoomLabel = document.getElementById("zoomLabel");
+      const btnModePan = document.getElementById("btnModePan");
+      const btnModeSelect = document.getElementById("btnModeSelect");
+      const statusModeText = document.getElementById("statusModeText");
+
+      function setMode(mode) {
+        currentMode = mode;
+        document.body.className = `h-screen w-screen flex flex-col font-sans mode-${mode}`;
+        if (mode === "pan") {
+          btnModePan.className =
+            "px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition bg-indigo-600 text-white shadow";
+          btnModeSelect.className =
+            "px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition text-slate-300 hover:text-white";
+          statusModeText.innerHTML =
+            "Đang ở chế độ: <b>Kéo sơ đồ (Pan)</b> - Giữ chuột trái kéo qua lại.";
+        } else {
+          btnModeSelect.className =
+            "px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition bg-indigo-600 text-white shadow";
+          btnModePan.className =
+            "px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition text-slate-300 hover:text-white";
+          statusModeText.innerHTML =
+            "Đang ở chế độ: <b>Di chuyển bảng</b> - Nhấp giữ vào thanh tiêu đề bảng để dời chỗ.";
+        }
+      }
+
+      btnModePan.addEventListener("click", () => setMode("pan"));
+      btnModeSelect.addEventListener("click", () => setMode("select"));
+
+      function updateTransform() {
+        canvas.style.transform = `matrix(${zoom}, 0, 0, ${zoom}, ${panX}, ${panY})`;
+        zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
+      }
+
+      // Auto Center & Fit Schema on screen
+      function fitCenter() {
+        const vWidth = viewport.clientWidth;
+        const vHeight = viewport.clientHeight;
+
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+        DB_SCHEMA.tables.forEach((t) => {
+          const el = document.getElementById(`tbl-${t.id}`);
+          const w = el ? el.offsetWidth : 290;
+          const h = el ? el.offsetHeight : 300;
+          minX = Math.min(minX, t.x);
+          minY = Math.min(minY, t.y);
+          maxX = Math.max(maxX, t.x + w);
+          maxY = Math.max(maxY, t.y + h);
+        });
+
+        const schemaWidth = maxX - minX + 120;
+        const schemaHeight = maxY - minY + 120;
+
+        const scaleX = vWidth / schemaWidth;
+        const scaleY = vHeight / schemaHeight;
+        zoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.35), 1.0);
+
+        panX = (vWidth - (maxX + minX) * zoom) / 2;
+        panY = (vHeight - (maxY + minY) * zoom) / 2;
+
+        updateTransform();
+      }
+
+      // Render Tables
+      function renderTables() {
+        tablesLayer.innerHTML = "";
+        DB_SCHEMA.tables.forEach((table) => {
+          const card = document.createElement("div");
+          card.id = `tbl-${table.id}`;
+          card.className = `table-card ${table.color}`;
+          card.style.left = `${table.x}px`;
+          card.style.top = `${table.y}px`;
+
+          let colsHtml = table.columns
+            .map((col) => {
+              let badge = "";
+              if (col.pk)
+                badge = `<span class="field-badge-pk" title="Primary Key">PK</span>`;
+              else if (col.fk)
+                badge = `<span class="field-badge-fk" title="Foreign Key">FK</span>`;
+              else if (col.uq)
+                badge = `<span class="bg-indigo-500/30 text-indigo-300 font-semibold px-1 rounded text-[9px]">UQ</span>`;
+
+              return `
+            <div class="field-row font-mono">
+              <div class="flex items-center gap-1.5 overflow-hidden">
+                ${badge}
+                <span class="${col.pk ? "text-amber-300 font-bold" : col.fk ? "text-sky-300" : "text-slate-200"} truncate">
+                  ${col.name}
+                </span>
+              </div>
+              <span class="text-[10px] text-slate-400 font-sans tracking-tight ml-2 shrink-0">${col.type}</span>
+            </div>
+          `;
+            })
+            .join("");
+
+          card.innerHTML = `
+          <div class="table-header px-3 py-2 rounded-t-[7px] border-b border-slate-700/80 flex items-center justify-between ${table.headerBg} cursor-pointer">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-table text-slate-400 text-xs"></i>
+              <div class="font-bold text-white tracking-wide font-mono text-[12px]">${table.name}</div>
+            </div>
+            <span class="text-[10px] text-slate-400 font-sans bg-slate-900/60 px-1.5 py-0.5 rounded border border-slate-700/50">${table.title}</span>
+          </div>
+          <div class="max-h-[300px] overflow-y-auto custom-scroll bg-slate-900/80">
+            ${colsHtml}
+          </div>
+        `;
+
+          // Card Click / Drag events
+          card.addEventListener("mousedown", (e) => {
+            if (currentMode === "select" && e.button === 0) {
+              draggedTable = table;
+              dragStartX = e.clientX;
+              dragStartY = e.clientY;
+              tableOrigX = table.x;
+              tableOrigY = table.y;
+              setActiveTable(table.id);
+              e.stopPropagation();
+            } else {
+              setActiveTable(table.id);
+            }
+          });
+
+          tablesLayer.appendChild(card);
+        });
+
+        renderConnections();
+      }
+
+      function setActiveTable(tableId) {
+        activeTableId = tableId;
+        document.querySelectorAll(".table-card").forEach((el) => {
+          if (el.id === `tbl-${tableId}`) {
+            el.classList.add("active-table");
+          } else {
+            el.classList.remove("active-table");
+          }
+        });
+        renderConnections();
+      }
+
+      function getTableAnchor(tableId, targetCenter) {
+        const el = document.getElementById(`tbl-${tableId}`);
+        if (!el) return { x: 0, y: 0 };
+        const table = DB_SCHEMA.tables.find((t) => t.id === tableId);
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        const x = table.x;
+        const y = table.y;
+        const center = { x: x + w / 2, y: y + h / 2 };
+
+        if (targetCenter.x > center.x) {
+          return {
+            x: x + w,
+            y: Math.min(Math.max(targetCenter.y, y + 25), y + h - 15),
+          };
+        } else {
+          return {
+            x: x,
+            y: Math.min(Math.max(targetCenter.y, y + 25), y + h - 15),
+          };
+        }
+      }
+
+      function renderConnections() {
+        while (svgCanvas.lastChild && svgCanvas.lastChild.nodeName === "path") {
+          svgCanvas.removeChild(svgCanvas.lastChild);
+        }
+
+        DB_SCHEMA.relations.forEach((rel) => {
+          const fromT = DB_SCHEMA.tables.find((t) => t.id === rel.from);
+          const toT = DB_SCHEMA.tables.find((t) => t.id === rel.to);
+          if (!fromT || !toT) return;
+
+          const fromEl = document.getElementById(`tbl-${fromT.id}`);
+          const toEl = document.getElementById(`tbl-${toT.id}`);
+          if (!fromEl || !toEl) return;
+
+          const toCenter = {
+            x: toT.x + toEl.offsetWidth / 2,
+            y: toT.y + toEl.offsetHeight / 2,
+          };
+          const fromCenter = {
+            x: fromT.x + fromEl.offsetWidth / 2,
+            y: fromT.y + fromEl.offsetHeight / 2,
+          };
+
+          const start = getTableAnchor(fromT.id, toCenter);
+          const end = getTableAnchor(toT.id, fromCenter);
+
+          const dx = Math.abs(end.x - start.x) * 0.5 + 40;
+          const cp1x = start.x > end.x ? start.x - dx : start.x + dx;
+          const cp1y = start.y;
+          const cp2x = end.x > start.x ? end.x - dx : end.x + dx;
+          const cp2y = end.y;
+
+          const path = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path",
+          );
+          const isHighlighted =
+            activeTableId === rel.from || activeTableId === rel.to;
+
+          path.setAttribute(
+            "d",
+            `M ${start.x} ${start.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${end.x} ${end.y}`,
+          );
+          path.setAttribute(
+            "class",
+            `fk-line ${isHighlighted ? "highlighted" : ""}`,
+          );
+          path.setAttribute(
+            "marker-end",
+            isHighlighted ? "url(#arrow-active)" : "url(#arrow)",
+          );
+
+          const titleEl = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "title",
+          );
+          titleEl.textContent = `${rel.name}: ${rel.from}.${rel.fromCol} -> ${rel.to}.${rel.toCol}`;
+          path.appendChild(titleEl);
+
+          svgCanvas.appendChild(path);
+        });
+      }
+
+      // Viewport Pan Events (Global Pan support)
+      viewport.addEventListener("mousedown", (e) => {
+        if (
+          currentMode === "pan" ||
+          e.button === 1 ||
+          e.target.id === "viewport" ||
+          e.target.id === "canvas"
+        ) {
+          isPanning = true;
+          startMouseX = e.clientX;
+          startMouseY = e.clientY;
+          startPanX = panX;
+          startPanY = panY;
+          viewport.classList.add("is-dragging");
+          e.preventDefault();
+        }
+      });
+
+      window.addEventListener("mousemove", (e) => {
+        if (isPanning) {
+          panX = startPanX + (e.clientX - startMouseX);
+          panY = startPanY + (e.clientY - startMouseY);
+          updateTransform();
+        } else if (draggedTable) {
+          const deltaX = (e.clientX - dragStartX) / zoom;
+          const deltaY = (e.clientY - dragStartY) / zoom;
+          draggedTable.x = Math.max(10, tableOrigX + deltaX);
+          draggedTable.y = Math.max(10, tableOrigY + deltaY);
+
+          const card = document.getElementById(`tbl-${draggedTable.id}`);
+          if (card) {
+            card.style.left = `${draggedTable.x}px`;
+            card.style.top = `${draggedTable.y}px`;
+          }
+          renderConnections();
+        }
+      });
+
+      window.addEventListener("mouseup", () => {
+        isPanning = false;
+        draggedTable = null;
+        viewport.classList.remove("is-dragging");
+      });
+
+      // Zoom on wheel
+      viewport.addEventListener(
+        "wheel",
+        (e) => {
+          e.preventDefault();
+          const zoomFactor = 1.1;
+          const oldZoom = zoom;
+
+          if (e.deltaY < 0) {
+            zoom = Math.min(zoom * zoomFactor, 2.0);
+          } else {
+            zoom = Math.max(zoom / zoomFactor, 0.3);
+          }
+
+          const rect = viewport.getBoundingClientRect();
+          const mouseX = e.clientX - rect.left;
+          const mouseY = e.clientY - rect.top;
+
+          panX = mouseX - (mouseX - panX) * (zoom / oldZoom);
+          panY = mouseY - (mouseY - panY) * (zoom / oldZoom);
+
+          updateTransform();
+        },
+        { passive: false },
+      );
+
+      // Buttons
+      document.getElementById("btnZoomIn").addEventListener("click", () => {
+        zoom = Math.min(zoom * 1.2, 2.0);
+        updateTransform();
+      });
+      document.getElementById("btnZoomOut").addEventListener("click", () => {
+        zoom = Math.max(zoom / 1.2, 0.3);
+        updateTransform();
+      });
+      document
+        .getElementById("btnFitCenter")
+        .addEventListener("click", fitCenter);
+
+      // Reset to neat Grid
+      document
+        .getElementById("btnResetPositions")
+        .addEventListener("click", () => {
+          const grid = {
+            nguoi_dung: { x: 50, y: 50 },
+            yeu_cau_cap_tai_khoan: { x: 50, y: 400 },
+            vi_blockchain: { x: 50, y: 840 },
+            nong_trai: { x: 400, y: 50 },
+            thua_dat: { x: 400, y: 400 },
+            mua_vu: { x: 750, y: 50 },
+            san_pham_nong_san: { x: 750, y: 400 },
+            lo_nong_san: { x: 1100, y: 50 },
+            quyen_thao_tac_lo: { x: 1100, y: 540 },
+            lien_ket_nguon_goc_lo: { x: 1450, y: 50 },
+            lich_su_truy_xuat_lo: { x: 1450, y: 390 },
+            blockchain_outbox: { x: 1800, y: 390 },
+          };
+
+          DB_SCHEMA.tables.forEach((t) => {
+            if (grid[t.id]) {
+              t.x = grid[t.id].x;
+              t.y = grid[t.id].y;
+              const card = document.getElementById(`tbl-${t.id}`);
+              if (card) {
+                card.style.left = `${t.x}px`;
+                card.style.top = `${t.y}px`;
+              }
+            }
+          });
+          renderConnections();
+          fitCenter();
+        });
+
+      // Deselect active table on blank click
+      viewport.addEventListener("click", (e) => {
+        if (e.target.id === "viewport" || e.target.id === "canvas") {
+          setActiveTable(null);
+        }
+      });
+
+      // Start
+      renderTables();
+      setTimeout(fitCenter, 100);
+    </script>
+  </body>
+</html>
