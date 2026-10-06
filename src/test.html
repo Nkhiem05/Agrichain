@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sơ đồ CSDL Truy Xuất Nông Sản (ERD Diagram)</title>
+    <title>Sơ đồ CSDL Truy Xuất Nông Sản (12 Bảng - ERD)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
       rel="stylesheet"
@@ -26,7 +26,7 @@
       }
       .table-card {
         position: absolute;
-        width: 290px;
+        width: 300px;
         background: #1e293b;
         border: 1px solid #334155;
         border-radius: 8px;
@@ -123,8 +123,8 @@
             <span class="text-emerald-400 font-mono">truy_xuat_nong_san</span>
           </h1>
           <p class="text-[11px] text-slate-400">
-            11 Bảng • 14 Khóa ngoại (FK) • Chuỗi truy xuất lô & Blockchain
-            Outbox
+            12 Bảng • 16 Khóa ngoại (FK) • Tích hợp Cơ quan kiểm định &
+            Blockchain Outbox
           </p>
         </div>
       </div>
@@ -179,7 +179,7 @@
           <button
             id="btnFitCenter"
             class="px-2.5 py-1 text-sky-400 hover:text-sky-300 hover:bg-slate-700 rounded transition ml-1 text-xs font-medium flex items-center gap-1"
-            title="Căn toàn bộ sơ đồ vào giữa màn hình"
+            title="Căn giữa toàn bộ sơ đồ"
           >
             <i class="fa-solid fa-compress"></i> Căn giữa
           </button>
@@ -201,8 +201,8 @@
         id="canvas"
         class="absolute inset-0 origin-top-left"
         style="
-          width: 3200px;
-          height: 2400px;
+          width: 3600px;
+          height: 2600px;
           transform: matrix(0.85, 0, 0, 0.85, 0, 0);
         "
       >
@@ -259,7 +259,7 @@
     </main>
 
     <script>
-      // Database Schema Model
+      // Database Schema Model cập nhật từ truy_xuat_nong_san_2.sql
       const DB_SCHEMA = {
         tables: [
           {
@@ -275,7 +275,10 @@
               { name: "ho_ten", type: "varchar(150)", nullable: false },
               { name: "ten_dang_nhap", type: "varchar(50)", uq: true },
               { name: "mat_khau", type: "varchar(255)" },
-              { name: "vai_tro", type: "enum(ADMIN, FARMER...)" },
+              {
+                name: "vai_tro",
+                type: "enum(ADMIN, FARMER_COOP, CERT_AUTHORITY...)",
+              },
               { name: "so_dien_thoai", type: "varchar(20)" },
               { name: "trang_thai", type: "tinyint(1)", def: "1" },
               { name: "created_at", type: "datetime" },
@@ -289,20 +292,19 @@
             color: "border-amber-400",
             headerBg: "bg-amber-950/80",
             x: 40,
-            y: 400,
+            y: 380,
             columns: [
               { name: "ma_yeu_cau", type: "bigint(20) unsigned", pk: true },
-              { name: "vai_tro_yeu_cau", type: "enum('FARMER',...)" },
+              { name: "vai_tro_yeu_cau", type: "enum('FARMER_COOP',...)" },
               { name: "ho_ten", type: "varchar(150)" },
               { name: "so_dien_thoai", type: "varchar(20)" },
               { name: "email", type: "varchar(150)" },
               { name: "ten_co_so", type: "varchar(255)" },
+              { name: "dia_chi", type: "varchar(255)" },
               { name: "thong_tin_bo_sung", type: "text" },
-              { name: "cam_ket_dieu_khoan", type: "tinyint(1)", def: "1" },
               {
                 name: "trang_thai_duyet",
-                type: "enum('PENDING',...)",
-                def: "'PENDING'",
+                type: "enum('PENDING','APPROVED','REJECTED')",
               },
               { name: "ly_do_tu_choi", type: "text", nullable: true },
               {
@@ -378,7 +380,10 @@
               { name: "ten_thua_dat", type: "varchar(150)", nullable: false },
               { name: "dien_tich", type: "decimal(12,2)" },
               { name: "loai_dat", type: "varchar(100)" },
-              { name: "trang_thai", type: "enum(DAT_TRONG...)" },
+              {
+                name: "trang_thai",
+                type: "enum('DAT_TRONG','DANG_CANH_TAC','TAM_NGUNG')",
+              },
               { name: "created_at", type: "datetime" },
               { name: "updated_at", type: "datetime" },
             ],
@@ -465,8 +470,14 @@
               { name: "ngay_thu_hoach", type: "date" },
               { name: "so_luong_hien_tai", type: "decimal(18,3)" },
               { name: "don_vi_tinh", type: "varchar(30)" },
-              { name: "giai_doan_hien_tai", type: "enum('CREATED',...)" },
-              { name: "tinh_trang_su_dung", type: "enum('ACTIVE',...)" },
+              {
+                name: "giai_doan_hien_tai",
+                type: "enum('CREATED','HARVESTED',...)",
+              },
+              {
+                name: "tinh_trang_su_dung",
+                type: "enum('ACTIVE','CONSUMED_BY_SPLIT',...)",
+              },
               { name: "latest_event_sequence", type: "bigint(20) unsigned" },
               { name: "latest_event_hash", type: "char(66)" },
               { name: "blockchain_sync_status", type: "enum('QUEUED',...)" },
@@ -495,9 +506,56 @@
                 type: "varchar(64)",
                 fk: "lo_nong_san.ma_lo_nong_san",
               },
-              { name: "loai_quyen_duoc_cap", type: "enum('WRITE_EVENT',...)" },
+              {
+                name: "loai_quyen_duoc_cap",
+                type: "enum('WRITE_EVENT','TRANSFER','LINK_RELATION')",
+              },
               { name: "trang_thai_quyen", type: "tinyint(1)", def: "1" },
               { name: "thoi_diem_cap_quyen", type: "datetime" },
+            ],
+          },
+          {
+            id: "kiem_dinh_lo_hang",
+            name: "kiem_dinh_lo_hang",
+            title: "Kiểm Định & Chứng Nhận",
+            color: "border-cyan-400",
+            headerBg: "bg-cyan-950/90",
+            x: 1480,
+            y: 40,
+            columns: [
+              { name: "ma_kiem_dinh", type: "varchar(64)", pk: true },
+              { name: "ma_ho_so", type: "varchar(50)", uq: true },
+              {
+                name: "ma_lo_nong_san",
+                type: "varchar(64)",
+                fk: "lo_nong_san.ma_lo_nong_san",
+              },
+              {
+                name: "ma_co_quan",
+                type: "varchar(50)",
+                fk: "nguoi_dung.ma_nguoi_dung",
+              },
+              {
+                name: "tieu_chuan_dang_ky",
+                type: "enum('VIETGAP','GLOBALGAP','ORGANIC')",
+              },
+              { name: "noi_dung_de_nghi", type: "text" },
+              { name: "ngay_hen_lay_mau", type: "date" },
+              { name: "gio_hen_lay_mau", type: "time" },
+              { name: "kiem_dinh_vien", type: "varchar(150)" },
+              { name: "ma_niem_phong", type: "varchar(100)" },
+              { name: "khoi_luong_mau", type: "varchar(50)" },
+              { name: "chi_so_xet_nghiem", type: "longtext JSON" },
+              { name: "so_chung_nhan", type: "varchar(100)" },
+              {
+                name: "ket_luan",
+                type: "enum('PENDING','PASSED','FAILED','REVOKED')",
+              },
+              {
+                name: "trang_thai_ho_so",
+                type: "enum('CHO_TIEP_NHAN','DA_HEN_LICH',...)",
+              },
+              { name: "created_at", type: "datetime" },
             ],
           },
           {
@@ -507,7 +565,7 @@
             color: "border-orange-500",
             headerBg: "bg-orange-950/80",
             x: 1480,
-            y: 40,
+            y: 530,
             columns: [
               { name: "ma_lien_ket", type: "varchar(64)", pk: true },
               { name: "relation_group_id", type: "varchar(64)" },
@@ -536,8 +594,8 @@
             title: "Lịch Sử Sự Kiện Truy Xuất",
             color: "border-violet-500",
             headerBg: "bg-violet-950/80",
-            x: 1480,
-            y: 380,
+            x: 1840,
+            y: 40,
             columns: [
               { name: "ma_lich_su", type: "varchar(64)", pk: true },
               {
@@ -551,7 +609,10 @@
                 fk: "nguoi_dung.ma_nguoi_dung",
               },
               { name: "so_thu_tu_su_kien", type: "bigint(20) unsigned" },
-              { name: "loai_hoat_dong", type: "enum('HARVEST_CONFIRMED',...)" },
+              {
+                name: "loai_hoat_dong",
+                type: "enum('HARVEST_CONFIRMED',...,'CERTIFICATE_ISSUED')",
+              },
               { name: "thoi_diem_xay_ra", type: "datetime(3)" },
               { name: "du_lieu_chi_tiet", type: "longtext JSON" },
               { name: "ma_bam_du_lieu", type: "char(66)" },
@@ -570,7 +631,7 @@
             color: "border-pink-500",
             headerBg: "bg-pink-950/80",
             x: 1840,
-            y: 380,
+            y: 530,
             columns: [
               { name: "outbox_id", type: "bigint(20) unsigned", pk: true },
               {
@@ -581,11 +642,14 @@
               },
               {
                 name: "aggregate_type",
-                type: "enum('BATCH','TRACE_EVENT',...)",
+                type: "enum('BATCH','TRACE_EVENT','BATCH_RELATION')",
               },
               { name: "aggregate_id", type: "varchar(64)" },
               { name: "payload", type: "longtext JSON" },
-              { name: "status", type: "enum('QUEUED','SUBMITTED'...)" },
+              {
+                name: "status",
+                type: "enum('QUEUED','SUBMITTED','CONFIRMED','FAILED')",
+              },
               { name: "retry_count", type: "int(10) unsigned" },
               { name: "next_retry_at", type: "datetime" },
               { name: "last_error", type: "text" },
@@ -675,6 +739,20 @@
             name: "fk_quyen_lo_nong_san",
           },
           {
+            from: "kiem_dinh_lo_hang",
+            fromCol: "ma_lo_nong_san",
+            to: "lo_nong_san",
+            toCol: "ma_lo_nong_san",
+            name: "fk_kd_lo_nong_san",
+          },
+          {
+            from: "kiem_dinh_lo_hang",
+            fromCol: "ma_co_quan",
+            to: "nguoi_dung",
+            toCol: "ma_nguoi_dung",
+            name: "fk_kd_co_quan",
+          },
+          {
             from: "lien_ket_nguon_goc_lo",
             fromCol: "ma_lo_nguon",
             to: "lo_nong_san",
@@ -713,7 +791,7 @@
       };
 
       // State
-      let currentMode = "pan"; // "pan" | "select"
+      let currentMode = "pan";
       let zoom = 0.65;
       let panX = 60;
       let panY = 40;
@@ -767,7 +845,6 @@
         zoomLabel.textContent = `${Math.round(zoom * 100)}%`;
       }
 
-      // Auto Center & Fit Schema on screen
       function fitCenter() {
         const vWidth = viewport.clientWidth;
         const vHeight = viewport.clientHeight;
@@ -778,8 +855,8 @@
           maxY = -Infinity;
         DB_SCHEMA.tables.forEach((t) => {
           const el = document.getElementById(`tbl-${t.id}`);
-          const w = el ? el.offsetWidth : 290;
-          const h = el ? el.offsetHeight : 300;
+          const w = el ? el.offsetWidth : 300;
+          const h = el ? el.offsetHeight : 320;
           minX = Math.min(minX, t.x);
           minY = Math.min(minY, t.y);
           maxX = Math.max(maxX, t.x + w);
@@ -799,7 +876,6 @@
         updateTransform();
       }
 
-      // Render Tables
       function renderTables() {
         tablesLayer.innerHTML = "";
         DB_SCHEMA.tables.forEach((table) => {
@@ -846,7 +922,6 @@
           </div>
         `;
 
-          // Card Click / Drag events
           card.addEventListener("mousedown", (e) => {
             if (currentMode === "select" && e.button === 0) {
               draggedTable = table;
@@ -965,7 +1040,7 @@
         });
       }
 
-      // Viewport Pan Events (Global Pan support)
+      // Pan Events
       viewport.addEventListener("mousedown", (e) => {
         if (
           currentMode === "pan" ||
@@ -1035,7 +1110,6 @@
         { passive: false },
       );
 
-      // Buttons
       document.getElementById("btnZoomIn").addEventListener("click", () => {
         zoom = Math.min(zoom * 1.2, 2.0);
         updateTransform();
@@ -1048,7 +1122,7 @@
         .getElementById("btnFitCenter")
         .addEventListener("click", fitCenter);
 
-      // Reset to neat Grid
+      // Sắp xếp lưới chuẩn
       document
         .getElementById("btnResetPositions")
         .addEventListener("click", () => {
@@ -1062,9 +1136,10 @@
             san_pham_nong_san: { x: 750, y: 400 },
             lo_nong_san: { x: 1100, y: 50 },
             quyen_thao_tac_lo: { x: 1100, y: 540 },
-            lien_ket_nguon_goc_lo: { x: 1450, y: 50 },
-            lich_su_truy_xuat_lo: { x: 1450, y: 390 },
-            blockchain_outbox: { x: 1800, y: 390 },
+            kiem_dinh_lo_hang: { x: 1450, y: 50 },
+            lien_ket_nguon_goc_lo: { x: 1450, y: 540 },
+            lich_su_truy_xuat_lo: { x: 1800, y: 50 },
+            blockchain_outbox: { x: 1800, y: 540 },
           };
 
           DB_SCHEMA.tables.forEach((t) => {
@@ -1082,14 +1157,12 @@
           fitCenter();
         });
 
-      // Deselect active table on blank click
       viewport.addEventListener("click", (e) => {
         if (e.target.id === "viewport" || e.target.id === "canvas") {
           setActiveTable(null);
         }
       });
 
-      // Start
       renderTables();
       setTimeout(fitCenter, 100);
     </script>

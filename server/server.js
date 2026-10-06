@@ -7,6 +7,7 @@ require("./config/db"); // nạp file để kết nối MySQL khi khởi động
 const authRoutes = require("./routes/authRoutes");
 const farmerRoutes = require("./routes/farmerRoutes");
 const registerRoutes = require("./routes/registerRoutes");
+const kiemdinhRoutes = require("./routes/kiemdinhRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -27,6 +28,9 @@ app.use("/api/register", registerRoutes);
 
 // Nông dân
 app.use("/api/farmer", farmerRoutes);
+
+//kiểm định
+app.use("/api/kiem-dinh", kiemdinhRoutes);
 
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);
