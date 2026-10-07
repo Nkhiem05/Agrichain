@@ -25,6 +25,7 @@ app.get("/", (req, res) => {
 
 // Login
 app.use("/api", authRoutes);
+app.use("/api", authRoutes);
 
 //resgister
 app.use("/api/register", registerRoutes);
@@ -38,11 +39,11 @@ app.use("/api/kiem-dinh", kiemdinhRoutes);
 // Mùa vụ
 app.use("/api/mua-vu", muavuRoutes);
 
-// Lô thu hoạch                                          
-app.use("/api/lo-thu-hoach", lothuhoachRoutes);   
+// Lô thu hoạch
+app.use("/api/lo-thu-hoach", lothuhoachRoutes);
 
-// Chi tiết nông trại                                    
-app.use("/api/nong-trai", nongtraiRoutes); 
+// Chi tiết nông trại
+app.use("/api/nong-trai", nongtraiRoutes);
 
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);

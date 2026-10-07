@@ -1,9 +1,10 @@
 const db = require("../../server/config/db");
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken"); // 1. Thêm import jwt
+const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "bi_mat_agrichain_2026"; // Nên đưa vào file .env
+const JWT_SECRET = process.env.JWT_SECRET || "bi_mat_agrichain_2026";
 
+// 1. Hàm xử lý đăng nhập
 const login = async (req, res) => {
   const { ten_dang_nhap, mat_khau } = req.body;
 
@@ -54,7 +55,7 @@ const login = async (req, res) => {
       });
     }
 
-    // 2. Tạo Token có chứa ID và vai trò của user (hết hạn sau 1 ngày)
+    // Tạo token chứa mã người dùng và vai trò
     const token = jwt.sign(
       {
         ma_nguoi_dung: user.ma_nguoi_dung,
@@ -64,11 +65,10 @@ const login = async (req, res) => {
       { expiresIn: "1d" },
     );
 
-    // 3. Trả token kèm theo thông tin user
     return res.json({
       success: true,
       message: "Đăng nhập thành công",
-      token, // Trả token về cho React
+      token,
       user: {
         ma_nguoi_dung: user.ma_nguoi_dung,
         ho_ten: user.ho_ten,
@@ -86,4 +86,32 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login };
+// 2. Hàm xác thực token cho ProtectedRoute frontend gọi sang
+const verifyToken = async (req, res) => {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({
+      valid: false,
+      message: "Không tìm thấy token xác thực",
+    });
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, decodedUser) => {
+    if (err) {
+      return res.status(403).json({
+        valid: false,
+        message: "Phiên đăng nhập đã hết hạn hoặc token không hợp lệ",
+      });
+    }
+
+    // Token hợp lệ, trả về payload (ma_nguoi_dung, vai_tro)
+    return res.json({
+      valid: true,
+      user: decodedUser,
+    });
+  });
+};
+
+module.exports = { login, verifyToken };

@@ -48,15 +48,14 @@ const LoginPage = () => {
         }),
       });
 
+      // Tìm đến đoạn này trong hàm handleLogin:
       const data = await response.json();
 
-      // Nếu backend trả về lỗi
       if (!response.ok) {
         setLoi(data.message || "Đăng nhập thất bại");
         return;
       }
-
-      // Lưu thông tin người dùng vào trình duyệt
+      localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
       console.log("Đăng nhập thành công:", data.user);
@@ -69,6 +68,10 @@ const LoginPage = () => {
 
         case "TRANSPORTER":
           navigate("/van-chuyen");
+          break;
+
+        case "CERT_AUTHORITY":
+          navigate("/co-quan-kiem-dinh");
           break;
 
         case "ADMIN":
