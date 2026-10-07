@@ -501,3 +501,33 @@
     display: none;
   }
 }
+
+/* Nút sửa / xóa trên thẻ thửa đất */
+.plot-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.plot-action-btn {
+  background: transparent;
+  border: 1px solid #c8d0d8;
+  border-radius: 6px;
+  padding: 3px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+}
+
+.plot-action-btn:hover {
+  background-color: #ffffff;
+  border-color: #278d49;
+  color: #278d49;
+}
+
+.plot-action-btn.danger:hover {
+  border-color: #e53e3e;
+  color: #e53e3e;
+}

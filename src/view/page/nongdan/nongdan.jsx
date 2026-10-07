@@ -20,6 +20,61 @@ const DEFAULT_LOGO_IMG =
 
 const API_URL = "http://localhost:3000";
 
+const EMPTY_SEASON_FORM = {
+  loai_cay_trong: "",
+  giong_cay: "",
+  ma_thua_dat: "",
+  ngay_gieo_trong: "",
+  ngay_thu_hoach_du_kien: "",
+};
+
+const newMaterialRow = (row = {}) => ({
+  key: `${Date.now()}-${Math.random()}`,
+  loai_vat_tu: "",
+  ma_vat_tu: "",
+  lieu_luong: "",
+  ngay_su_dung: "",
+  ...row,
+});
+
+// "2025-06-18" -> "18/06/2025"
+const formatDate = (value) => {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
+};
+
+const EMPTY_BATCH_FORM = {
+  ma_mua_vu: "",
+  so_luong: "",
+  ngay_thu_hoach: "",
+};
+
+// Ngày hôm nay dạng YYYY-MM-DD theo giờ máy (không lệch múi giờ như toISOString)
+const todayText = () => {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+
+// "12000.500", "kg" -> "12.000,5 kg"
+const formatQuantity = (value, unit) =>
+  `${Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`.trim();
+
+const BATCH_STAGE_LABELS = {
+  CREATED: "Mới tạo, chờ xác nhận thu hoạch",
+  HARVESTED: "Đã thu hoạch",
+  PROCESSED: "Đã sơ chế",
+  PACKAGED: "Đã đóng gói",
+  IN_TRANSIT: "Đang vận chuyển",
+  RECEIVED: "Đã nhận hàng",
+  DISTRIBUTED: "Đã phân phối",
+  COMPLETED: "Hoàn tất",
+};
+
 const DashboardPage = () => {
   const navigate = useNavigate();
 
@@ -34,7 +89,6 @@ const DashboardPage = () => {
   const [showFarmModal, setShowFarmModal] = useState(false);
   const [showSeasonModal, setShowSeasonModal] = useState(false);
   const [showBatchModal, setShowBatchModal] = useState(false);
-  const [showMaterialForm, setShowMaterialForm] = useState(false);
   const [showShippingModal, setShowShippingModal] = useState(false);
 
   // =========================================================
@@ -85,6 +139,57 @@ const DashboardPage = () => {
   // TRẠNG THÁI LƯU
   // =========================================================
   const [savingFarm, setSavingFarm] = useState(false);
+
+  // =========================================================
+  // MÙA VỤ
+  // =========================================================
+  const [seasons, setSeasons] = useState([]);
+  const [seasonStats, setSeasonStats] = useState({
+    dang_trien_khai: 0,
+    sap_thu_hoach: 0,
+    so_lo_dang_canh_tac: 0,
+    tong_so_lo: 0,
+  });
+  const [loadingSeasons, setLoadingSeasons] = useState(false);
+  const [seasonError, setSeasonError] = useState("");
+
+  // Nông trại đang lọc ở tab mùa vụ ("" = tất cả)
+  const [seasonFarmId, setSeasonFarmId] = useState("");
+
+  // Mùa vụ đang sửa và nông trại của form
+  const [editingSeason, setEditingSeason] = useState(null);
+  const [seasonModalFarmId, setSeasonModalFarmId] = useState("");
+
+  const [seasonForm, setSeasonForm] = useState(EMPTY_SEASON_FORM);
+  const [seasonMaterials, setSeasonMaterials] = useState([]);
+  const [savingSeason, setSavingSeason] = useState(false);
+
+  // Ảnh mùa vụ: file mới chọn + ảnh xem trước (ảnh cũ trên server hoặc blob)
+  const [seasonImage, setSeasonImage] = useState(null);
+  const [seasonImagePreview, setSeasonImagePreview] = useState(null);
+
+  // Dữ liệu cho dropdown trong popup
+  const [plots, setPlots] = useState([]);
+  const [materialCatalog, setMaterialCatalog] = useState([]);
+
+  // =========================================================
+  // LÔ THU HOẠCH
+  // =========================================================
+  const [batches, setBatches] = useState([]);
+  const [batchStats, setBatchStats] = useState({
+    cho_thu_hoach: 0,
+    so_lo_canh_tac: 0,
+    tong_so_lo: 0,
+  });
+  const [loadingBatches, setLoadingBatches] = useState(false);
+  const [batchError, setBatchError] = useState("");
+
+  const [editingBatch, setEditingBatch] = useState(null);
+  const [batchForm, setBatchForm] = useState(EMPTY_BATCH_FORM);
+  const [savingBatch, setSavingBatch] = useState(false);
+
+  // Mùa vụ đang triển khai để chọn khi tạo lô
+  const [batchSeasons, setBatchSeasons] = useState([]);
 
   // =========================================================
   // DỮ LIỆU LÔ HÀNG ĐỂ CHỌN KHI TẠO LỆNH VẬN CHUYỂN
@@ -219,14 +324,24 @@ const DashboardPage = () => {
   // =========================================================
   // CHUYỂN TRANG CHI TIẾT
   // =========================================================
-  const handlechitietnongtrai = (e) => {
+  const handlechitietnongtrai = (e, maNongTrai) => {
     e.preventDefault();
-    navigate("/chi-tiet-nong-trai");
+    navigate(`/chi-tiet-nong-trai/${maNongTrai}`);
   };
 
-  const handlechitietmuavu = (e) => {
+  // maLo (tuỳ chọn): mở thẳng lô đó trên trang chi tiết mùa vụ
+  const handlechitietmuavu = (e, maMuaVu, maLo) => {
     e.preventDefault();
-    navigate("/chi-tiet-mua-vu");
+    setOpenDropdown(null);
+
+    if (!maMuaVu) {
+      alert("Lô này chưa gắn với mùa vụ nào");
+      return;
+    }
+
+    navigate(
+      `/chi-tiet-mua-vu/${maMuaVu}${maLo ? `?lo=${encodeURIComponent(maLo)}` : ""}`,
+    );
   };
 
   // =========================================================
@@ -492,11 +607,500 @@ const DashboardPage = () => {
   }, 0);
 
   // =========================================================
-  // ĐÓNG POPUP MÙA VỤ
+  // LẤY DANH SÁCH MÙA VỤ + THỐNG KÊ
   // =========================================================
+  const fetchSeasons = async () => {
+    if (!user?.ma_nguoi_dung) return;
+
+    setLoadingSeasons(true);
+    setSeasonError("");
+
+    const query = seasonFarmId
+      ? `?ma_nong_trai=${encodeURIComponent(seasonFarmId)}`
+      : "";
+
+    try {
+      const [listRes, statsRes] = await Promise.all([
+        fetch(`${API_URL}/api/mua-vu/user/${user.ma_nguoi_dung}${query}`),
+        fetch(
+          `${API_URL}/api/mua-vu/thong-ke/user/${user.ma_nguoi_dung}${query}`,
+        ),
+      ]);
+      const listData = await listRes.json();
+      const statsData = await statsRes.json();
+
+      if (!listRes.ok) {
+        setSeasonError(listData.message || "Không thể lấy danh sách mùa vụ");
+        return;
+      }
+
+      setSeasons(listData.data || []);
+      if (statsRes.ok) setSeasonStats(statsData.data);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách mùa vụ:", error);
+      setSeasonError("Không thể kết nối tới backend");
+    } finally {
+      setLoadingSeasons(false);
+    }
+  };
+
+  const fetchMaterialCatalog = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/mua-vu/vat-tu`);
+      const data = await response.json();
+
+      if (response.ok) setMaterialCatalog(data.data || []);
+    } catch (error) {
+      console.error("Lỗi lấy danh mục vật tư:", error);
+    }
+  };
+
+  const fetchPlots = async (maNongTrai) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/farmer/plots/farm/${maNongTrai}`,
+      );
+      const data = await response.json();
+
+      setPlots(response.ok ? data.data || [] : []);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách thửa đất:", error);
+      setPlots([]);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "season") {
+      fetchSeasons();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeTab, seasonFarmId]);
+
+  useEffect(() => {
+    fetchMaterialCatalog();
+  }, []);
+
+  // =========================================================
+  // POPUP MÙA VỤ
+  // =========================================================
+  const resetSeasonImage = (preview = null) => {
+    if (seasonImagePreview && seasonImagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(seasonImagePreview);
+    }
+
+    setSeasonImage(null);
+    setSeasonImagePreview(preview);
+  };
+
   const handleCloseSeasonModal = () => {
     setShowSeasonModal(false);
-    setShowMaterialForm(false);
+    setEditingSeason(null);
+    setSeasonModalFarmId("");
+    setSeasonForm(EMPTY_SEASON_FORM);
+    setSeasonMaterials([]);
+    setPlots([]);
+    resetSeasonImage();
+  };
+
+  const handleSeasonImageChange = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) {
+      resetSeasonImage(
+        editingSeason?.anh_mua_vu
+          ? `${API_URL}${editingSeason.anh_mua_vu}`
+          : null,
+      );
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Ảnh không được vượt quá 5MB");
+      e.target.value = "";
+      return;
+    }
+
+    if (seasonImagePreview && seasonImagePreview.startsWith("blob:")) {
+      URL.revokeObjectURL(seasonImagePreview);
+    }
+
+    setSeasonImage(file);
+    setSeasonImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleOpenAddSeason = () => {
+    // Mùa vụ thuộc về 1 nông trại: lấy từ bộ lọc, hoặc nông trại duy nhất
+    const maNongTrai =
+      seasonFarmId || (farms.length === 1 ? farms[0].ma_nong_trai : "");
+
+    if (!maNongTrai) {
+      alert("Vui lòng chọn nông trại trước khi thêm mùa vụ");
+      return;
+    }
+
+    setEditingSeason(null);
+    setSeasonModalFarmId(maNongTrai);
+    setSeasonForm(EMPTY_SEASON_FORM);
+    setSeasonMaterials([]);
+    resetSeasonImage();
+    fetchPlots(maNongTrai);
+    setShowSeasonModal(true);
+  };
+
+  const handleEditSeason = async (season) => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/mua-vu/${season.ma_mua_vu}`,
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Không thể lấy thông tin mùa vụ");
+        return;
+      }
+
+      const detail = data.data;
+
+      setEditingSeason(detail);
+      setSeasonModalFarmId(detail.ma_nong_trai);
+      setSeasonForm({
+        loai_cay_trong: detail.loai_cay_trong || "",
+        giong_cay: detail.giong_cay || "",
+        ma_thua_dat: detail.ma_thua_dat || "",
+        ngay_gieo_trong: detail.ngay_gieo_trong || "",
+        ngay_thu_hoach_du_kien: detail.ngay_thu_hoach_du_kien || "",
+      });
+      setSeasonMaterials(
+        (detail.vat_tu || []).map((item) =>
+          newMaterialRow({
+            loai_vat_tu: item.loai_vat_tu,
+            ma_vat_tu: item.ma_vat_tu,
+            lieu_luong: item.lieu_luong,
+            ngay_su_dung: item.ngay_su_dung,
+          }),
+        ),
+      );
+      resetSeasonImage(
+        detail.anh_mua_vu ? `${API_URL}${detail.anh_mua_vu}` : null,
+      );
+      fetchPlots(detail.ma_nong_trai);
+      setShowSeasonModal(true);
+    } catch (error) {
+      console.error("Lỗi lấy chi tiết mùa vụ:", error);
+      alert("Không thể kết nối tới backend");
+    }
+  };
+
+  const handleSeasonInputChange = (e) => {
+    const { name, value } = e.target;
+    setSeasonForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // =========================================================
+  // PHÂN BÓN / THUỐC BVTV TRONG MÙA VỤ
+  // =========================================================
+  const handleAddMaterial = () => {
+    setSeasonMaterials((prev) => [...prev, newMaterialRow()]);
+  };
+
+  const handleRemoveMaterial = (key) => {
+    setSeasonMaterials((prev) => prev.filter((row) => row.key !== key));
+  };
+
+  const handleMaterialChange = (key, field, value) => {
+    setSeasonMaterials((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+
+        // Đổi loại vật tư thì phải chọn lại tên phân/thuốc
+        if (field === "loai_vat_tu") {
+          return { ...row, loai_vat_tu: value, ma_vat_tu: "" };
+        }
+
+        return { ...row, [field]: value };
+      }),
+    );
+  };
+
+  // =========================================================
+  // LƯU MÙA VỤ (THÊM / CẬP NHẬT)
+  // =========================================================
+  const handleSaveSeason = async () => {
+    if (!seasonForm.loai_cay_trong.trim() || !seasonForm.ngay_gieo_trong) {
+      alert("Vui lòng nhập tên mùa vụ và ngày bắt đầu");
+      return;
+    }
+
+    if (
+      seasonMaterials.some(
+        (row) =>
+          !row.ma_vat_tu ||
+          !(Number(row.lieu_luong) > 0) ||
+          !row.ngay_su_dung,
+      )
+    ) {
+      alert(
+        "Vui lòng chọn loại, tên, liều lượng và ngày sử dụng cho mỗi vật tư",
+      );
+      return;
+    }
+
+    // Gửi multipart/form-data để kèm được file ảnh
+    const formData = new FormData();
+    formData.append("ma_nong_trai", seasonModalFarmId);
+    formData.append("ma_thua_dat", seasonForm.ma_thua_dat);
+    formData.append("loai_cay_trong", seasonForm.loai_cay_trong.trim());
+    formData.append("giong_cay", seasonForm.giong_cay.trim());
+    formData.append("ngay_gieo_trong", seasonForm.ngay_gieo_trong);
+    formData.append(
+      "ngay_thu_hoach_du_kien",
+      seasonForm.ngay_thu_hoach_du_kien,
+    );
+    formData.append(
+      "vat_tu",
+      JSON.stringify(
+        seasonMaterials.map((row) => ({
+          ma_vat_tu: row.ma_vat_tu,
+          lieu_luong: Number(row.lieu_luong),
+          ngay_su_dung: row.ngay_su_dung,
+        })),
+      ),
+    );
+
+    if (seasonImage) {
+      formData.append("anh_mua_vu", seasonImage);
+    }
+
+    setSavingSeason(true);
+
+    try {
+      const response = await fetch(
+        editingSeason
+          ? `${API_URL}/api/mua-vu/${editingSeason.ma_mua_vu}`
+          : `${API_URL}/api/mua-vu`,
+        {
+          method: editingSeason ? "PUT" : "POST",
+          body: formData,
+        },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Lưu mùa vụ thất bại");
+        return;
+      }
+
+      alert(data.message);
+      handleCloseSeasonModal();
+      await fetchSeasons();
+    } catch (error) {
+      console.error("Lỗi lưu mùa vụ:", error);
+      alert("Không thể kết nối tới backend");
+    } finally {
+      setSavingSeason(false);
+    }
+  };
+
+  // =========================================================
+  // XÓA MÙA VỤ
+  // =========================================================
+  const handleDeleteSeason = async (maMuaVu) => {
+    setOpenDropdown(null);
+
+    if (!window.confirm("Bạn có chắc muốn xóa mùa vụ này?")) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/mua-vu/${maMuaVu}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Xóa mùa vụ thất bại");
+        return;
+      }
+
+      alert(data.message);
+      await fetchSeasons();
+    } catch (error) {
+      console.error("Lỗi xóa mùa vụ:", error);
+      alert("Không thể kết nối tới backend");
+    }
+  };
+
+  // =========================================================
+  // LẤY DANH SÁCH LÔ THU HOẠCH + THỐNG KÊ
+  // =========================================================
+  const fetchBatches = async () => {
+    if (!user?.ma_nguoi_dung) return;
+
+    setLoadingBatches(true);
+    setBatchError("");
+
+    try {
+      const [listRes, statsRes] = await Promise.all([
+        fetch(`${API_URL}/api/lo-thu-hoach/user/${user.ma_nguoi_dung}`),
+        fetch(
+          `${API_URL}/api/lo-thu-hoach/thong-ke/user/${user.ma_nguoi_dung}`,
+        ),
+      ]);
+      const listData = await listRes.json();
+      const statsData = await statsRes.json();
+
+      if (!listRes.ok) {
+        setBatchError(listData.message || "Không thể lấy danh sách lô");
+        return;
+      }
+
+      setBatches(listData.data || []);
+      if (statsRes.ok) setBatchStats(statsData.data);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách lô thu hoạch:", error);
+      setBatchError("Không thể kết nối tới backend");
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
+
+  const fetchBatchSeasons = async () => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/mua-vu/user/${user.ma_nguoi_dung}`,
+      );
+      const data = await response.json();
+
+      setBatchSeasons(response.ok ? data.data || [] : []);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách mùa vụ:", error);
+      setBatchSeasons([]);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "batch") {
+      fetchBatches();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, activeTab]);
+
+  // =========================================================
+  // POPUP LÔ THU HOẠCH
+  // =========================================================
+  const handleCloseBatchModal = () => {
+    setShowBatchModal(false);
+    setEditingBatch(null);
+    setBatchForm(EMPTY_BATCH_FORM);
+  };
+
+  const handleOpenAddBatch = () => {
+    setEditingBatch(null);
+    setBatchForm({ ...EMPTY_BATCH_FORM, ngay_thu_hoach: todayText() });
+    fetchBatchSeasons();
+    setShowBatchModal(true);
+  };
+
+  const handleEditBatch = (batch) => {
+    setOpenDropdown(null);
+    setEditingBatch(batch);
+    setBatchForm({
+      ma_mua_vu: batch.ma_mua_vu || "",
+      so_luong: batch.so_luong_hien_tai,
+      ngay_thu_hoach: batch.ngay_thu_hoach || "",
+    });
+    fetchBatchSeasons();
+    setShowBatchModal(true);
+  };
+
+  const handleBatchInputChange = (e) => {
+    const { name, value } = e.target;
+    setBatchForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  // =========================================================
+  // LƯU LÔ THU HOẠCH (THÊM / CẬP NHẬT)
+  // =========================================================
+  const handleSaveBatch = async () => {
+    if (!editingBatch && !batchForm.ma_mua_vu) {
+      alert("Vui lòng chọn mùa vụ thu hoạch");
+      return;
+    }
+
+    if (!(Number(batchForm.so_luong) > 0)) {
+      alert("Sản lượng phải lớn hơn 0");
+      return;
+    }
+
+    if (!batchForm.ngay_thu_hoach) {
+      alert("Vui lòng chọn ngày thu hoạch");
+      return;
+    }
+
+    setSavingBatch(true);
+
+    try {
+      const response = await fetch(
+        editingBatch
+          ? `${API_URL}/api/lo-thu-hoach/${editingBatch.ma_lo_nong_san}`
+          : `${API_URL}/api/lo-thu-hoach`,
+        {
+          method: editingBatch ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ma_mua_vu: batchForm.ma_mua_vu,
+            so_luong: Number(batchForm.so_luong),
+            ngay_thu_hoach: batchForm.ngay_thu_hoach,
+          }),
+        },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Lưu lô thu hoạch thất bại");
+        return;
+      }
+
+      alert(data.message);
+      handleCloseBatchModal();
+      await fetchBatches();
+    } catch (error) {
+      console.error("Lỗi lưu lô thu hoạch:", error);
+      alert("Không thể kết nối tới backend");
+    } finally {
+      setSavingBatch(false);
+    }
+  };
+
+  // =========================================================
+  // XÓA LÔ THU HOẠCH
+  // =========================================================
+  const handleDeleteBatch = async (maLo) => {
+    setOpenDropdown(null);
+
+    if (!window.confirm("Bạn có chắc muốn xóa lô thu hoạch này?")) return;
+
+    try {
+      const response = await fetch(`${API_URL}/api/lo-thu-hoach/${maLo}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Xóa lô thu hoạch thất bại");
+        return;
+      }
+
+      alert(data.message);
+      await fetchBatches();
+    } catch (error) {
+      console.error("Lỗi xóa lô thu hoạch:", error);
+      alert("Không thể kết nối tới backend");
+    }
   };
 
   return (
@@ -708,7 +1312,9 @@ const DashboardPage = () => {
                       <div className="farm-card-buttons">
                         <button
                           className="btn-update"
-                          onClick={handlechitietnongtrai}
+                          onClick={(e) =>
+                            handlechitietnongtrai(e, farm.ma_nong_trai)
+                          }
                         >
                           Xem chi tiết
                         </button>
@@ -743,23 +1349,32 @@ const DashboardPage = () => {
                 <div className="metric-card">
                   <div className="metric-title">Mùa vụ đang triển khai</div>
                   <div className="metric-number">
-                    2<span className="metric-unit">MÙA VỤ</span>
+                    {seasonStats.dang_trien_khai}
+                    <span className="metric-unit">MÙA VỤ</span>
                   </div>
                 </div>
 
                 <div className="metric-card">
                   <div className="metric-title">Số lô đang canh tác</div>
-                  <div className="metric-number">2/2</div>
+                  <div className="metric-number">
+                    {seasonStats.so_lo_dang_canh_tac}/{seasonStats.tong_so_lo}
+                  </div>
                 </div>
 
                 <div className="metric-card">
                   <div className="metric-title">Lô sắp thu hoạch</div>
-                  <div className="metric-number">1</div>
+                  <div className="metric-number">
+                    {seasonStats.sap_thu_hoach}
+                  </div>
                 </div>
 
                 <div className="actions-box">
-                  <select className="filter-select">
-                    <option>-- chọn nông trại --</option>
+                  <select
+                    className="filter-select"
+                    value={seasonFarmId}
+                    onChange={(e) => setSeasonFarmId(e.target.value)}
+                  >
+                    <option value="">-- chọn nông trại --</option>
                     {farms.map((farm) => (
                       <option key={farm.ma_nong_trai} value={farm.ma_nong_trai}>
                         {farm.ten_nong_trai}
@@ -769,72 +1384,114 @@ const DashboardPage = () => {
 
                   <button
                     className="btn-primary-action"
-                    onClick={() => setShowSeasonModal(true)}
+                    onClick={handleOpenAddSeason}
                   >
                     + Thêm Mùa Vụ
                   </button>
                 </div>
               </div>
 
-              <div className="season-card">
-                <img
-                  src={DEFAULT_FARM_IMG}
-                  alt="Crop"
-                  className="season-thumbnail"
-                />
+              {loadingSeasons && <p>Đang tải danh sách mùa vụ...</p>}
 
-                <div className="season-body">
-                  <div className="season-header">
-                    <h3 className="season-title">Quýt Đường</h3>
-                    <div className="season-tags">
-                      <span className="tag-badge gray">#LA111</span>
-                      <span className="tag-badge green">Dữ liệu mẫu</span>
+              {seasonError && <p>{seasonError}</p>}
+
+              {!loadingSeasons && !seasonError && seasons.length === 0 && (
+                <p>Chưa có mùa vụ nào. Bấm "+ Thêm Mùa Vụ" để bắt đầu.</p>
+              )}
+
+              {seasons.map((season) => (
+                <div className="season-card" key={season.ma_mua_vu}>
+                  <img
+                    src={
+                      season.anh_mua_vu
+                        ? `${API_URL}${season.anh_mua_vu}`
+                        : DEFAULT_FARM_IMG
+                    }
+                    alt="Crop"
+                    className="season-thumbnail"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src = DEFAULT_FARM_IMG;
+                    }}
+                  />
+
+                  <div className="season-body">
+                    <div className="season-header">
+                      <h3 className="season-title">{season.loai_cay_trong}</h3>
+                      <div className="season-tags">
+                        <span className="tag-badge gray">
+                          #{season.ma_mua_vu}
+                        </span>
+                        <span className="tag-badge green">
+                          {season.ten_nong_trai}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="season-row-info">
+                      <span>
+                        <strong>Giống:</strong> {season.giong_cay || "—"}
+                      </span>
+                      <span>
+                        <strong>Thửa:</strong>{" "}
+                        {season.ten_thua_dat || "Chưa chọn"}
+                      </span>
+                      <span>
+                        <strong>Ngày bắt đầu:</strong>{" "}
+                        {formatDate(season.ngay_gieo_trong)}
+                      </span>
+                      {season.ngay_thu_hoach_du_kien && (
+                        <span>
+                          <strong>Dự kiến thu hoạch:</strong>{" "}
+                          {formatDate(season.ngay_thu_hoach_du_kien)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <div className="season-row-info">
-                    <span>
-                      <strong>Giống:</strong> Quýt Đường
-                    </span>
-                    <span>
-                      <strong>Thửa:</strong> A1-1
-                    </span>
-                    <span>
-                      <strong>Ngày bắt đầu:</strong> 18/06/2025
-                    </span>
-                  </div>
-                </div>
-
-                <div className="season-actions">
-                  <button className="btn-outline-green">
-                    ✏️ cập nhật mùa vụ
-                  </button>
-
-                  <div className="dropdown-container">
+                  <div className="season-actions">
                     <button
-                      className="btn-more"
-                      onClick={() => handleToggleDropdown("season-1")}
+                      className="btn-outline-green"
+                      onClick={() => handleEditSeason(season)}
                     >
-                      ⋮
+                      ✏️ cập nhật mùa vụ
                     </button>
 
-                    {openDropdown === "season-1" && (
-                      <div className="dropdown-menu">
-                        <div
-                          className="dropdown-item"
-                          onClick={handlechitietmuavu}
-                        >
-                          Xem chi tiết
+                    <div className="dropdown-container">
+                      <button
+                        className="btn-more"
+                        onClick={() => handleToggleDropdown(season.ma_mua_vu)}
+                      >
+                        ⋮
+                      </button>
+
+                      {openDropdown === season.ma_mua_vu && (
+                        <div className="dropdown-menu">
+                          <div
+                            className="dropdown-item"
+                            onClick={(e) =>
+                              handlechitietmuavu(e, season.ma_mua_vu)
+                            }
+                          >
+                            Xem chi tiết
+                          </div>
+                          <div className="dropdown-divider"></div>
+                          <div className="dropdown-item">
+                            Đánh dấu sẵn sàng
+                          </div>
+                          <div className="dropdown-divider"></div>
+                          <div
+                            className="dropdown-item danger"
+                            onClick={() => handleDeleteSeason(season.ma_mua_vu)}
+                          >
+                            Xóa
+                          </div>
                         </div>
-                        <div className="dropdown-divider"></div>
-                        <div className="dropdown-item">Đánh dấu sẵn sàng</div>
-                        <div className="dropdown-divider"></div>
-                        <div className="dropdown-item danger">Xóa</div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
           )}
 
@@ -846,12 +1503,14 @@ const DashboardPage = () => {
               <div className="metrics-row">
                 <div className="metric-card">
                   <div className="metric-title">Số lô chờ thu hoạch</div>
-                  <div className="metric-number">1</div>
+                  <div className="metric-number">{batchStats.cho_thu_hoach}</div>
                 </div>
 
                 <div className="metric-card">
                   <div className="metric-title">Số lô canh tác</div>
-                  <div className="metric-number">17</div>
+                  <div className="metric-number">
+                    {batchStats.so_lo_canh_tac}
+                  </div>
                 </div>
 
                 <div className="metric-card">
@@ -862,7 +1521,7 @@ const DashboardPage = () => {
                 <div className="actions-box">
                   <button
                     className="btn-primary-action"
-                    onClick={() => setShowBatchModal(true)}
+                    onClick={handleOpenAddBatch}
                   >
                     + Tạo lô thu hoạch
                   </button>
@@ -872,6 +1531,10 @@ const DashboardPage = () => {
                   </div>
                 </div>
               </div>
+
+              {loadingBatches && <p>Đang tải danh sách lô thu hoạch...</p>}
+
+              {batchError && <p>{batchError}</p>}
 
               <div className="table-container custom-scrollbar">
                 <table className="batch-table">
@@ -887,46 +1550,97 @@ const DashboardPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>LA1-11111111</td>
-                      <td>FARM11111111</td>
-                      <td>Quýt đường vụ hè</td>
-                      <td>A1-12111</td>
-                      <td>12.000kg</td>
-                      <td>25/12/2026</td>
-                      <td>
-                        <div className="status-icon-cell">
-                          <span className="status-icon success">✓</span>
-                          <div className="dropdown-container">
-                            <button
-                              className="btn-more"
-                              onClick={() => handleToggleDropdown("batch-1")}
-                            >
-                              ⋮
-                            </button>
+                    {!loadingBatches && !batchError && batches.length === 0 && (
+                      <tr>
+                        <td colSpan={7}>
+                          Chưa có lô thu hoạch nào. Bấm "+ Tạo lô thu hoạch" để
+                          bắt đầu.
+                        </td>
+                      </tr>
+                    )}
 
-                            {openDropdown === "batch-1" && (
-                              <div className="dropdown-menu">
-                                <div
-                                  className="dropdown-item"
-                                  onClick={handlechitietmuavu}
-                                >
-                                  Xem chi tiết
+                    {batches.map((batch) => (
+                      <tr key={batch.ma_lo_nong_san}>
+                        <td>{batch.ma_lo_nong_san}</td>
+                        <td>{batch.ma_nong_trai || "—"}</td>
+                        <td>{batch.loai_cay_trong || "—"}</td>
+                        <td>{batch.ten_thua_dat || "—"}</td>
+                        <td>
+                          {formatQuantity(
+                            batch.so_luong_hien_tai,
+                            batch.don_vi_tinh,
+                          )}
+                        </td>
+                        <td>{formatDate(batch.ngay_thu_hoach) || "—"}</td>
+                        <td>
+                          <div className="status-icon-cell">
+                            <span
+                              className={`status-icon ${
+                                batch.giai_doan_hien_tai === "CREATED"
+                                  ? "empty"
+                                  : "success"
+                              }`}
+                              title={
+                                BATCH_STAGE_LABELS[batch.giai_doan_hien_tai] ||
+                                batch.giai_doan_hien_tai
+                              }
+                            >
+                              {batch.giai_doan_hien_tai === "CREATED" ? "" : "✓"}
+                            </span>
+                            <div className="dropdown-container">
+                              <button
+                                className="btn-more"
+                                onClick={() =>
+                                  handleToggleDropdown(
+                                    `batch-${batch.ma_lo_nong_san}`,
+                                  )
+                                }
+                              >
+                                ⋮
+                              </button>
+
+                              {openDropdown ===
+                                `batch-${batch.ma_lo_nong_san}` && (
+                                <div className="dropdown-menu">
+                                  <div
+                                    className="dropdown-item"
+                                    onClick={(e) =>
+                                      handlechitietmuavu(
+                                        e,
+                                        batch.ma_mua_vu,
+                                        batch.ma_lo_nong_san,
+                                      )
+                                    }
+                                  >
+                                    Xem chi tiết
+                                  </div>
+                                  <div className="dropdown-divider"></div>
+                                  <div
+                                    className="dropdown-item"
+                                    onClick={() => handleEditBatch(batch)}
+                                  >
+                                    Cập nhật
+                                  </div>
+                                  <div className="dropdown-divider"></div>
+                                  <div className="dropdown-item">
+                                    Yêu cầu kiểm định
+                                  </div>
+                                  <div className="dropdown-divider"></div>
+                                  <div
+                                    className="dropdown-item danger"
+                                    onClick={() =>
+                                      handleDeleteBatch(batch.ma_lo_nong_san)
+                                    }
+                                  >
+                                    Xóa
+                                  </div>
                                 </div>
-                                <div className="dropdown-divider"></div>
-                                <div className="dropdown-item">Cập nhật</div>
-                                <div className="dropdown-divider"></div>
-                                <div className="dropdown-item">
-                                  Yêu cầu kiểm định
-                                </div>
-                                <div className="dropdown-divider"></div>
-                                <div className="dropdown-item danger">Xóa</div>
-                              </div>
-                            )}
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1359,33 +2073,96 @@ const DashboardPage = () => {
 
             <div className="modal-body">
               <div className="form-group">
-                <label>Tên thửa đất</label>
-                <input type="text" placeholder="Nhập tên nông trại của bạn" />
+                <label>Tên mùa vụ</label>
+                <input
+                  type="text"
+                  name="loai_cay_trong"
+                  placeholder="Nhập tên mùa vụ / loại cây trồng"
+                  value={seasonForm.loai_cay_trong}
+                  onChange={handleSeasonInputChange}
+                />
               </div>
 
               <div className="form-grid-2">
                 <div className="form-group">
                   <label>Giống cây</label>
-                  <input type="text" placeholder="Nhập tên giống cây" />
+                  <input
+                    type="text"
+                    name="giong_cay"
+                    placeholder="Nhập tên giống cây"
+                    value={seasonForm.giong_cay}
+                    onChange={handleSeasonInputChange}
+                  />
                 </div>
 
                 <div className="form-group">
                   <label>Thửa đất</label>
-                  <select>
-                    <option>-- Chọn thửa đất --</option>
+                  <select
+                    name="ma_thua_dat"
+                    value={seasonForm.ma_thua_dat}
+                    onChange={handleSeasonInputChange}
+                  >
+                    <option value="">-- Chọn thửa đất --</option>
+                    {plots
+                      .filter(
+                        (plot) =>
+                          !plot.ma_mua_vu ||
+                          plot.ma_thua_dat === seasonForm.ma_thua_dat,
+                      )
+                      .map((plot) => (
+                        <option key={plot.ma_thua_dat} value={plot.ma_thua_dat}>
+                          {plot.ten_thua_dat}
+                        </option>
+                      ))}
                   </select>
                 </div>
 
                 <div className="form-group">
                   <label>Ngày bắt đầu</label>
-                  <input type="date" />
+                  <input
+                    type="date"
+                    name="ngay_gieo_trong"
+                    value={seasonForm.ngay_gieo_trong}
+                    onChange={handleSeasonInputChange}
+                  />
                 </div>
 
                 <div className="form-group">
                   <label>Ngày thu hoạch dự kiến</label>
-                  <input type="date" />
+                  <input
+                    type="date"
+                    name="ngay_thu_hoach_du_kien"
+                    min={seasonForm.ngay_gieo_trong || undefined}
+                    value={seasonForm.ngay_thu_hoach_du_kien}
+                    onChange={handleSeasonInputChange}
+                  />
                 </div>
               </div>
+
+              <div className="form-group">
+                <label>Ảnh mùa vụ</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleSeasonImageChange}
+                />
+              </div>
+
+              {seasonImagePreview && (
+                <div className="form-group">
+                  <label>{seasonImage ? "Ảnh xem trước" : "Ảnh hiện tại"}</label>
+                  <img
+                    src={seasonImagePreview}
+                    alt="Xem trước"
+                    style={{
+                      width: "100%",
+                      maxHeight: "220px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="material-section">
                 <div className="material-header">
@@ -1393,56 +2170,130 @@ const DashboardPage = () => {
                   <button
                     type="button"
                     className="btn-add-small"
-                    onClick={() => setShowMaterialForm(true)}
+                    onClick={handleAddMaterial}
                   >
                     + Thêm
                   </button>
                 </div>
 
-                {showMaterialForm && (
-                  <div className="material-box">
-                    <button
-                      type="button"
-                      className="btn-remove-material"
-                      onClick={() => setShowMaterialForm(false)}
-                    >
-                      ✕
-                    </button>
+                {seasonMaterials.map((row) => {
+                  const options = materialCatalog.filter(
+                    (item) => item.loai_vat_tu === row.loai_vat_tu,
+                  );
+                  const selected = materialCatalog.find(
+                    (item) => item.ma_vat_tu === row.ma_vat_tu,
+                  );
 
-                    <div className="form-grid-2">
-                      <div className="form-group radio-group-container">
-                        <label>Loại vật tư</label>
-                        <div className="radio-group">
+                  return (
+                    <div
+                      className="material-box"
+                      key={row.key}
+                      style={{ marginBottom: 12 }}
+                    >
+                      <button
+                        type="button"
+                        className="btn-remove-material"
+                        onClick={() => handleRemoveMaterial(row.key)}
+                      >
+                        ✕
+                      </button>
+
+                      <div className="form-grid-2">
+                        <div className="form-group radio-group-container">
+                          <label>Loại vật tư</label>
+                          <div className="radio-group">
+                            <label>
+                              <input
+                                type="radio"
+                                name={`vattu-${row.key}`}
+                                checked={row.loai_vat_tu === "PHAN_BON"}
+                                onChange={() =>
+                                  handleMaterialChange(
+                                    row.key,
+                                    "loai_vat_tu",
+                                    "PHAN_BON",
+                                  )
+                                }
+                              />
+                              Phân bón
+                            </label>
+                            <label>
+                              <input
+                                type="radio"
+                                name={`vattu-${row.key}`}
+                                checked={row.loai_vat_tu === "THUOC_BVTV"}
+                                onChange={() =>
+                                  handleMaterialChange(
+                                    row.key,
+                                    "loai_vat_tu",
+                                    "THUOC_BVTV",
+                                  )
+                                }
+                              />
+                              Thuốc BVTV
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="form-group">
+                          <label>Tên phân thuốc</label>
+                          <select
+                            value={row.ma_vat_tu}
+                            disabled={!row.loai_vat_tu}
+                            onChange={(e) =>
+                              handleMaterialChange(
+                                row.key,
+                                "ma_vat_tu",
+                                e.target.value,
+                              )
+                            }
+                          >
+                            <option value="">-- Chọn vật tư --</option>
+                            {options.map((item) => (
+                              <option key={item.ma_vat_tu} value={item.ma_vat_tu}>
+                                {item.ten_vat_tu}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="form-group">
                           <label>
-                            <input type="radio" name="vattu" />
-                            Phân bón
+                            Liều lượng{selected ? ` (${selected.don_vi_tinh})` : ""}
                           </label>
-                          <label>
-                            <input type="radio" name="vattu" />
-                            Thuốc BVTV
-                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={row.lieu_luong}
+                            onChange={(e) =>
+                              handleMaterialChange(
+                                row.key,
+                                "lieu_luong",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Ngày sử dụng</label>
+                          <input
+                            type="date"
+                            value={row.ngay_su_dung}
+                            onChange={(e) =>
+                              handleMaterialChange(
+                                row.key,
+                                "ngay_su_dung",
+                                e.target.value,
+                              )
+                            }
+                          />
                         </div>
                       </div>
-
-                      <div className="form-group">
-                        <label>Tên phân thuốc</label>
-                        <select>
-                          <option>-- Chọn vật tư --</option>
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label>Liều lượng</label>
-                        <input type="number" />
-                      </div>
-
-                      <div className="form-group">
-                        <label>Ngày sử dụng</label>
-                        <input type="date" />
-                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })}
               </div>
             </div>
 
@@ -1455,8 +2306,13 @@ const DashboardPage = () => {
                 Hủy
               </button>
 
-              <button type="button" className="btn-save">
-                Lưu thông tin
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSaveSeason}
+                disabled={savingSeason}
+              >
+                {savingSeason ? "Đang lưu..." : "Lưu thông tin"}
               </button>
             </div>
           </div>
@@ -1474,38 +2330,80 @@ const DashboardPage = () => {
             </div>
 
             <div className="modal-body">
-              <div className="form-group">
-                <label>Mã Lô</label>
-                <select>
-                  <option>-- Chọn mã lô --</option>
-                </select>
-              </div>
+              {(() => {
+                // Thông tin mùa vụ đang chọn (hoặc mùa vụ của lô đang sửa)
+                const season = batchSeasons.find(
+                  (item) => item.ma_mua_vu === batchForm.ma_mua_vu,
+                );
+                const info = season || editingBatch;
 
-              <div className="form-grid-2 readonly-grid">
-                <div className="readonly-item">
-                  <label>Mã nông trại</label>
-                  <span>Chưa có dữ liệu</span>
+                return (
+                  <>
+                    <div className="form-group">
+                      <label>Mùa vụ thu hoạch</label>
+                      <select
+                        name="ma_mua_vu"
+                        value={batchForm.ma_mua_vu}
+                        onChange={handleBatchInputChange}
+                        disabled={!!editingBatch}
+                      >
+                        <option value="">-- Chọn mùa vụ --</option>
+                        {batchSeasons.map((item) => (
+                          <option key={item.ma_mua_vu} value={item.ma_mua_vu}>
+                            {item.ma_mua_vu} - {item.loai_cay_trong} (
+                            {item.ten_nong_trai})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-grid-2 readonly-grid">
+                      <div className="readonly-item">
+                        <label>Mã nông trại</label>
+                        <span>{info?.ma_nong_trai || "Chưa có dữ liệu"}</span>
+                      </div>
+
+                      <div className="readonly-item">
+                        <label>Thửa đất</label>
+                        <span>{info?.ten_thua_dat || "Chưa có dữ liệu"}</span>
+                      </div>
+
+                      <div className="readonly-item">
+                        <label>Mùa vụ</label>
+                        <span>{info?.loai_cay_trong || "Chưa có dữ liệu"}</span>
+                      </div>
+
+                      <div className="readonly-item">
+                        <label>Giống cây</label>
+                        <span>{info?.giong_cay || "Chưa có dữ liệu"}</span>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Sản lượng (kg)</label>
+                  <input
+                    type="number"
+                    name="so_luong"
+                    min="0"
+                    step="any"
+                    value={batchForm.so_luong}
+                    onChange={handleBatchInputChange}
+                  />
                 </div>
 
-                <div className="readonly-item">
-                  <label>Thửa đất</label>
-                  <span>Chưa có dữ liệu</span>
+                <div className="form-group">
+                  <label>Ngày thu hoạch</label>
+                  <input
+                    type="date"
+                    name="ngay_thu_hoach"
+                    value={batchForm.ngay_thu_hoach}
+                    onChange={handleBatchInputChange}
+                  />
                 </div>
-
-                <div className="readonly-item">
-                  <label>Mùa vụ</label>
-                  <span>Chưa có dữ liệu</span>
-                </div>
-
-                <div className="readonly-item">
-                  <label>Giống cây</label>
-                  <span>Chưa có dữ liệu</span>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Sản lượng (kg)</label>
-                <input type="number" />
               </div>
             </div>
 
@@ -1513,13 +2411,18 @@ const DashboardPage = () => {
               <button
                 type="button"
                 className="btn-cancel"
-                onClick={() => setShowBatchModal(false)}
+                onClick={handleCloseBatchModal}
               >
                 Hủy
               </button>
 
-              <button type="button" className="btn-save">
-                Lưu thông tin
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSaveBatch}
+                disabled={savingBatch}
+              >
+                {savingBatch ? "Đang lưu..." : "Lưu thông tin"}
               </button>
             </div>
           </div>

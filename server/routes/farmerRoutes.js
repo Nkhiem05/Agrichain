@@ -98,22 +98,6 @@ router.delete("/plots/:maThuaDat", farmerController.deletePlot);
 
 /*
 ==================================================
-MÙA VỤ
-==================================================
-*/
-
-router.get("/seasons/farm/:maNongTrai", farmerController.getSeasons);
-
-router.get("/seasons/:maMuaVu", farmerController.getSeasonById);
-
-router.post("/seasons", farmerController.createSeason);
-
-router.put("/seasons/:maMuaVu", farmerController.updateSeason);
-
-router.delete("/seasons/:maMuaVu", farmerController.deleteSeason);
-
-/*
-==================================================
 LÔ NÔNG SẢN
 ==================================================
 */

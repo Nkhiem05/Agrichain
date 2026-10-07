@@ -1,122 +1,224 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import "../../css/chitietnongtrai.css";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
+const DEFAULT_FARM_IMG =
+  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg";
+
+const API_URL = "http://localhost:3000";
+
+const EMPTY_PLOT_FORM = {
+  ten_thua_dat: "",
+  dien_tich: "",
+  loai_dat: "",
+  status: "active",
+  loai_cay_trong: "",
+};
+
+// "2026-06-18" -> "18/06/2026"
+const formatDate = (value) => {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
+};
+
+const formatArea = (value) =>
+  value === null || value === undefined || value === ""
+    ? "—"
+    : `${Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ha`;
+
 export default function FarmDetail() {
+  const navigate = useNavigate();
+  const { maNongTrai } = useParams();
+
+  const [user, setUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Dữ liệu vườn cam mẫu[cite: 1]
-  const [farmData] = useState({
-    name: "Vườn Cam A1",
-    code: "FARM-01111",
-    area: "6.0 ha",
-    soilType: "Đất phù sa",
-    address: "Ấp 10 , Trí Phải, Cà Mau",
-    manager: "Nguyễn Văn A",
-    mainCrops: "Cam Sành, Quýt đường",
-    image:
-      "https://images.unsplash.com/photo-1582281298055-e25b84a30b0b?w=600&auto=format&fit=crop&q=80",
-  });
+  const [farm, setFarm] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Danh sách các thửa đất[cite: 1]
-  const [plots, setPlots] = useState([
-    {
-      id: 1,
-      name: "Thửa A1-1",
-      area: "2.5ha",
-      crop: "Quýt đường",
-      startDate: "18/06/2026",
-      days: 42,
-      status: "active",
-    },
-    {
-      id: 2,
-      name: "Thửa A1-2",
-      area: "2.5ha",
-      crop: "",
-      startDate: "",
-      days: 0,
-      status: "empty",
-    },
-    {
-      id: 3,
-      name: "Thửa A1-1",
-      area: "2.5ha",
-      crop: "Quýt đường",
-      startDate: "18/06/2026",
-      days: 42,
-      status: "active",
-    },
-    {
-      id: 4,
-      name: "Thửa A1-1",
-      area: "2.5ha",
-      crop: "Quýt đường",
-      startDate: "18/06/2026",
-      days: 42,
-      status: "active",
-    },
-    {
-      id: 5,
-      name: "Thửa A1-2",
-      area: "2.5ha",
-      crop: "",
-      startDate: "",
-      days: 0,
-      status: "empty",
-    },
-    {
-      id: 6,
-      name: "Thửa A1-1",
-      area: "2.5ha",
-      crop: "Quýt đường",
-      startDate: "18/06/2026",
-      days: 42,
-      status: "active",
-    },
-  ]);
+  const [formData, setFormData] = useState(EMPTY_PLOT_FORM);
+  const [saving, setSaving] = useState(false);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    area: "",
-    crop: "",
-    status: "active",
-  });
+  // Thửa đang sửa (null = đang thêm mới)
+  const [editingPlot, setEditingPlot] = useState(null);
 
-  const filteredPlots = plots.filter(
-    (plot) =>
-      plot.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      plot.crop.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  // Lấy user từ localStorage (giống trang nông dân)
+  useEffect(() => {
+    const savedUser = localStorage.getItem("user");
 
-  const handleBack = () => {
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      alert("Quay về trang trước");
+    if (!savedUser) {
+      navigate("/");
+      return;
+    }
+
+    try {
+      setUser(JSON.parse(savedUser));
+    } catch {
+      localStorage.removeItem("user");
+      navigate("/");
+    }
+  }, [navigate]);
+
+  // Lấy thông tin nông trại + danh sách thửa đất
+  const fetchFarm = async () => {
+    if (!maNongTrai) {
+      setError("Chưa chọn nông trại. Hãy mở từ trang Quản lý nông trại.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/nong-trai/${encodeURIComponent(maNongTrai)}/chi-tiet`,
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "Không thể lấy chi tiết nông trại");
+        return;
+      }
+
+      setFarm(data.data);
+    } catch (err) {
+      console.error("Lỗi lấy chi tiết nông trại:", err);
+      setError("Không thể kết nối tới backend");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAddPlot = (e) => {
-    e.preventDefault();
-    if (!formData.name) return;
+  useEffect(() => {
+    fetchFarm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maNongTrai]);
 
-    const newPlot = {
-      id: Date.now(),
-      name: formData.name,
-      area: formData.area ? `${formData.area}ha` : "2.0ha",
-      crop: formData.status === "active" ? formData.crop || "Quýt đường" : "",
-      startDate: formData.status === "active" ? "01/07/2026" : "",
-      days: formData.status === "active" ? 1 : 0,
-      status: formData.status,
+  const plots = farm?.thua_dat || [];
+
+  const filteredPlots = plots.filter((plot) => {
+    const keyword = searchTerm.trim().toLowerCase();
+
+    return (
+      (plot.ten_thua_dat || "").toLowerCase().includes(keyword) ||
+      (plot.loai_cay_trong || "").toLowerCase().includes(keyword)
+    );
+  });
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/nong-dan");
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingPlot(null);
+    setFormData(EMPTY_PLOT_FORM);
+  };
+
+  const handleOpenAdd = () => {
+    setEditingPlot(null);
+    setFormData(EMPTY_PLOT_FORM);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (plot) => {
+    setEditingPlot(plot);
+    setFormData({
+      ten_thua_dat: plot.ten_thua_dat || "",
+      dien_tich: plot.dien_tich ?? "",
+      loai_dat: plot.loai_dat || "",
+      // Chỉ đổi được giữa "đất trống" và "tạm ngưng"
+      status: plot.trang_thai === "TAM_NGUNG" ? "TAM_NGUNG" : "DAT_TRONG",
+      loai_cay_trong: "",
+    });
+    setIsModalOpen(true);
+  };
+
+  // Thửa đang có mùa vụ chạy thì trạng thái do mùa vụ quyết định
+  const editingHasSeason = !!editingPlot?.ma_mua_vu;
+
+  const handleSavePlot = async (e) => {
+    e.preventDefault();
+
+    if (!formData.ten_thua_dat.trim()) return;
+
+    setSaving(true);
+
+    const baseUrl = `${API_URL}/api/nong-trai/${encodeURIComponent(maNongTrai)}/thua-dat`;
+    const common = {
+      ten_thua_dat: formData.ten_thua_dat.trim(),
+      dien_tich: formData.dien_tich,
+      loai_dat: formData.loai_dat.trim(),
     };
 
-    setPlots([...plots, newPlot]);
-    setIsModalOpen(false);
-    setFormData({ name: "", area: "", crop: "", status: "active" });
+    try {
+      const response = await fetch(
+        editingPlot ? `${baseUrl}/${editingPlot.ma_thua_dat}` : baseUrl,
+        {
+          method: editingPlot ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(
+            editingPlot
+              ? {
+                  ...common,
+                  ...(editingHasSeason ? {} : { trang_thai: formData.status }),
+                }
+              : {
+                  ...common,
+                  bat_dau_canh_tac: formData.status === "active",
+                  loai_cay_trong: formData.loai_cay_trong.trim(),
+                },
+          ),
+        },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Lưu thửa đất thất bại");
+        return;
+      }
+
+      handleCloseModal();
+      await fetchFarm();
+    } catch (err) {
+      console.error("Lỗi lưu thửa đất:", err);
+      alert("Không thể kết nối tới backend");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeletePlot = async (plot) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa ${plot.ten_thua_dat}?`)) return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/nong-trai/${encodeURIComponent(maNongTrai)}/thua-dat/${plot.ma_thua_dat}`,
+        { method: "DELETE" },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Xóa thửa đất thất bại");
+        return;
+      }
+
+      await fetchFarm();
+    } catch (err) {
+      console.error("Lỗi xóa thửa đất:", err);
+      alert("Không thể kết nối tới backend");
+    }
   };
 
   return (
@@ -128,13 +230,18 @@ export default function FarmDetail() {
         </div>
 
         <div className="header-search-bar">
-          <input type="text" placeholder="Tìm kiếm lô canh tác ..." />
+          <input
+            type="text"
+            placeholder="Tìm kiếm thửa đất, cây trồng ..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
         <div className="header-profile">
           <div className="avatar-circle"></div>
           <div className="profile-meta">
-            <span className="profile-name">Nguyễn Văn A</span>
+            <span className="profile-name">{user?.ho_ten || "Nông dân"}</span>
             <span className="profile-role">Nông dân</span>
           </div>
         </div>
@@ -162,121 +269,191 @@ export default function FarmDetail() {
           </button>
         </div>
 
-        {/* Thẻ thông tin Vườn Cam A1[cite: 1] */}
-        <div className="farm-card">
-          <div className="farm-image-box">
-            <img src={farmData.image} alt={farmData.name} />
-          </div>
+        {loading && <p>Đang tải thông tin nông trại...</p>}
 
-          <div className="farm-details">
-            <div className="farm-title-row">
-              <h1 className="farm-title">{farmData.name}</h1>
-              <span className="farm-badge">{farmData.code}</span>
-            </div>
+        {error && <p>{error}</p>}
 
-            <div className="farm-stats-grid">
-              <div className="stat-col">
-                <span className="stat-label">Diện tích</span>
-                <span className="stat-val">{farmData.area}</span>
+        {farm && (
+          <>
+            {/* Thẻ thông tin nông trại */}
+            <div className="farm-card">
+              <div className="farm-image-box">
+                <img
+                  src={
+                    farm.anh_nong_trai
+                      ? `${API_URL}${farm.anh_nong_trai}`
+                      : DEFAULT_FARM_IMG
+                  }
+                  alt={farm.ten_nong_trai}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src = DEFAULT_FARM_IMG;
+                  }}
+                />
               </div>
-              <div className="stat-col">
-                <span className="stat-label">Thổ nhưỡng</span>
-                <span className="stat-val">{farmData.soilType}</span>
-              </div>
-              <div className="stat-col">
-                <span className="stat-label">Địa chỉ</span>
-                <span className="stat-val">{farmData.address}</span>
-              </div>
-              <div className="stat-col">
-                <span className="stat-label">Người Quản lý</span>
-                <span className="stat-val">{farmData.manager}</span>
-              </div>
-            </div>
 
-            <div className="farm-crops">
-              <span className="crops-label">Cây trồng chủ yếu: </span>
-              <span className="crops-value">{farmData.mainCrops}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Tiêu đề & Nút thêm thửa đất[cite: 1] */}
-        <div className="section-header">
-          <div>
-            <h2 className="section-title">Quản lý thửa đất</h2>
-            <p className="section-subtitle">
-              Theo dõi tình trạng canh tác của nông trại
-            </p>
-          </div>
-
-          <button className="btn-add-plot" onClick={() => setIsModalOpen(true)}>
-            + Thêm thửa đất
-          </button>
-        </div>
-
-        {/* Lưới danh sách thửa[cite: 1] */}
-        <div className="plots-grid">
-          {filteredPlots.map((plot) => (
-            <div
-              key={plot.id}
-              className={`plot-card ${
-                plot.status === "active" ? "plot-active" : "plot-empty"
-              }`}
-            >
-              <div className="plot-header">
-                <div>
-                  <h3 className="plot-name">{plot.name}</h3>
-                  <span className="plot-area">{plot.area}</span>
+              <div className="farm-details">
+                <div className="farm-title-row">
+                  <h1 className="farm-title">{farm.ten_nong_trai}</h1>
+                  <span className="farm-badge">{farm.ma_nong_trai}</span>
                 </div>
-                <div className="plot-status-wrap">
-                  {plot.status === "active" ? (
-                    <span className="status-badge status-active">
-                      <span className="status-dot"></span> Đang canh tác
+
+                <div className="farm-stats-grid">
+                  <div className="stat-col">
+                    <span className="stat-label">Diện tích</span>
+                    <span className="stat-val">
+                      {formatArea(farm.dien_tich_nong_trai)}
                     </span>
-                  ) : (
-                    <span className="status-badge status-empty">Đất trống</span>
-                  )}
+                  </div>
+                  <div className="stat-col">
+                    <span className="stat-label">Thổ nhưỡng</span>
+                    <span className="stat-val">
+                      {farm.loai_dat.length > 0
+                        ? farm.loai_dat.join(", ")
+                        : "Chưa cập nhật"}
+                    </span>
+                  </div>
+                  <div className="stat-col">
+                    <span className="stat-label">Địa chỉ</span>
+                    <span className="stat-val">{farm.dia_diem_nong_trai}</span>
+                  </div>
+                  <div className="stat-col">
+                    <span className="stat-label">Người Quản lý</span>
+                    <span className="stat-val">{farm.nguoi_quan_ly}</span>
+                  </div>
+                </div>
+
+                <div className="farm-crops">
+                  <span className="crops-label">Cây trồng chủ yếu: </span>
+                  <span className="crops-value">
+                    {farm.cay_trong_chu_yeu.length > 0
+                      ? farm.cay_trong_chu_yeu.join(", ")
+                      : "Chưa có"}
+                  </span>
                 </div>
               </div>
-
-              <div className="plot-body">
-                {plot.status === "active" ? (
-                  <>
-                    <p className="crop-name">{plot.crop}</p>
-                    <p className="plot-date">Bắt đầu: {plot.startDate}</p>
-                    <p className="plot-duration">{plot.days} ngày</p>
-                  </>
-                ) : (
-                  <p className="empty-notice">Chưa bắt đầu mùa vụ</p>
-                )}
-              </div>
             </div>
-          ))}
-        </div>
+
+            {/* Tiêu đề & Nút thêm thửa đất */}
+            <div className="section-header">
+              <div>
+                <h2 className="section-title">Quản lý thửa đất</h2>
+                <p className="section-subtitle">
+                  Theo dõi tình trạng canh tác của nông trại
+                </p>
+              </div>
+
+              <button
+                className="btn-add-plot"
+                onClick={handleOpenAdd}
+              >
+                + Thêm thửa đất
+              </button>
+            </div>
+
+            {plots.length === 0 && (
+              <p>Nông trại chưa có thửa đất nào. Bấm "+ Thêm thửa đất".</p>
+            )}
+
+            {/* Lưới danh sách thửa */}
+            <div className="plots-grid">
+              {filteredPlots.map((plot) => {
+                const isActive = plot.trang_thai === "DANG_CANH_TAC";
+
+                return (
+                  <div
+                    key={plot.ma_thua_dat}
+                    className={`plot-card ${
+                      isActive ? "plot-active" : "plot-empty"
+                    }`}
+                  >
+                    <div className="plot-header">
+                      <div>
+                        <h3 className="plot-name">{plot.ten_thua_dat}</h3>
+                        <span className="plot-area">
+                          {formatArea(plot.dien_tich)}
+                        </span>
+                      </div>
+                      <div className="plot-status-wrap">
+                        {isActive ? (
+                          <span className="status-badge status-active">
+                            <span className="status-dot"></span> Đang canh tác
+                          </span>
+                        ) : (
+                          <span className="status-badge status-empty">
+                            {plot.trang_thai === "TAM_NGUNG"
+                              ? "Tạm ngưng"
+                              : "Đất trống"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="plot-body">
+                      {isActive ? (
+                        <>
+                          <p className="crop-name">
+                            {plot.loai_cay_trong || "Chưa gắn mùa vụ"}
+                          </p>
+                          {plot.ngay_gieo_trong && (
+                            <>
+                              <p className="plot-date">
+                                Bắt đầu: {formatDate(plot.ngay_gieo_trong)}
+                              </p>
+                              <p className="plot-duration">
+                                {plot.so_ngay} ngày
+                              </p>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <p className="empty-notice">Chưa bắt đầu mùa vụ</p>
+                      )}
+                    </div>
+
+                    <div className="plot-actions">
+                      <button
+                        type="button"
+                        className="plot-action-btn"
+                        onClick={() => handleOpenEdit(plot)}
+                      >
+                        Sửa
+                      </button>
+                      <button
+                        type="button"
+                        className="plot-action-btn danger"
+                        onClick={() => handleDeletePlot(plot)}
+                      >
+                        Xóa
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
       </main>
 
       {/* Modal Popup thêm thửa đất */}
       {isModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+        <div className="modal-overlay" onClick={handleCloseModal}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Thêm thửa đất mới</h3>
-              <button
-                className="modal-close"
-                onClick={() => setIsModalOpen(false)}
-              >
+              <h3>{editingPlot ? "Sửa thửa đất" : "Thêm thửa đất mới"}</h3>
+              <button className="modal-close" onClick={handleCloseModal}>
                 ✕
               </button>
             </div>
-            <form onSubmit={handleAddPlot} className="modal-form">
+            <form onSubmit={handleSavePlot} className="modal-form">
               <div className="form-group">
                 <label>Tên thửa đất</label>
                 <input
                   type="text"
                   placeholder="Ví dụ: Thửa A1-3"
-                  value={formData.name}
+                  value={formData.ten_thua_dat}
                   onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
+                    setFormData({ ...formData, ten_thua_dat: e.target.value })
                   }
                   required
                 />
@@ -287,51 +464,93 @@ export default function FarmDetail() {
                 <input
                   type="number"
                   step="0.1"
+                  min="0"
                   placeholder="2.5"
-                  value={formData.area}
+                  value={formData.dien_tich}
                   onChange={(e) =>
-                    setFormData({ ...formData, area: e.target.value })
+                    setFormData({ ...formData, dien_tich: e.target.value })
                   }
                 />
               </div>
 
               <div className="form-group">
-                <label>Trạng thái ban đầu</label>
-                <select
-                  value={formData.status}
+                <label>Loại đất</label>
+                <input
+                  type="text"
+                  placeholder="Đất phù sa, đất đỏ bazan..."
+                  value={formData.loai_dat}
                   onChange={(e) =>
-                    setFormData({ ...formData, status: e.target.value })
+                    setFormData({ ...formData, loai_dat: e.target.value })
                   }
-                >
-                  <option value="active">Đang canh tác</option>
-                  <option value="empty">Đất trống</option>
-                </select>
+                />
               </div>
 
-              {formData.status === "active" && (
+              {editingPlot ? (
                 <div className="form-group">
-                  <label>Loại cây trồng</label>
-                  <input
-                    type="text"
-                    placeholder="Quýt đường, Cam sành..."
-                    value={formData.crop}
-                    onChange={(e) =>
-                      setFormData({ ...formData, crop: e.target.value })
-                    }
-                  />
+                  <label>Trạng thái</label>
+                  {editingHasSeason ? (
+                    <input
+                      type="text"
+                      value={`Đang canh tác (mùa vụ ${editingPlot.ma_mua_vu}) - đổi ở Quản lý mùa vụ`}
+                      disabled
+                    />
+                  ) : (
+                    <select
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData({ ...formData, status: e.target.value })
+                      }
+                    >
+                      <option value="DAT_TRONG">Đất trống</option>
+                      <option value="TAM_NGUNG">Tạm ngưng</option>
+                    </select>
+                  )}
                 </div>
+              ) : (
+                <>
+                  <div className="form-group">
+                    <label>Trạng thái ban đầu</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) =>
+                        setFormData({ ...formData, status: e.target.value })
+                      }
+                    >
+                      <option value="active">Đang canh tác</option>
+                      <option value="empty">Đất trống</option>
+                    </select>
+                  </div>
+
+                  {formData.status === "active" && (
+                    <div className="form-group">
+                      <label>Loại cây trồng</label>
+                      <input
+                        type="text"
+                        placeholder="Quýt đường, Cam sành..."
+                        value={formData.loai_cay_trong}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            loai_cay_trong: e.target.value,
+                          })
+                        }
+                        required
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="modal-actions">
                 <button
                   type="button"
                   className="btn-cancel"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                 >
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit">
-                  Lưu thửa đất
+                <button type="submit" className="btn-submit" disabled={saving}>
+                  {saving ? "Đang lưu..." : editingPlot ? "Cập nhật" : "Lưu thửa đất"}
                 </button>
               </div>
             </form>

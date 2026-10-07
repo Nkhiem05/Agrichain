@@ -637,3 +637,20 @@
     justify-content: flex-start;
   }
 }
+
+/* Ô nhập sản lượng / ngày thu hoạch / chọn lô trong thẻ Thu hoạch */
+.field-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #1f2937;
+  background-color: #ffffff;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: #278d49;
+}
