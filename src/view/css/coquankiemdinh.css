@@ -221,64 +221,94 @@
   }
 
   .view-panel {
-    padding: 32px;
+    padding: 0 32px 32px 32px;
     max-width: 1280px;
     margin: 0 auto;
     width: 100%;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
   }
 
-  /* Metrics Top Grid */
+  /* ================= CỐ ĐỊNH KHUNG THỐNG KÊ (STICKY) ================= */
+  .metrics-sticky-wrapper {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    background-color: #f8faf9;
+    padding-top: 24px;
+    padding-bottom: 16px;
+    box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.03);
+  }
+
   .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, 1fr) 280px;
     gap: 16px;
-    align-items: center;
+    align-items: stretch;
   }
 
-  @media (max-width: 768px) {
+  @media (max-width: 1024px) {
+    .metrics-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
     .metrics-grid {
       grid-template-columns: 1fr;
     }
   }
 
+  /* Thẻ chỉ số card chuẩn style hình đính kèm */
   .metric-card {
-    background-color: #edf5f0;
-    padding: 16px;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
-    border: 1px solid #f3f4f6;
-    min-height: 90px;
+    padding: 18px 20px;
+    min-height: 95px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    transition: all 0.2s ease;
+  }
+
+  .metric-card:hover {
+    border-color: #cbd5e1;
+    background-color: #ffffff;
   }
 
   .metric-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: #6b7280;
+    font-size: 12px;
+    font-weight: 700;
+    color: #4b5563;
     text-transform: uppercase;
+    letter-spacing: 0.03em;
   }
 
   .metric-val {
-    font-size: 24px;
-    font-weight: 700;
-    color: #111827;
-    line-height: 1;
+    font-size: 28px;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
   }
 
   .metric-unit {
-    font-size: 12px;
-    font-weight: 400;
-    color: #6b7280;
-    margin-left: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #16a34a;
+    text-transform: none;
   }
 
+  /* Cột hành động / Bộ lọc bên phải */
   .filter-actions {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 8px;
   }
 
@@ -290,42 +320,59 @@
   .select-control {
     width: 100%;
     background-color: #ffffff;
-    border: 1px solid #d1d5db;
+    border: 1px solid #cbd5e1;
     border-radius: 8px;
     padding: 8px 32px 8px 12px;
     font-size: 12px;
-    color: #4b5563;
+    font-weight: 500;
+    color: #334155;
     appearance: none;
     cursor: pointer;
     outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .select-control:focus {
+    border-color: #16a34a;
   }
 
   .select-arrow-icon {
     position: absolute;
     right: 10px;
-    top: 10px;
-    color: #9ca3af;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8;
     pointer-events: none;
   }
 
   .btn-filter-urgent {
-    background-color: #337a4e;
+    background-color: #2e8b57;
     color: #ffffff;
-    padding: 8px 12px;
+    padding: 10px 16px;
     border-radius: 8px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 8px;
     border: none;
     cursor: pointer;
-    transition: background-color 0.15s ease;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(46, 139, 87, 0.2);
   }
 
   .btn-filter-urgent:hover {
-    background-color: #28633f;
+    background-color: #257247;
+  }
+
+  .filter-hint-text {
+    font-size: 11px;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 2px;
   }
 
   /* Card Lists */

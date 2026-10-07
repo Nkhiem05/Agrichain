@@ -37,6 +37,7 @@ function Coquankiemdinh() {
     e.preventDefault();
     navigate("/chi-tiet-kiem-dinh");
   };
+
   // Modals state
   const [modalAcceptOpen, setModalAcceptOpen] = useState(false);
   const [modalSamplingOpen, setModalSamplingOpen] = useState(false);
@@ -110,13 +111,13 @@ function Coquankiemdinh() {
     }
   };
 
-  // tải dữ liệu cho tab yêu cầu kiểm định
+  // Tải dữ liệu cho tab yêu cầu kiểm định
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [selectedStandard, setSelectedStandard] = useState(""); // Filter tiêu chuẩn
+  const [selectedStandard, setSelectedStandard] = useState("");
 
-  // 2. Viết hàm tải dữ liệu
+  // Hàm tải dữ liệu
   const fetchInspectionRequests = async () => {
     setLoading(true);
     setError(null);
@@ -127,7 +128,7 @@ function Coquankiemdinh() {
 
       const params = new URLSearchParams();
       params.append("trang_thai", "CHO_TIEP_NHAN");
-      if (maCoQuan) params.append("ma_co_quan", maCoQuan);
+      if (maCoQuan) params.append("ma_co_quan", "CQKD001");
       if (selectedStandard) {
         params.append("tieu_chuan", selectedStandard.toUpperCase());
       }
@@ -150,7 +151,7 @@ function Coquankiemdinh() {
       setLoading(false);
     }
   };
-  // 3. Gọi hàm khi component mount hoặc khi filter thay đổi
+
   useEffect(() => {
     if (currentTab === "requests") {
       fetchInspectionRequests();
@@ -259,46 +260,60 @@ function Coquankiemdinh() {
             {/* TAB 1: YÊU CẦU KIỂM ĐỊNH */}
             {currentTab === "requests" && (
               <main className="view-panel">
-                <div className="metrics-grid">
-                  <div className="metric-card">
-                    <span className="metric-label">Yêu cầu mới chờ duyệt</span>
-                    <p className="metric-val">
-                      4 <span className="metric-unit">HỒ SƠ MỚI</span>
-                    </p>
-                  </div>
-
-                  <div className="metric-card">
-                    <span className="metric-label">Đã lên lịch khảo sát</span>
-                    <p className="metric-val">
-                      3 <span className="metric-unit">ĐỢT LẤY MẪU</span>
-                    </p>
-                  </div>
-
-                  <div className="metric-card">
-                    <span className="metric-label">
-                      Đã cấp chứng nhận tháng này
-                    </span>
-                    <p className="metric-val">
-                      24 <span className="metric-unit">LÔ ĐẠT CHUẨN</span>
-                    </p>
-                  </div>
-
-                  <div className="filter-actions">
-                    <div className="custom-select-box">
-                      <select className="select-control" defaultValue="">
-                        <option value="">-- Tiêu chuẩn đăng ký --</option>
-                        <option value="vietgap">VietGAP Trồng trọt</option>
-                        <option value="globalgap">GlobalGAP</option>
-                        <option value="organic">
-                          Organic Nông nghiệp hữu cơ
-                        </option>
-                      </select>
-                      <ChevronDown size={16} className="select-arrow-icon" />
+                {/* VÙNG NEO CỐ ĐỊNH (STICKY) KHI CUỘN */}
+                <div className="metrics-sticky-wrapper">
+                  <div className="metrics-grid">
+                    <div className="metric-card">
+                      <span className="metric-label">
+                        Yêu cầu mới chờ duyệt
+                      </span>
+                      <p className="metric-val">
+                        {requests.length || 0}{" "}
+                        <span className="metric-unit">Hồ sơ mới</span>
+                      </p>
                     </div>
-                    <button type="button" className="btn-filter-urgent">
-                      <Filter size={14} />
-                      <span>Lọc hồ sơ khẩn cấp</span>
-                    </button>
+
+                    <div className="metric-card">
+                      <span className="metric-label">Đã lên lịch khảo sát</span>
+                      <p className="metric-val">
+                        3 <span className="metric-unit">Đợt lấy mẫu</span>
+                      </p>
+                    </div>
+
+                    <div className="metric-card">
+                      <span className="metric-label">
+                        Đã cấp chứng nhận tháng này
+                      </span>
+                      <p className="metric-val">
+                        24 <span className="metric-unit">Lô đạt chuẩn</span>
+                      </p>
+                    </div>
+
+                    <div className="filter-actions">
+                      <div className="custom-select-box">
+                        <select
+                          className="select-control"
+                          value={selectedStandard}
+                          onChange={(e) => setSelectedStandard(e.target.value)}
+                        >
+                          <option value="">-- Tiêu chuẩn đăng ký --</option>
+                          <option value="vietgap">VietGAP Trồng trọt</option>
+                          <option value="globalgap">GlobalGAP</option>
+                          <option value="organic">
+                            Organic Nông nghiệp hữu cơ
+                          </option>
+                        </select>
+                        <ChevronDown size={16} className="select-arrow-icon" />
+                      </div>
+                      <button type="button" className="btn-filter-urgent">
+                        <Filter size={14} />
+                        <span>Lọc hồ sơ khẩn cấp</span>
+                      </button>
+                      <div className="filter-hint-text">
+                        <span>🚜</span>
+                        <span>Ưu tiên lô hàng cận ngày xuất xưởng</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -332,7 +347,7 @@ function Coquankiemdinh() {
                           <div className="card-content-stack">
                             <div className="card-header-line">
                               <h3 className="card-title">
-                                {item.ten_san_pham} - Yêu cầu cấp tem{" "}
+                                {item.ten_san_pham} Yêu cầu cấp tem{" "}
                                 {item.tieu_chuan_dang_ky}
                               </h3>
                               <span className="pill-gray">
@@ -788,7 +803,7 @@ function Coquankiemdinh() {
                 <p style={{ color: "#4b5563" }}>
                   Hồ sơ kiểm định:{" "}
                   <b style={{ color: "#047857" }}>
-                    {acceptData.code} - {acceptData.farm}
+                    {acceptData.code} {acceptData.farm}
                   </b>
                 </p>
 
