@@ -1,122 +1,292 @@
 import React, { useState } from "react";
 import {
+  LayoutDashboard,
   ShieldCheck,
-  Users,
-  FolderTree,
-  Activity,
+  FolderKanban,
+  Boxes,
+  Microscope,
+  Truck,
+  Link2,
+  Plus,
+  Lock,
+  Unlock,
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  Trash2,
+  RefreshCw,
+  Building2,
   UserPlus,
+  Navigation,
+  FileCheck2,
+  X,
+  Tractor,
   Factory,
   Award,
-  Settings2,
-  Ban,
-  Check,
-  Plus,
-  Edit2,
-  Trash,
-  ShieldAlert,
-  RefreshCw,
-  X,
-  Building2,
 } from "lucide-react";
 import "../../css/admin.css";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
-const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState("actors");
+export default function AdminDashboard() {
+  // ================= TABS =================
+  const [activeTab, setActiveTab] = useState("overview");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  // State Chủ thể
+  // ================= MODALS STATE =================
+  const [showActorModal, setShowActorModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showCatModal, setShowCatModal] = useState(false);
+  const [showRecallModal, setShowRecallModal] = useState(false);
+  const [selectedRecallBatch, setSelectedRecallBatch] = useState("#LH-8790");
+  const [showGpsModal, setShowGpsModal] = useState(null);
+
+  // ================= DỮ LIỆU CHỦ THỂ =================
   const [actors, setActors] = useState([
     {
-      id: 1,
-      name: "HTX Sơ Chế & Chế Biến Mekong",
-      code: "#NODE-CS-01",
-      type: "Cơ Sở Sơ Chế / Đóng Gói",
-      representative: "Trần Văn Long",
-      tax: "1802198291",
-      nodeAddress: "0x81b7...d319",
+      id: "FARM-01111",
+      name: "Vườn Cam A1",
+      type: "Nông trại / HTX canh tác",
+      rep: "Nguyễn Văn A",
+      taxId: "1802198001",
+      node: "0x52a9...01ce",
+      category: "farm",
       active: true,
-      permissions:
-        "Tiếp nhận lô, Khởi tạo lô sơ chế, Tách/Gộp lô, Ký số chứng thực bao bì.",
+      desc: "Quản lý nông trại, mùa vụ, ghi nhật ký vật tư, xuất lô thu hoạch, đặt lịch kiểm định, tạo yêu cầu vận chuyển.",
     },
     {
-      id: 2,
-      name: "Trung Tâm Giám Định Vùng 2",
-      code: "#NODE-KD-02",
-      type: "Cơ Quan Kiểm Định Chất Lượng",
-      representative: "Sở Nông Nghiệp & PTNT",
-      tax: "Cấp chứng nhận VietGAP / GlobalGAP",
-      nodeAddress: "0x34f1...99bc",
+      id: "NODE-CS-01",
+      name: "HTX Sơ Chế & Chế Biến Mekong",
+      type: "Cơ sở sơ chế / đóng gói",
+      rep: "Trần Văn Long",
+      taxId: "1802198291",
+      node: "0x81b7...d319",
+      category: "factory",
       active: true,
-      permissions:
-        "Duyệt lịch hẹn lấy mẫu, Công bố kết quả xét nghiệm, Đình chỉ tem chứng nhận.",
+      desc: "Tiếp nhận hoặc từ chối lô, cân thực tế, khởi tạo lô sơ chế, tách/gộp lô, ký số bao bì, bàn giao vận chuyển.",
+    },
+    {
+      id: "NODE-KD-02",
+      name: "Trung Tâm Giám Định Vùng 2",
+      type: "Cơ quan kiểm định",
+      rep: "Sở Nông nghiệp & PTNT",
+      taxId: "VietGAP / GlobalGAP",
+      node: "0x34f1...99bc",
+      category: "inspection",
+      active: true,
+      desc: "Chấp thuận hoặc từ chối hồ sơ, hẹn lấy mẫu, niêm phong, nhập chỉ số xét nghiệm, ký số và công bố chứng nhận.",
+    },
+    {
+      id: "NODE-VC-04",
+      name: "Mekong Express Logistics",
+      type: "Đơn vị vận chuyển",
+      rep: "Lê Quốc Bảo",
+      taxId: "1801455620",
+      node: "0x9ad0...4e72",
+      category: "shipping",
+      active: true,
+      desc: "Nhận chuyến, quét QR lấy hàng, ghi hành trình GPS, xác nhận giao hàng, ký biên bản giao nhận điện tử.",
+    },
+    {
+      id: "NODE-CS-07",
+      name: "HTX Bến Tre Fresh",
+      type: "Cơ sở sơ chế / đóng gói",
+      rep: "Phạm Thị Hoa",
+      taxId: "1300774511",
+      node: "0xd941...c4a1",
+      category: "factory",
+      active: false,
+      desc: "Vi phạm quy trình tách/gộp lô - Node tạm dừng giao dịch trên Smart Contract.",
     },
   ]);
 
-  // State Người dùng
-  const [userList, setUserList] = useState([
+  // ================= DỮ LIỆU TÀI KHOẢN =================
+  const [users, setUsers] = useState([
     {
       username: "nongdan_nguyenvana",
-      fullname: "Nguyễn Văn A",
-      org: "Vườn Cam A1 (#FARM-01111)",
-      role: "Nông Dân (Canh tác)",
-      status: "Hoạt động",
+      name: "Nguyễn Văn A",
+      org: "Vườn Cam A1",
+      role: "Nông dân",
+      active: true,
+    },
+    {
+      username: "soche_tranvanlong",
+      name: "Trần Văn Long",
+      org: "HTX Sơ Chế Mekong",
+      role: "Cơ sở sơ chế",
+      active: true,
+    },
+    {
+      username: "kiemdinh_ttgd2",
+      name: "Võ Minh Khoa",
+      org: "Trung Tâm Giám Định V2",
+      role: "Kiểm định viên",
+      active: true,
     },
     {
       username: "taixe_hung65c",
-      fullname: "Nguyễn Văn Hùng",
+      name: "Nguyễn Văn Hùng",
       org: "Mekong Express Logistics",
-      role: "Tài Xế Vận Chuyển",
-      status: "Hoạt động",
+      role: "Tài xế vận chuyển",
+      active: true,
+    },
+    {
+      username: "taixe_minhtri",
+      name: "Nguyễn Minh Trí",
+      org: "Mekong Express Logistics",
+      role: "Tài xế vận chuyển",
+      active: false,
     },
   ]);
 
-  // State Modal
-  const [showAddActorModal, setShowAddActorModal] = useState(false);
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [showAddCatModal, setShowAddCatModal] = useState(false);
+  // ================= DỮ LIỆU DANH MỤC =================
+  const [categories, setCategories] = useState([
+    {
+      title: "Giống cây trồng",
+      items: [
+        "Quýt Đường miền Tây",
+        "Cam Sành Tiền Giang",
+        "Bưởi Da Xanh Bến Tre",
+      ],
+    },
+    {
+      title: "Tiêu chuẩn kiểm định",
+      items: ["VietGAP trồng trọt", "GlobalGAP xuất khẩu"],
+    },
+    {
+      title: "Chỉ số xét nghiệm",
+      items: [
+        "Dư lượng thuốc BVTV (mg/kg)",
+        "Kim loại nặng (Pb, Cd)",
+        "Độ Brix tiêu chuẩn",
+      ],
+    },
+    {
+      title: "Vật tư & phân bón",
+      items: ["Phân bón NPK 20-20-15", "Thuốc trừ sâu Decis 2.5EC"],
+    },
+    {
+      title: "Quy cách đóng gói",
+      items: ["Thùng carton 10 kg", "Túi lưới 2 kg", "Khay xốp bọc màng 500 g"],
+    },
+    {
+      title: "Phương tiện & ngưỡng bảo quản",
+      items: ["Xe lạnh 4–8°C", "Xe thường có bạt che"],
+    },
+  ]);
 
-  // Vô hiệu hóa/Kích hoạt chủ thể
+  // ================= TOÀN VẸN CHUỖI ON-CHAIN =================
+  const [blocksVerified, setBlocksVerified] = useState(42918);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  // ================= FORM STATES =================
+  const [newActor, setNewActor] = useState({
+    name: "",
+    type: "Nông trại / HTX canh tác",
+    taxId: "",
+    node: "",
+  });
+
+  const [newUser, setNewUser] = useState({
+    username: "",
+    name: "",
+    org: "Vườn Cam A1",
+    role: "Nông dân",
+  });
+
+  const [newCat, setNewCat] = useState({
+    categoryType: "Giống cây trồng",
+    name: "",
+  });
+
+  const [recallReason, setRecallReason] = useState("");
+
+  // ================= XỬ LÝ SỰ KIỆN =================
   const toggleActorStatus = (id) => {
     setActors((prev) =>
-      prev.map((actor) => {
-        if (actor.id === id) {
-          const updated = !actor.active;
-          alert(
-            updated
-              ? `Đã kích hoạt lại chủ thể ${actor.name}!`
-              : `Đã vô hiệu hóa chủ thể ${actor.name}! Tất cả giao dịch chuỗi từ node này đã bị chặn.`,
-          );
-          return { ...actor, active: updated };
-        }
-        return actor;
-      }),
+      prev.map((item) =>
+        item.id === id ? { ...item, active: !item.active } : item,
+      ),
     );
   };
 
-  // Khóa người dùng
-  const handleLockUser = (username) => {
-    if (window.confirm(`Bạn có chắc muốn tạm khóa tài khoản "${username}"?`)) {
-      setUserList((prev) =>
-        prev.map((u) =>
-          u.username === username ? { ...u, status: "Bị khóa" } : u,
-        ),
+  const toggleUserStatus = (username) => {
+    setUsers((prev) =>
+      prev.map((item) =>
+        item.username === username ? { ...item, active: !item.active } : item,
+      ),
+    );
+  };
+
+  const handleAddActor = (e) => {
+    e.preventDefault();
+    if (!newActor.name) return alert("Vui lòng điền tên chủ thể");
+    const created = {
+      id: `#NODE-${Math.floor(1000 + Math.random() * 9000)}`,
+      name: newActor.name,
+      type: newActor.type,
+      rep: "Đại diện hợp pháp",
+      taxId: newActor.taxId || "Đang xác thực",
+      node:
+        newActor.node ||
+        "0x" + Math.random().toString(16).substring(2, 8) + "...node",
+      category: "farm",
+      active: true,
+      desc: "Node mới thêm, đã ghi nhận trên mạng Smart Contract.",
+    };
+    setActors([...actors, created]);
+    setShowActorModal(false);
+    setNewActor({
+      name: "",
+      type: "Nông trại / HTX canh tác",
+      taxId: "",
+      node: "",
+    });
+  };
+
+  const handleAddUser = (e) => {
+    e.preventDefault();
+    if (!newUser.username || !newUser.name)
+      return alert("Vui lòng nhập đủ thông tin");
+    setUsers([...users, { ...newUser, active: true }]);
+    setShowUserModal(false);
+    setNewUser({
+      username: "",
+      name: "",
+      org: "Vườn Cam A1",
+      role: "Nông dân",
+    });
+  };
+
+  const handleAddCategoryItem = (e) => {
+    e.preventDefault();
+    if (!newCat.name) return alert("Vui lòng nhập tên mục");
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.title === newCat.categoryType
+          ? { ...c, items: [...c.items, newCat.name] }
+          : c,
+      ),
+    );
+    setShowCatModal(false);
+    setNewCat({ categoryType: "Giống cây trồng", name: "" });
+  };
+
+  const handleVerifyChain = () => {
+    setIsVerifying(true);
+    setTimeout(() => {
+      setBlocksVerified((prev) => prev + Math.floor(Math.random() * 8 + 1));
+      setIsVerifying(false);
+      alert(
+        "Đã đối soát xong! Toàn bộ khối giao dịch đều khớp 100% với Smart Contract.",
       );
-      alert(`Tài khoản ${username} đã bị khóa.`);
-    }
-  };
-
-  // Kiểm tra tính toàn vẹn
-  const handleRunIntegrityCheck = () => {
-    alert(
-      "Đang đối soát cây Merkle... Toàn bộ 42,918 khối và giao dịch khớp hoàn toàn với sổ cái Smart Contract. Không phát hiện sai lệch dữ liệu!",
-    );
+    }, 1000);
   };
 
   return (
-    <div className="admin-dashboard">
-      {/* HEADER (ĐỒNG BỘ NÔNG DÂN) */}
+    <div className="admin">
+      {/* ================= HEADER ================= */}
       <header className="dashboard-header">
         <div className="header-left">
           <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
@@ -126,7 +296,9 @@ const AdminPage = () => {
         <div className="header-search-bar">
           <input
             type="text"
-            placeholder="Tìm kiếm tài khoản, chủ thể, mã hợp đồng..."
+            placeholder="Tìm tài khoản, chủ thể, mã lô, mã chuyến, mã hợp đồng..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
@@ -139,47 +311,74 @@ const AdminPage = () => {
         </div>
       </header>
 
-      {/* BODY */}
+      {/* ================= BODY ================= */}
       <div className="dashboard-body">
-        {/* SIDEBAR (ĐỒNG BỘ NÔNG DÂN) */}
+        {/* ================= SIDEBAR ================= */}
         <aside className="dashboard-sidebar">
           <div>
             <div className="sidebar-heading">Quản trị hệ thống</div>
             <nav className="sidebar-nav">
               <button
                 type="button"
+                onClick={() => setActiveTab("overview")}
+                className={`nav-item-btn ${activeTab === "overview" ? "active" : ""}`}
+              >
+                <LayoutDashboard size={18} />
+                <span>Tổng quan</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab("actors")}
                 className={`nav-item-btn ${activeTab === "actors" ? "active" : ""}`}
               >
-                <ShieldCheck size={20} />
-                <span>Tài khoản & Chủ thể</span>
+                <ShieldCheck size={18} />
+                <span>Chủ thể & tài khoản</span>
               </button>
-
               <button
                 type="button"
-                onClick={() => setActiveTab("users")}
-                className={`nav-item-btn ${activeTab === "users" ? "active" : ""}`}
+                onClick={() => setActiveTab("catalog")}
+                className={`nav-item-btn ${activeTab === "catalog" ? "active" : ""}`}
               >
-                <Users size={20} />
-                <span>Tài khoản người dùng</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab("categories")}
-                className={`nav-item-btn ${activeTab === "categories" ? "active" : ""}`}
-              >
-                <FolderTree size={20} />
+                <FolderKanban size={18} />
                 <span>Danh mục dùng chung</span>
               </button>
+            </nav>
 
+            <div className="sidebar-heading" style={{ marginTop: 16 }}>
+              Giám sát chuỗi cung ứng
+            </div>
+            <nav className="sidebar-nav">
               <button
                 type="button"
-                onClick={() => setActiveTab("system")}
-                className={`nav-item-btn ${activeTab === "system" ? "active" : ""}`}
+                onClick={() => setActiveTab("batches")}
+                className={`nav-item-btn ${activeTab === "batches" ? "active" : ""}`}
               >
-                <Activity size={20} />
-                <span>Giám sát chuỗi & Lô hàng</span>
+                <Boxes size={18} />
+                <span>Lô hàng toàn chuỗi</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("inspection")}
+                className={`nav-item-btn ${activeTab === "inspection" ? "active" : ""}`}
+              >
+                <Microscope size={18} />
+                <span>Kiểm định & thu hồi</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("shipping")}
+                className={`nav-item-btn ${activeTab === "shipping" ? "active" : ""}`}
+              >
+                <Truck size={18} />
+                <span>Vận chuyển</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("integrity")}
+                className={`nav-item-btn ${activeTab === "integrity" ? "active" : ""}`}
+              >
+                <Link2 size={18} />
+                <span>Nhật ký & toàn vẹn</span>
               </button>
             </nav>
           </div>
@@ -192,80 +391,411 @@ const AdminPage = () => {
           </div>
         </aside>
 
-        {/* NỘI DUNG CHÍNH */}
+        {/* ================= CONTENT ================= */}
         <main className="dashboard-content">
-          {/* TAB 1: TÀI KHOẢN & CHỦ THỂ */}
+          {/* TAB 1: TỔNG QUAN */}
+          {activeTab === "overview" && (
+            <div>
+              <div className="metrics-row">
+                <div className="metric-card">
+                  <span className="metric-title">Nông trại đang canh tác</span>
+                  <div className="metric-number">
+                    128 <span className="metric-unit">NÔNG TRẠI</span>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Mùa vụ đang chạy</span>
+                  <div className="metric-number">
+                    214 <span className="metric-unit">MÙA VỤ</span>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Lô đang lưu thông</span>
+                  <div className="metric-number">
+                    86 <span className="metric-unit">LÔ</span>
+                  </div>
+                </div>
+                <div className="metric-card warn">
+                  <span className="metric-title">Cảnh báo cần xử lý</span>
+                  <div className="metric-number">
+                    5 <span className="metric-unit">MỤC</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overview-cols">
+                <div className="box-section">
+                  <h3>
+                    <span>Việc cần xử lý</span>
+                    <span className="status-pill danger">5 mục</span>
+                  </h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 14,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        paddingBottom: 12,
+                        borderBottom: "1px solid #f3f4f6",
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: 13.5, color: "#1f2937" }}>
+                          Hồ sơ chủ thể chờ duyệt
+                        </strong>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#6b7280",
+                            marginTop: 2,
+                          }}
+                        >
+                          3 đơn vị vừa đăng ký: 1 nông trại, 1 cơ sở sơ chế, 1
+                          đơn vị vận chuyển
+                        </p>
+                      </div>
+                      <button
+                        className="btn-action-view"
+                        onClick={() => setActiveTab("actors")}
+                      >
+                        Xem
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        paddingBottom: 12,
+                        borderBottom: "1px solid #f3f4f6",
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: 13.5, color: "#dc2626" }}>
+                          Lô #LH-8790 không đạt chuẩn VietGAP
+                        </strong>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#6b7280",
+                            marginTop: 2,
+                          }}
+                        >
+                          Cơ quan kiểm định đã đình chỉ tem chứng nhận hôm nay
+                        </p>
+                      </div>
+                      <button
+                        className="btn-action-retry"
+                        onClick={() => {
+                          setSelectedRecallBatch("#LH-8790");
+                          setShowRecallModal(true);
+                        }}
+                      >
+                        Thu hồi
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        paddingBottom: 12,
+                        borderBottom: "1px solid #f3f4f6",
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: 13.5, color: "#1f2937" }}>
+                          Chuyến #VC-3021 vượt ngưỡng nhiệt độ
+                        </strong>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#6b7280",
+                            marginTop: 2,
+                          }}
+                        >
+                          Xe 65C-128.45 ghi nhận 12°C, ngưỡng cho phép 4–8°C
+                        </p>
+                      </div>
+                      <button
+                        className="btn-action-edit"
+                        onClick={() => setActiveTab("shipping")}
+                      >
+                        Xem
+                      </button>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <strong style={{ fontSize: 13.5, color: "#1f2937" }}>
+                          Cơ sở sơ chế bị vô hiệu hóa
+                        </strong>
+                        <p
+                          style={{
+                            fontSize: 12,
+                            color: "#6b7280",
+                            marginTop: 2,
+                          }}
+                        >
+                          HTX Bến Tre Fresh, giao dịch chuỗi từ node này đang bị
+                          chặn
+                        </p>
+                      </div>
+                      <button
+                        className="btn-action-view"
+                        onClick={() => setActiveTab("actors")}
+                      >
+                        Xem
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="box-section">
+                  <h3>Lô hàng theo chặng</h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 14,
+                    }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 13,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <span>Canh tác</span>
+                        <b>42</b>
+                      </div>
+                      <div
+                        style={{
+                          height: 8,
+                          background: "#eef2f0",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "48%",
+                            height: "100%",
+                            background: "#67ac7d",
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 13,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <span>Sơ chế</span>
+                        <b>18</b>
+                      </div>
+                      <div
+                        style={{
+                          height: 8,
+                          background: "#eef2f0",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "21%",
+                            height: "100%",
+                            background: "#14532d",
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 13,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <span>Kiểm định</span>
+                        <b>11</b>
+                      </div>
+                      <div
+                        style={{
+                          height: 8,
+                          background: "#eef2f0",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "13%",
+                            height: "100%",
+                            background: "#e0a030",
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: 13,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <span>Vận chuyển</span>
+                        <b>15</b>
+                      </div>
+                      <div
+                        style={{
+                          height: 8,
+                          background: "#eef2f0",
+                          borderRadius: 4,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "17%",
+                            height: "100%",
+                            background: "#4f8fd6",
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="alert-box ok" style={{ marginTop: 12 }}>
+                      <div>
+                        <b>100% Khối hợp lệ</b>
+                        <p>Lần đối soát gần nhất: 15 phút trước</p>
+                      </div>
+                      <CheckCircle2 color="#16a34a" size={24} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: CHỦ THỂ & TÀI KHOẢN */}
           {activeTab === "actors" && (
             <div>
               <div className="metrics-row">
                 <div className="metric-card">
-                  <div className="metric-title">Tổng số chủ thể chuỗi</div>
+                  <span className="metric-title">Tổng số chủ thể chuỗi</span>
                   <div className="metric-number">
-                    {actors.length + 40}
-                    <span className="metric-unit">ĐƠN VỊ</span>
+                    {actors.length} <span className="metric-unit">ĐƠN VỊ</span>
                   </div>
                 </div>
-
                 <div className="metric-card">
-                  <div className="metric-title">Chủ thể đang hoạt động</div>
+                  <span className="metric-title">Đang hoạt động</span>
                   <div className="metric-number">
-                    {actors.filter((a) => a.active).length + 39}
+                    {actors.filter((a) => a.active).length}
                   </div>
                 </div>
-
+                <div className="metric-card warn">
+                  <span className="metric-title">Đang bị vô hiệu hóa</span>
+                  <div className="metric-number">
+                    {actors.filter((a) => !a.active).length}{" "}
+                    <span className="metric-unit">CHỦ THỂ</span>
+                  </div>
+                </div>
                 <div className="metric-card">
-                  <div className="metric-title">Đang bị vô hiệu hóa</div>
-                  <div className="metric-number" style={{ color: "#dc2626" }}>
-                    {actors.filter((a) => !a.active).length}
-                    <span className="metric-unit" style={{ color: "#dc2626" }}>
-                      CHỦ THỂ
-                    </span>
+                  <span className="metric-title">Chờ duyệt đăng ký</span>
+                  <div className="metric-number">
+                    3 <span className="metric-unit">HỒ SƠ</span>
                   </div>
-                </div>
-
-                <div className="actions-box">
-                  <button
-                    className="btn-primary-action"
-                    onClick={() => setShowAddActorModal(true)}
-                  >
-                    <UserPlus size={16} /> + Đăng ký chủ thể
-                  </button>
                 </div>
               </div>
 
-              {/* Danh sách chủ thể */}
+              <div className="content-head">
+                <div>
+                  <h2>Chủ thể tham gia chuỗi</h2>
+                  <p>
+                    Mỗi chủ thể là một node với quyền hạn riêng trên Smart
+                    Contract.
+                  </p>
+                </div>
+                <button
+                  className="btn-primary-action"
+                  onClick={() => setShowActorModal(true)}
+                >
+                  <Plus size={16} /> Đăng ký chủ thể
+                </button>
+              </div>
+
               {actors.map((actor) => (
-                <div className="card-item" key={actor.id}>
+                <div
+                  key={actor.id}
+                  className={`panel-card ${actor.active ? "" : "disabled"}`}
+                >
                   <div
-                    className={`card-icon-box ${actor.id === 1 ? "green" : "blue"}`}
+                    className={`card-icon-avatar ${
+                      actor.category === "shipping"
+                        ? "amber"
+                        : actor.category === "inspection"
+                          ? "blue"
+                          : actor.active
+                            ? ""
+                            : "red"
+                    }`}
                   >
-                    {actor.id === 1 ? (
-                      <Factory size={28} />
-                    ) : (
-                      <Award size={28} />
-                    )}
+                    {actor.category === "farm" && <Tractor size={26} />}
+                    {actor.category === "factory" && <Factory size={26} />}
+                    {actor.category === "inspection" && <Award size={26} />}
+                    {actor.category === "shipping" && <Truck size={26} />}
                   </div>
 
-                  <div className="card-body">
-                    <div className="card-header-line">
-                      <h3 className="card-title">{actor.name}</h3>
-                      <span className="tag-badge gray">{actor.code}</span>
+                  <div className="card-main">
+                    <div className="card-head-row">
+                      <h3>{actor.name}</h3>
+                      <span className="status-pill gray mono">#{actor.id}</span>
                       <span
-                        className={`tag-badge ${actor.id === 1 ? "green" : "blue"}`}
+                        className={`status-pill ${actor.active ? "success" : "danger"}`}
                       >
                         {actor.type}
                       </span>
                     </div>
 
-                    <div className="card-meta-row">
+                    <div className="card-grid-info">
                       <span>
-                        Đại diện: <strong>{actor.representative}</strong>
+                        Đại diện: <strong>{actor.rep}</strong>
                       </span>
                       <span>
-                        Mã định danh/MST: <strong>{actor.tax}</strong>
+                        Mã định danh/MST: <strong>{actor.taxId}</strong>
                       </span>
                       <span>
-                        Địa chỉ node: <strong>{actor.nodeAddress}</strong>
+                        Node: <strong className="mono">{actor.node}</strong>
                       </span>
                       <span>
                         Trạng thái:{" "}
@@ -274,74 +804,44 @@ const AdminPage = () => {
                             color: actor.active ? "#15803d" : "#dc2626",
                           }}
                         >
-                          {actor.active
-                            ? "Đang hoạt động (Active)"
-                            : "Đã vô hiệu hóa"}
+                          {actor.active ? "Đang hoạt động" : "Đã vô hiệu hóa"}
                         </strong>
                       </span>
                     </div>
 
-                    <div className="card-desc">
-                      <strong>Quyền hạn chuỗi:</strong> {actor.permissions}
+                    <div className="card-desc-box">
+                      <strong>Quyền hạn chuỗi:</strong> {actor.desc}
                     </div>
                   </div>
 
-                  <div className="card-actions">
+                  <div className="card-actions-col">
                     <button
                       className={
-                        actor.active
-                          ? "btn-action-danger"
-                          : "btn-action-outline"
+                        actor.active ? "btn-action-retry" : "btn-action-view"
                       }
                       onClick={() => toggleActorStatus(actor.id)}
                     >
-                      {actor.active ? <Ban size={15} /> : <Check size={15} />}
-                      <span>
-                        {actor.active ? "Vô hiệu hóa" : "Kích hoạt lại"}
-                      </span>
+                      {actor.active ? <Lock size={12} /> : <Unlock size={12} />}
+                      {actor.active ? "Vô hiệu hóa" : "Kích hoạt lại"}
                     </button>
                     <button
-                      className="btn-action-outline"
-                      onClick={() =>
-                        alert("Mở cấu hình phân quyền Smart Contract")
-                      }
+                      className="btn-action-edit"
+                      onClick={() => alert(`Phân quyền cho ${actor.name}`)}
                     >
-                      <Settings2 size={15} /> Phân quyền
+                      Phân quyền
                     </button>
                   </div>
                 </div>
               ))}
-            </div>
-          )}
 
-          {/* TAB 2: NGƯỜI DÙNG */}
-          {activeTab === "users" && (
-            <div style={{ paddingTop: "24px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  backgroundColor: "#ffffff",
-                  padding: "16px 20px",
-                  borderRadius: "10px",
-                  border: "1px solid #e5e7eb",
-                  marginBottom: "20px",
-                }}
-              >
+              <div className="content-head" style={{ marginTop: 32 }}>
                 <div>
-                  <h2 style={{ fontSize: "16px", fontWeight: "700" }}>
-                    Danh Sách Người Dùng Hệ Thống
-                  </h2>
-                  <p style={{ fontSize: "12px", color: "#6b7280" }}>
-                    Quản lý định danh cá nhân thuộc các chủ thể tham gia chuỗi
-                    cung ứng.
-                  </p>
+                  <h2>Tài khoản người dùng</h2>
+                  <p>Định danh cá nhân thuộc các chủ thể tham gia chuỗi.</p>
                 </div>
                 <button
                   className="btn-primary-action"
-                  style={{ height: "36px", padding: "0 16px" }}
-                  onClick={() => setShowAddUserModal(true)}
+                  onClick={() => setShowUserModal(true)}
                 >
                   <UserPlus size={16} /> Thêm tài khoản
                 </button>
@@ -351,53 +851,43 @@ const AdminPage = () => {
                 <table className="admin-table">
                   <thead>
                     <tr>
-                      <th>Tên Đăng Nhập</th>
-                      <th>Họ & Tên</th>
-                      <th>Chủ Thể Trực Thuộc</th>
-                      <th>Vai Trò</th>
-                      <th>Trạng Thái</th>
-                      <th style={{ textAlign: "right" }}>Thao Tác</th>
+                      <th>Tên đăng nhập</th>
+                      <th>Họ và tên</th>
+                      <th>Chủ thể trực thuộc</th>
+                      <th>Vai trò</th>
+                      <th>Trạng thái</th>
+                      <th style={{ textAlign: "right" }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {userList.map((u, idx) => (
-                      <tr key={idx}>
-                        <td
-                          style={{ fontWeight: "700", fontFamily: "monospace" }}
-                        >
-                          {u.username}
+                    {users.map((user) => (
+                      <tr key={user.username}>
+                        <td className="mono" style={{ fontWeight: 600 }}>
+                          {user.username}
                         </td>
-                        <td>{u.fullname}</td>
-                        <td style={{ color: "#16a34a", fontWeight: "600" }}>
-                          {u.org}
+                        <td>{user.name}</td>
+                        <td style={{ color: "#16a34a", fontWeight: 600 }}>
+                          {user.org}
                         </td>
-                        <td>{u.role}</td>
+                        <td>{user.role}</td>
                         <td>
                           <span
-                            className={`status-badge ${
-                              u.status === "Hoạt động" ? "active" : "disabled"
-                            }`}
+                            className={`status-pill ${user.active ? "success" : "danger"}`}
                           >
-                            {u.status}
+                            {user.active ? "Hoạt động" : "Bị khóa"}
                           </span>
                         </td>
                         <td style={{ textAlign: "right" }}>
-                          {u.status === "Hoạt động" ? (
-                            <button
-                              style={{
-                                background: "none",
-                                border: "none",
-                                color: "#dc2626",
-                                fontWeight: "600",
-                                cursor: "pointer",
-                              }}
-                              onClick={() => handleLockUser(u.username)}
-                            >
-                              Khóa tài khoản
-                            </button>
-                          ) : (
-                            <span style={{ color: "#9ca3af" }}>Đã khóa</span>
-                          )}
+                          <button
+                            className={
+                              user.active
+                                ? "btn-action-retry"
+                                : "btn-action-view"
+                            }
+                            onClick={() => toggleUserStatus(user.username)}
+                          >
+                            {user.active ? "Khóa tài khoản" : "Mở khóa"}
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -407,518 +897,1131 @@ const AdminPage = () => {
             </div>
           )}
 
-          {/* TAB 3: DANH MỤC */}
-          {activeTab === "categories" && (
-            <div style={{ paddingTop: "24px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  backgroundColor: "#ffffff",
-                  padding: "16px 20px",
-                  borderRadius: "10px",
-                  border: "1px solid #e5e7eb",
-                  marginBottom: "20px",
-                }}
-              >
+          {/* TAB 3: DANH MỤC DÙNG CHUNG */}
+          {activeTab === "catalog" && (
+            <div>
+              <div className="content-head">
                 <div>
-                  <h2 style={{ fontSize: "16px", fontWeight: "700" }}>
-                    Danh Mục Chuẩn Hóa Toàn Ngành
-                  </h2>
-                  <p style={{ fontSize: "12px", color: "#6b7280" }}>
-                    Định nghĩa trước danh mục cây trồng, loại phân bón và tiêu
-                    chuẩn chứng nhận.
+                  <h2>Danh mục chuẩn hóa toàn ngành</h2>
+                  <p>
+                    Nông dân, cơ sở sơ chế và cơ quan kiểm định cùng chọn từ các
+                    danh mục này.
                   </p>
                 </div>
                 <button
                   className="btn-primary-action"
-                  style={{ height: "36px", padding: "0 16px" }}
-                  onClick={() => setShowAddCatModal(true)}
+                  onClick={() => setShowCatModal(true)}
                 >
                   <Plus size={16} /> Thêm danh mục
                 </button>
               </div>
 
-              <div className="categories-grid">
-                <div className="category-box">
-                  <div className="category-box-header">
-                    <span style={{ fontWeight: "700", fontSize: "14px" }}>
-                      Giống Cây Trồng
-                    </span>
-                    <span
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                  gap: 16,
+                }}
+              >
+                {categories.map((cat, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: "#ffffff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 10,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
                       style={{
-                        color: "#16a34a",
-                        fontSize: "12px",
-                        fontWeight: "600",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        padding: "12px 16px",
+                        background: "#f9fafb",
+                        borderBottom: "1px solid #e5e7eb",
+                        fontWeight: 700,
                       }}
                     >
-                      2 giống
-                    </span>
-                  </div>
-                  <div className="category-item">
-                    <span>Quýt Đường miền Tây</span>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <Edit2
-                        size={14}
-                        style={{ cursor: "pointer", color: "#6b7280" }}
-                      />
-                      <Trash
-                        size={14}
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                      />
+                      <span>{cat.title}</span>
+                      <span style={{ color: "#278d49", fontSize: 12 }}>
+                        {cat.items.length} mục
+                      </span>
+                    </div>
+                    <div>
+                      {cat.items.map((item, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            padding: "10px 16px",
+                            borderBottom:
+                              i === cat.items.length - 1
+                                ? "none"
+                                : "1px solid #f3f4f6",
+                            fontSize: 13,
+                          }}
+                        >
+                          <span>{item}</span>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "#6b7280",
+                                cursor: "pointer",
+                                fontSize: 12,
+                              }}
+                              onClick={() => alert(`Sửa ${item}`)}
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "#dc2626",
+                                cursor: "pointer",
+                                fontSize: 12,
+                              }}
+                              onClick={() => {
+                                setCategories((prev) =>
+                                  prev.map((c) =>
+                                    c.title === cat.title
+                                      ? {
+                                          ...c,
+                                          items: c.items.filter(
+                                            (it) => it !== item,
+                                          ),
+                                        }
+                                      : c,
+                                  ),
+                                );
+                              }}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="category-item">
-                    <span>Cam Sành Tiền Giang</span>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <Edit2
-                        size={14}
-                        style={{ cursor: "pointer", color: "#6b7280" }}
-                      />
-                      <Trash
-                        size={14}
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="category-box">
-                  <div className="category-box-header">
-                    <span style={{ fontWeight: "700", fontSize: "14px" }}>
-                      Tiêu Chuẩn Đăng Kiểm
-                    </span>
-                    <span
-                      style={{
-                        color: "#16a34a",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      2 chuẩn
-                    </span>
-                  </div>
-                  <div className="category-item">
-                    <span>VietGAP Trồng Trọt</span>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <Edit2
-                        size={14}
-                        style={{ cursor: "pointer", color: "#6b7280" }}
-                      />
-                      <Trash
-                        size={14}
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                      />
-                    </div>
-                  </div>
-                  <div className="category-item">
-                    <span>GlobalGAP Xuất Khẩu</span>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <Edit2
-                        size={14}
-                        style={{ cursor: "pointer", color: "#6b7280" }}
-                      />
-                      <Trash
-                        size={14}
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="category-box">
-                  <div className="category-box-header">
-                    <span style={{ fontWeight: "700", fontSize: "14px" }}>
-                      Vật Tư & Phân Bón
-                    </span>
-                    <span
-                      style={{
-                        color: "#16a34a",
-                        fontSize: "12px",
-                        fontWeight: "600",
-                      }}
-                    >
-                      2 loại
-                    </span>
-                  </div>
-                  <div className="category-item">
-                    <span>Phân bón NPK 20-20-15</span>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <Edit2
-                        size={14}
-                        style={{ cursor: "pointer", color: "#6b7280" }}
-                      />
-                      <Trash
-                        size={14}
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                      />
-                    </div>
-                  </div>
-                  <div className="category-item">
-                    <span>Thuốc trừ sâu Decis 2.5EC</span>
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      <Edit2
-                        size={14}
-                        style={{ cursor: "pointer", color: "#6b7280" }}
-                      />
-                      <Trash
-                        size={14}
-                        style={{ cursor: "pointer", color: "#dc2626" }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* TAB 4: GIÁM SÁT CHUỖI & LÔ HÀNG */}
-          {activeTab === "system" && (
-            <div style={{ paddingTop: "24px" }}>
-              <div
-                style={{
-                  backgroundColor: "#ffffff",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: "12px",
-                  padding: "20px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: "20px",
-                }}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: "16px" }}
-                >
-                  <div
-                    style={{
-                      width: "48px",
-                      height: "48px",
-                      borderRadius: "10px",
-                      backgroundColor: "#ecfdf5",
-                      color: "#15803d",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <ShieldAlert size={24} />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: "16px", fontWeight: "700" }}>
-                      Kiểm Tra Tính Toàn Vẹn Chuỗi Dữ Liệu
-                    </h3>
-                    <p style={{ fontSize: "12px", color: "#6b7280" }}>
-                      Đối chiếu giá trị Hash khối giữa CSDL tập trung và Sổ cái
-                      Smart Contract.
-                    </p>
+          {/* TAB 4: LÔ HÀNG TOÀN CHUỖI */}
+          {activeTab === "batches" && (
+            <div>
+              <div className="metrics-row">
+                <div className="metric-card">
+                  <span className="metric-title">Canh tác (Nông dân)</span>
+                  <div className="metric-number">
+                    42 <span className="metric-unit">LÔ THU HOẠCH</span>
                   </div>
                 </div>
+                <div className="metric-card">
+                  <span className="metric-title">Sơ chế (Cơ sở)</span>
+                  <div className="metric-number">
+                    18 <span className="metric-unit">TÁCH/GỘP</span>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Kiểm định</span>
+                  <div className="metric-number">
+                    11 <span className="metric-unit">CHỜ MẪU/KẾT QUẢ</span>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Vận chuyển</span>
+                  <div className="metric-number">
+                    15 <span className="metric-unit">ĐANG TRÊN ĐƯỜNG</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="content-head">
+                <div>
+                  <h2>Theo dõi trạng thái lô toàn chuỗi</h2>
+                  <p>
+                    Mỗi lô hiển thị chặng hiện tại và mã Hash gần nhất ghi lên
+                    sổ cái Smart Contract.
+                  </p>
+                </div>
+                <span className="status-pill success">100% Khối hợp lệ</span>
+              </div>
+
+              <div className="table-container">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Mã lô</th>
+                      <th>Nguồn gốc</th>
+                      <th>Chặng hiện tại</th>
+                      <th>Khối lượng</th>
+                      <th>Tx Hash</th>
+                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <b>#LH-8824</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô thu hoạch
+                        </small>
+                      </td>
+                      <td>Vườn Cam A1, mùa vụ Quýt Đường</td>
+                      <td>
+                        <span className="status-pill gray">Chờ sơ chế</span>
+                      </td>
+                      <td>1.500 kg</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0x3d12...88fe
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">
+                          <Eye size={12} /> Hành trình
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>#LH-8801</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô thu hoạch
+                        </small>
+                      </td>
+                      <td>Vườn Cam A1 → HTX Mekong</td>
+                      <td>
+                        <span className="status-pill info">
+                          Đang tiếp nhận, cân thực tế
+                        </span>
+                      </td>
+                      <td>2.000 kg</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0x61aa...b210
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">
+                          <Eye size={12} /> Hành trình
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>#SC-2026-004</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô sơ chế (gộp)
+                        </small>
+                      </td>
+                      <td>HTX Sơ Chế Mekong</td>
+                      <td>
+                        <span className="status-pill warning">
+                          Chờ lấy mẫu kiểm định
+                        </span>
+                      </td>
+                      <td>1.850 kg</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0xb7e3...12c9
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">
+                          <Eye size={12} /> Hành trình
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>#SC-2026-001</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô thành phẩm
+                        </small>
+                      </td>
+                      <td>Trà Vinh → Tổng kho Bách Hóa Xanh</td>
+                      <td>
+                        <span className="status-pill info">
+                          Đang vận chuyển chuỗi lạnh
+                        </span>
+                      </td>
+                      <td>1.200 kg</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0x7c49...a74c
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">
+                          <Eye size={12} /> Hành trình
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>#LH-8790</b>
+                        <small style={{ display: "block", color: "#dc2626" }}>
+                          Lô thu hoạch
+                        </small>
+                      </td>
+                      <td>Vườn Bưởi B3</td>
+                      <td>
+                        <span className="status-pill danger">Bị đình chỉ</span>
+                      </td>
+                      <td>800 kg</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#dc2626", fontWeight: 700 }}
+                      >
+                        0xe419...77aa
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          className="btn-action-retry"
+                          onClick={() => {
+                            setSelectedRecallBatch("#LH-8790");
+                            setShowRecallModal(true);
+                          }}
+                        >
+                          Xem lý do
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: KIỂM ĐỊNH & THU HỒI */}
+          {activeTab === "inspection" && (
+            <div>
+              <div className="metrics-row">
+                <div className="metric-card">
+                  <span className="metric-title">Yêu cầu kiểm định mới</span>
+                  <div className="metric-number">
+                    9 <span className="metric-unit">HỒ SƠ</span>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Đã hẹn lấy mẫu</span>
+                  <div className="metric-number">6</div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Chứng nhận đã công bố</span>
+                  <div className="metric-number">73</div>
+                </div>
+                <div className="metric-card warn">
+                  <span className="metric-title">Lô bị đình chỉ</span>
+                  <div className="metric-number">
+                    2 <span className="metric-unit">LÔ</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="alert-box">
+                <div>
+                  <b>Lô #LH-8790 không đạt chuẩn VietGAP</b>
+                  <p>
+                    Dư lượng Decis vượt ngưỡng. Tem chứng nhận đã bị đình chỉ,
+                    lô chưa được thu hồi khỏi các điểm bán.
+                  </p>
+                </div>
                 <button
-                  className="btn-primary-action"
-                  style={{ height: "38px", padding: "0 18px" }}
-                  onClick={handleRunIntegrityCheck}
+                  className="btn-action-retry"
+                  onClick={() => {
+                    setSelectedRecallBatch("#LH-8790");
+                    setShowRecallModal(true);
+                  }}
                 >
-                  <RefreshCw size={15} /> Chạy kiểm tra ngay
+                  Thu hồi lô
                 </button>
               </div>
 
-              <div className="table-container" style={{ padding: "20px" }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderBottom: "1px solid #f3f4f6",
-                    paddingBottom: "12px",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <h3 style={{ fontSize: "14px", fontWeight: "700" }}>
-                    Theo Dõi Trạng Thái Lô Toàn Chuỗi
-                  </h3>
-                  <span className="status-badge active">100% Khối hợp lệ</span>
+              <div className="content-head">
+                <div>
+                  <h2>Hồ sơ kiểm định</h2>
+                  <p>
+                    Từ yêu cầu của nông dân đến chứng nhận ký số do cơ quan kiểm
+                    định công bố.
+                  </p>
                 </div>
+              </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "14px",
-                  }}
+              <div className="table-container">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Hồ sơ</th>
+                      <th>Nông trại</th>
+                      <th>Tiêu chuẩn</th>
+                      <th>Lịch lấy mẫu</th>
+                      <th>Trạng thái</th>
+                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="mono">
+                        <b>#KD-2201</b>
+                      </td>
+                      <td>Vườn Cam A1</td>
+                      <td>VietGAP trồng trọt</td>
+                      <td>12/10/2026</td>
+                      <td>
+                        <span className="status-pill warning">Chờ lấy mẫu</span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">Chi tiết</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="mono">
+                        <b>#KD-2198</b>
+                      </td>
+                      <td>Vườn Quýt C2</td>
+                      <td>GlobalGAP xuất khẩu</td>
+                      <td>08/10/2026</td>
+                      <td>
+                        <span className="status-pill info">
+                          Đã niêm phong, chờ kết quả
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">Chi tiết</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="mono">
+                        <b>#KD-2187</b>
+                      </td>
+                      <td>Vườn Cam A1</td>
+                      <td>VietGAP trồng trọt</td>
+                      <td>02/10/2026</td>
+                      <td>
+                        <span className="status-pill success">
+                          Đã công bố chứng nhận
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">
+                          Tải chứng thư
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="mono">
+                        <b>#KD-2180</b>
+                      </td>
+                      <td>Vườn Bưởi B3</td>
+                      <td>VietGAP trồng trọt</td>
+                      <td>29/09/2026</td>
+                      <td>
+                        <span className="status-pill danger">
+                          Không đạt, đình chỉ tem
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          className="btn-action-retry"
+                          onClick={() => {
+                            setSelectedRecallBatch("#LH-8790");
+                            setShowRecallModal(true);
+                          }}
+                        >
+                          Xử lý
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: VẬN CHUYỂN */}
+          {activeTab === "shipping" && (
+            <div>
+              <div className="metrics-row">
+                <div className="metric-card">
+                  <span className="metric-title">Chuyến chờ nhận</span>
+                  <div className="metric-number">4</div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Đang vận chuyển</span>
+                  <div className="metric-number">
+                    19 <span className="metric-unit">CHUYẾN</span>
+                  </div>
+                </div>
+                <div className="metric-card">
+                  <span className="metric-title">Đã giao hôm nay</span>
+                  <div className="metric-number">11</div>
+                </div>
+                <div className="metric-card warn">
+                  <span className="metric-title">Cảnh báo hành trình</span>
+                  <div className="metric-number">
+                    1 <span className="metric-unit">CHUYẾN</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="content-head">
+                <div>
+                  <h2>Giám sát chuyến vận chuyển</h2>
+                  <p>
+                    Theo dõi nhận chuyến, lấy hàng, nhật ký GPS và biên bản giao
+                    nhận điện tử.
+                  </p>
+                </div>
+                <button
+                  className="btn-action-edit"
+                  onClick={() => alert("Đang xuất báo cáo...")}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      borderBottom: "1px solid #f3f4f6",
-                      paddingBottom: "12px",
-                    }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <span style={{ fontWeight: "700", fontSize: "14px" }}>
-                          Lô Thành Phẩm #SC-2026-001
-                        </span>
-                        <span className="tag-badge blue">
-                          Đang Vận Chuyển Chuỗi Lạnh
-                        </span>
-                      </div>
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "#6b7280",
-                          marginTop: "4px",
-                        }}
-                      >
-                        Trà Vinh ➔ Tổng Kho Bách Hóa Xanh (TP.HCM) | Xe
+                  Xuất Excel / CSV
+                </button>
+              </div>
+
+              <div className="table-container">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Mã chuyến</th>
+                      <th>Lộ trình</th>
+                      <th>Xe / Tài xế</th>
+                      <th>Nhiệt độ</th>
+                      <th>Trạng thái</th>
+                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <b>#VC-3021</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô #SC-2026-001
+                        </small>
+                      </td>
+                      <td>Trà Vinh → TP.HCM</td>
+                      <td>
                         65C-128.45
-                      </p>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span
-                        style={{
-                          fontFamily: "monospace",
-                          fontWeight: "700",
-                          color: "#15803d",
-                        }}
-                      >
-                        Hash: 0x7c49...a74c
-                      </span>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "11px",
-                          color: "#9ca3af",
-                        }}
-                      >
-                        Cập nhật 15 phút trước
-                      </span>
-                    </div>
-                  </div>
-
-                  <div
-                    style={{ display: "flex", justifyContent: "space-between" }}
-                  >
-                    <div>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                        }}
-                      >
-                        <span style={{ fontWeight: "700", fontSize: "14px" }}>
-                          Lô Thu Hoạch #LH-8824
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Nguyễn Văn Hùng
+                        </small>
+                      </td>
+                      <td style={{ color: "#dc2626", fontWeight: 700 }}>
+                        12°C
+                      </td>
+                      <td>
+                        <span className="status-pill danger">Vượt ngưỡng</span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          className="btn-action-edit"
+                          onClick={() => setShowGpsModal("#VC-3021")}
+                        >
+                          <Navigation size={12} /> Xem GPS
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>#VC-3019</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô #SC-2026-003
+                        </small>
+                      </td>
+                      <td>Cần Thơ → Đà Nẵng</td>
+                      <td>
+                        65H-044.12
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lê Văn Tâm
+                        </small>
+                      </td>
+                      <td>6°C</td>
+                      <td>
+                        <span className="status-pill info">
+                          Đang vận chuyển
                         </span>
-                        <span className="tag-badge gray">Chờ Sơ Chế</span>
-                      </div>
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "#6b7280",
-                          marginTop: "4px",
-                        }}
-                      >
-                        Vườn Cam A1 ➔ HTX Sơ Chế Mekong (1,500 kg Quýt Đường)
-                      </p>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span
-                        style={{
-                          fontFamily: "monospace",
-                          fontWeight: "700",
-                          color: "#15803d",
-                        }}
-                      >
-                        Hash: 0x3d12...88fe
-                      </span>
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "11px",
-                          color: "#9ca3af",
-                        }}
-                      >
-                        Cập nhật hôm nay
-                      </span>
-                    </div>
-                  </div>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          className="btn-action-edit"
+                          onClick={() => setShowGpsModal("#VC-3019")}
+                        >
+                          <Navigation size={12} /> Xem GPS
+                        </button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>#VC-3017</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô #SC-2026-002
+                        </small>
+                      </td>
+                      <td>Tiền Giang → Cần Thơ</td>
+                      <td>
+                        63C-210.77
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Phạm Hữu Phúc
+                        </small>
+                      </td>
+                      <td>5°C</td>
+                      <td>
+                        <span className="status-pill warning">
+                          Chờ lấy hàng
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">Chi tiết</button>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <b>#VC-3012</b>
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Lô #SC-2026-000
+                        </small>
+                      </td>
+                      <td>Vĩnh Long → TP.HCM</td>
+                      <td>
+                        64C-099.31
+                        <small style={{ display: "block", color: "#6b7280" }}>
+                          Trần Quốc Việt
+                        </small>
+                      </td>
+                      <td>7°C</td>
+                      <td>
+                        <span className="status-pill success">
+                          Đã giao, đã ký
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn-action-view">
+                          <FileCheck2 size={12} /> Biên bản
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: NHẬT KÝ & TOÀN VẸN */}
+          {activeTab === "integrity" && (
+            <div>
+              <div className="alert-box ok">
+                <div>
+                  <b>Kiểm tra tính toàn vẹn chuỗi dữ liệu</b>
+                  <p>
+                    Đối chiếu Hash khối giữa CSDL tập trung và sổ cái Smart
+                    Contract. Lần gần nhất:{" "}
+                    <b>{blocksVerified.toLocaleString()} khối</b> khớp hoàn
+                    toàn.
+                  </p>
                 </div>
+                <button
+                  className="btn-primary-action"
+                  onClick={handleVerifyChain}
+                  disabled={isVerifying}
+                >
+                  <RefreshCw
+                    size={15}
+                    className={isVerifying ? "spin-icon" : ""}
+                  />
+                  {isVerifying ? "Đang kiểm tra..." : "Chạy kiểm tra ngay"}
+                </button>
+              </div>
+
+              <div className="content-head">
+                <div>
+                  <h2>Nhật ký thao tác quản trị và chuỗi</h2>
+                  <p>
+                    Mọi thay đổi quyền, khóa tài khoản và giao dịch bị chặn đều
+                    được ghi lại.
+                  </p>
+                </div>
+              </div>
+
+              <div className="table-container">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Thời gian</th>
+                      <th>Tác nhân</th>
+                      <th>Hành động</th>
+                      <th>Đối tượng</th>
+                      <th>Tx Hash</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>08/10/2026 09:41</td>
+                      <td>
+                        <b>admin</b>
+                      </td>
+                      <td>
+                        <span className="status-pill danger">
+                          Vô hiệu hóa chủ thể
+                        </span>
+                      </td>
+                      <td>HTX Bến Tre Fresh</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0x91c2...03ab
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>08/10/2026 09:12</td>
+                      <td>
+                        <b>kiemdinh_ttgd2</b>
+                      </td>
+                      <td>
+                        <span className="status-pill danger">
+                          Đình chỉ tem chứng nhận
+                        </span>
+                      </td>
+                      <td>Lô #LH-8790</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#dc2626", fontWeight: 700 }}
+                      >
+                        0xe419...77aa
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>08/10/2026 08:30</td>
+                      <td>
+                        <b>taixe_hung65c</b>
+                      </td>
+                      <td>
+                        <span className="status-pill info">Cập nhật GPS</span>
+                      </td>
+                      <td>Chuyến #VC-3021</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0x7c49...a74c
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>07/10/2026 16:05</td>
+                      <td>
+                        <b>soche_tranvanlong</b>
+                      </td>
+                      <td>
+                        <span className="status-pill warning">Gộp lô</span>
+                      </td>
+                      <td>#SC-2026-004</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0xb7e3...12c9
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>07/10/2026 14:20</td>
+                      <td>
+                        <b>admin</b>
+                      </td>
+                      <td>
+                        <span className="status-pill success">
+                          Tạo tài khoản
+                        </span>
+                      </td>
+                      <td>taixe_minhtri</td>
+                      <td
+                        className="mono"
+                        style={{ color: "#15803d", fontWeight: 700 }}
+                      >
+                        0x4ab0...e5f1
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
         </main>
       </div>
 
-      {/* MODAL 1: ĐĂNG KÝ CHỦ THỂ */}
-      {showAddActorModal && (
+      {/* ================= MODAL ĐĂNG KÝ CHỦ THỂ ================= */}
+      {showActorModal && (
         <div className="modal-overlay">
-          <div className="modal-container">
+          <form className="modal-container" onSubmit={handleAddActor}>
             <div className="modal-header">
-              <h3>
-                <Building2 size={18} color="#2e8b57" /> Đăng Ký Chủ Thể Mới
-              </h3>
+              <h3>Đăng ký chủ thể mới</h3>
               <button
-                className="modal-close-btn"
-                onClick={() => setShowAddActorModal(false)}
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setShowActorModal(false)}
               >
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Loại Hình Chủ Thể (*)</label>
-                <select>
-                  <option>Nông Trại / Hợp Tác Xã Canh Tác</option>
-                  <option>Cơ Sở Sơ Chế & Đóng Gói</option>
-                  <option>Cơ Quan Kiểm Định / Giám Định</option>
-                  <option>Đơn Vị Vận Chuyển / Logistics</option>
+                <label>Loại hình chủ thể (*)</label>
+                <select
+                  value={newActor.type}
+                  onChange={(e) =>
+                    setNewActor({ ...newActor, type: e.target.value })
+                  }
+                >
+                  <option>Nông trại / HTX canh tác</option>
+                  <option>Cơ sở sơ chế & đóng gói</option>
+                  <option>Cơ quan kiểm định</option>
+                  <option>Đơn vị vận chuyển</option>
                 </select>
               </div>
               <div className="form-group">
-                <label>Tên Doanh Nghiệp / Chủ Thể (*)</label>
+                <label>Tên doanh nghiệp / chủ thể (*)</label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Công Ty Cổ Phần Nông Sản Nam Bộ"
+                  placeholder="Ví dụ: Công ty Cổ phần Nông sản Nam Bộ"
+                  value={newActor.name}
+                  onChange={(e) =>
+                    setNewActor({ ...newActor, name: e.target.value })
+                  }
+                  required
                 />
               </div>
               <div className="form-grid-2">
                 <div className="form-group">
-                  <label>Mã Số Thuế / Giấy Phép</label>
-                  <input type="text" placeholder="0312984920" />
+                  <label>Mã số thuế / giấy phép</label>
+                  <input
+                    type="text"
+                    placeholder="0312984920"
+                    value={newActor.taxId}
+                    onChange={(e) =>
+                      setNewActor({ ...newActor, taxId: e.target.value })
+                    }
+                  />
                 </div>
                 <div className="form-group">
-                  <label>Node / Public Key</label>
-                  <input type="text" placeholder="0x..." />
+                  <label>Node / Public key</label>
+                  <input
+                    type="text"
+                    placeholder="0x..."
+                    value={newActor.node}
+                    onChange={(e) =>
+                      setNewActor({ ...newActor, node: e.target.value })
+                    }
+                  />
                 </div>
               </div>
             </div>
             <div className="modal-footer">
               <button
+                type="button"
                 className="btn-cancel"
-                onClick={() => setShowAddActorModal(false)}
+                onClick={() => setShowActorModal(false)}
               >
                 Hủy
               </button>
-              <button
-                className="btn-save"
-                onClick={() => {
-                  alert("Đã khởi tạo node chủ thể mới thành công!");
-                  setShowAddActorModal(false);
-                }}
-              >
-                Tạo Chủ Thể
+              <button type="submit" className="btn-save">
+                Tạo chủ thể
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
-      {/* MODAL 2: THÊM NGƯỜI DÙNG */}
-      {showAddUserModal && (
+      {/* ================= MODAL THÊM TÀI KHOẢN ================= */}
+      {showUserModal && (
         <div className="modal-overlay">
-          <div className="modal-container">
+          <form className="modal-container" onSubmit={handleAddUser}>
             <div className="modal-header">
-              <h3>
-                <UserPlus size={18} color="#2e8b57" /> Thêm Tài Khoản Đăng Nhập
-              </h3>
+              <h3>Thêm tài khoản đăng nhập</h3>
               <button
-                className="modal-close-btn"
-                onClick={() => setShowAddUserModal(false)}
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setShowUserModal(false)}
               >
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Tên Đăng Nhập (*)</label>
-                <input type="text" placeholder="Ví dụ: taixe_minhtri" />
+                <label>Tên đăng nhập (*)</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: taixe_minhtri"
+                  value={newUser.username}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, username: e.target.value })
+                  }
+                  required
+                />
               </div>
               <div className="form-group">
-                <label>Họ Và Tên</label>
-                <input type="text" placeholder="Nguyễn Minh Trí" />
+                <label>Họ và tên</label>
+                <input
+                  type="text"
+                  placeholder="Nguyễn Minh Trí"
+                  value={newUser.name}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, name: e.target.value })
+                  }
+                  required
+                />
               </div>
-              <div className="form-group">
-                <label>Chủ Thể Trực Thuộc</label>
-                <select>
-                  <option>HTX Sơ Chế & Chế Biến Mekong</option>
-                  <option>Vườn Cam A1 (#FARM-01111)</option>
-                  <option>Mekong Express Logistics</option>
-                </select>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Chủ thể trực thuộc</label>
+                  <select
+                    value={newUser.org}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, org: e.target.value })
+                    }
+                  >
+                    {actors.map((a) => (
+                      <option key={a.id} value={a.name}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Vai trò</label>
+                  <select
+                    value={newUser.role}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, role: e.target.value })
+                    }
+                  >
+                    <option>Nông dân</option>
+                    <option>Cơ sở sơ chế</option>
+                    <option>Kiểm định viên</option>
+                    <option>Tài xế vận chuyển</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div className="modal-footer">
               <button
+                type="button"
                 className="btn-cancel"
-                onClick={() => setShowAddUserModal(false)}
+                onClick={() => setShowUserModal(false)}
               >
                 Hủy
               </button>
-              <button
-                className="btn-save"
-                onClick={() => {
-                  alert("Đã tạo tài khoản người dùng thành công!");
-                  setShowAddUserModal(false);
-                }}
-              >
-                Tạo Tài Khoản
+              <button type="submit" className="btn-save">
+                Tạo tài khoản
               </button>
             </div>
-          </div>
+          </form>
         </div>
       )}
 
-      {/* MODAL 3: THÊM DANH MỤC */}
-      {showAddCatModal && (
+      {/* ================= MODAL THÊM DANH MỤC ================= */}
+      {showCatModal && (
         <div className="modal-overlay">
-          <div className="modal-container">
+          <form className="modal-container" onSubmit={handleAddCategoryItem}>
             <div className="modal-header">
-              <h3>
-                <Plus size={18} color="#2e8b57" /> Thêm Danh Mục Dùng Chung
-              </h3>
+              <h3>Thêm danh mục dùng chung</h3>
               <button
-                className="modal-close-btn"
-                onClick={() => setShowAddCatModal(false)}
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setShowCatModal(false)}
               >
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Loại Danh Mục</label>
-                <select>
-                  <option>Giống Nông Sản</option>
-                  <option>Tiêu Chuẩn Kiểm Định</option>
-                  <option>Phân Bón & Thuốc BVTV</option>
+                <label>Loại danh mục</label>
+                <select
+                  value={newCat.categoryType}
+                  onChange={(e) =>
+                    setNewCat({ ...newCat, categoryType: e.target.value })
+                  }
+                >
+                  {categories.map((c, i) => (
+                    <option key={i} value={c.title}>
+                      {c.title}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="form-group">
-                <label>Tên Danh Mục (*)</label>
-                <input type="text" placeholder="Ví dụ: Bưởi Da Xanh Bến Tre" />
+                <label>Tên mục (*)</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Quýt Đường miền Tây"
+                  value={newCat.name}
+                  onChange={(e) =>
+                    setNewCat({ ...newCat, name: e.target.value })
+                  }
+                  required
+                />
               </div>
             </div>
             <div className="modal-footer">
               <button
+                type="button"
                 className="btn-cancel"
-                onClick={() => setShowAddCatModal(false)}
+                onClick={() => setShowCatModal(false)}
+              >
+                Hủy
+              </button>
+              <button type="submit" className="btn-save">
+                Lưu danh mục
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= MODAL THU HỒI LÔ ================= */}
+      {showRecallModal && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3
+                style={{
+                  color: "#dc2626",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <AlertTriangle size={18} /> Thu hồi lô {selectedRecallBatch}
+              </h3>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setShowRecallModal(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 14 }}>
+                Lô sẽ bị chặn mọi giao dịch tiếp theo trên chuỗi Smart Contract,
+                và người tiêu dùng khi quét mã QR sẽ thấy cảnh báo thu hồi tức
+                thì.
+              </p>
+              <div className="form-group">
+                <label>Lý do thu hồi (*)</label>
+                <textarea
+                  placeholder="Dư lượng thuốc BVTV vượt ngưỡng cho phép..."
+                  value={recallReason}
+                  onChange={(e) => setRecallReason(e.target.value)}
+                ></textarea>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowRecallModal(false)}
               >
                 Hủy
               </button>
               <button
+                type="button"
                 className="btn-save"
+                style={{ background: "#dc2626" }}
                 onClick={() => {
-                  alert("Đã lưu mục mới vào danh mục dùng chung!");
-                  setShowAddCatModal(false);
+                  if (!recallReason)
+                    return alert("Vui lòng nhập lý do thu hồi!");
+                  alert(
+                    `Đã kích hoạt lệnh thu hồi lô ${selectedRecallBatch} trên Smart Contract!`,
+                  );
+                  setShowRecallModal(false);
+                  setRecallReason("");
                 }}
               >
-                Lưu Mục
+                Xác nhận thu hồi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL GPS VẬN CHUYỂN ================= */}
+      {showGpsModal && (
+        <div className="modal-overlay">
+          <div className="modal-container modal-lg">
+            <div className="modal-header">
+              <h3>Nhật ký hành trình GPS & Cảm biến: {showGpsModal}</h3>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setShowGpsModal(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div
+                style={{
+                  height: 180,
+                  background: "#e2e8f0",
+                  borderRadius: 8,
+                  display: "grid",
+                  placeItems: "center",
+                  color: "#475569",
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ textAlign: "center" }}>
+                  <Navigation
+                    size={32}
+                    color="#2563eb"
+                    style={{ margin: "0 auto 6px" }}
+                  />
+                  <b>Mô phỏng bản đồ vệ tinh tuyến đường (Trà Vinh → TP.HCM)</b>
+                  <p style={{ fontSize: 12, color: "#64748b" }}>
+                    Cập nhật tự động qua định vị IoT
+                  </p>
+                </div>
+              </div>
+              <div className="form-grid-2">
+                <div className="form-group">
+                  <label>Tọa độ hiện tại</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value="10.2431° N, 106.3753° E (Bến Lức, Long An)"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Nhiệt độ thùng lạnh</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value="12°C (Vượt ngưỡng tiêu chuẩn 4–8°C)"
+                    style={{ color: "#dc2626", fontWeight: 700 }}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowGpsModal(null)}
+              >
+                Đóng
               </button>
             </div>
           </div>
@@ -926,6 +2029,4 @@ const AdminPage = () => {
       )}
     </div>
   );
-};
-
-export default AdminPage;
+}

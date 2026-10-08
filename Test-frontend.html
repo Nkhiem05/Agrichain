@@ -1,0 +1,1797 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AgriChain Admin</title>
+    <style>
+      /* AgriChain Admin - HTML/CSS thuần, không JavaScript.
+   Tab dùng radio + :checked, modal dùng :target. */
+      :root {
+        --g: #278d49;
+        --g2: #2e8b57;
+        --g3: #67ac7d;
+        --gd: #14532d;
+        --bg: #f7f9fa;
+        --line: #e5e7eb;
+        --mut: #6b7280;
+        --ink: #0f172a;
+        --red: #dc2626;
+        --blue: #1d4ed8;
+        --amb: #b45309;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        background: var(--bg);
+        color: #333;
+        font-size: 14px;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      button {
+        cursor: pointer;
+        font: inherit;
+      }
+      .tab-radio {
+        position: absolute;
+        opacity: 0;
+        pointer-events: none;
+      }
+      .app {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      /* header */
+      .top {
+        height: 56px;
+        background: var(--g);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 24px;
+        flex-shrink: 0;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 240px;
+      }
+      .brand img {
+        width: 42px;
+        height: 42px;
+        object-fit: contain;
+      }
+      .brand b {
+        font-size: 18px;
+        letter-spacing: 1.5px;
+      }
+      .search {
+        flex: 1;
+        max-width: 620px;
+        margin: 0 20px;
+      }
+      .search input {
+        width: 100%;
+        height: 34px;
+        border: 0;
+        border-radius: 4px;
+        padding: 0 14px;
+        font-size: 13px;
+        outline: none;
+      }
+      .me {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        background: var(--gd);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        font-size: 13px;
+      }
+      .me small {
+        display: block;
+        font-size: 11px;
+        color: #d1fae5;
+      }
+      .me span {
+        font-weight: 600;
+      }
+
+      /* layout */
+      .body {
+        flex: 1;
+        display: flex;
+        min-height: 0;
+      }
+      .side {
+        width: 256px;
+        background: #f0f2f1;
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        flex-shrink: 0;
+        overflow-y: auto;
+      }
+      .side h4 {
+        padding: 16px 16px 6px;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--mut);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .side nav {
+        padding: 0 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .side label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        color: #374151;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .side label:hover {
+        background: rgba(229, 231, 235, 0.8);
+      }
+      .side label i {
+        font-style: normal;
+        width: 20px;
+        text-align: center;
+      }
+      .side label em {
+        margin-left: auto;
+        font-style: normal;
+        font-size: 11px;
+        font-weight: 700;
+        background: var(--red);
+        color: #fff;
+        border-radius: 10px;
+        padding: 1px 7px;
+      }
+      .side-foot {
+        padding: 14px 16px;
+        border-top: 1px solid var(--line);
+        font-size: 12px;
+        color: var(--mut);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #10b981;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.35;
+        }
+      }
+      .main {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+      }
+      .panel {
+        display: none;
+      }
+      #t1:checked ~ .app .p1,
+      #t2:checked ~ .app .p2,
+      #t3:checked ~ .app .p3,
+      #t4:checked ~ .app .p4,
+      #t5:checked ~ .app .p5,
+      #t6:checked ~ .app .p6,
+      #t7:checked ~ .app .p7 {
+        display: block;
+      }
+      #t1:checked ~ .app [for="t1"],
+      #t2:checked ~ .app [for="t2"],
+      #t3:checked ~ .app [for="t3"],
+      #t4:checked ~ .app [for="t4"],
+      #t5:checked ~ .app [for="t5"],
+      #t6:checked ~ .app [for="t6"],
+      #t7:checked ~ .app [for="t7"] {
+        background: var(--g3);
+        color: #fff;
+      }
+      .tab-radio:focus-visible ~ .app .side {
+        outline: 2px solid var(--g);
+      }
+
+      /* common blocks */
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 16px 20px;
+        margin-bottom: 20px;
+      }
+      .head h2 {
+        font-size: 16px;
+      }
+      .head p {
+        font-size: 12px;
+        color: var(--mut);
+        margin-top: 2px;
+      }
+      .metrics {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+      }
+      .metric {
+        background: #f1f6fd;
+        border: 1px solid #e1eaf5;
+        border-radius: 10px;
+        padding: 16px 18px;
+      }
+      .metric span {
+        font-size: 12px;
+        color: #64748b;
+        font-weight: 600;
+      }
+      .metric b {
+        display: block;
+        font-size: 28px;
+        color: var(--ink);
+        margin-top: 6px;
+      }
+      .metric b small {
+        font-size: 11px;
+        color: var(--g);
+        margin-left: 6px;
+      }
+      .metric.warn b,
+      .metric.warn b small {
+        color: var(--red);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 36px;
+        padding: 0 16px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--g2);
+        color: #fff;
+        font-weight: 600;
+      }
+      .btn:hover {
+        background: #257247;
+      }
+      .btn.out {
+        background: #fff;
+        color: #374151;
+        border: 1px solid #d1d5db;
+        height: 32px;
+        padding: 0 12px;
+        font-size: 13px;
+      }
+      .btn.out:hover {
+        background: #f3f4f6;
+      }
+      .btn.del {
+        background: #fff;
+        color: var(--red);
+        border: 1px solid #fecaca;
+        height: 32px;
+        padding: 0 12px;
+        font-size: 13px;
+      }
+      .btn.del:hover {
+        background: #fef2f2;
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 20px;
+      }
+      .box {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 20px;
+      }
+      .box h3 {
+        font-size: 14px;
+        margin-bottom: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .tag {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #f3f4f6;
+        color: #4b5563;
+      }
+      .tag.green {
+        background: #dcfce7;
+        color: #15803d;
+      }
+      .tag.blue {
+        background: #dbeafe;
+        color: var(--blue);
+      }
+      .tag.amber {
+        background: #fef3c7;
+        color: var(--amb);
+      }
+      .tag.red {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .mono {
+        font-family: ui-monospace, Menlo, Consolas, monospace;
+      }
+      .hash {
+        color: #15803d;
+        font-weight: 700;
+      }
+
+      /* todo + bars */
+      .todo {
+        list-style: none;
+      }
+      .todo li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 11px 0;
+        border-bottom: 1px solid #f3f4f6;
+      }
+      .todo li:last-child {
+        border: 0;
+      }
+      .todo p {
+        font-size: 12px;
+        color: var(--mut);
+        margin-top: 2px;
+      }
+      .bar-row {
+        display: grid;
+        grid-template-columns: 92px 1fr 36px;
+        gap: 10px;
+        align-items: center;
+        margin: 12px 0;
+        font-size: 13px;
+      }
+      .bar {
+        height: 10px;
+        background: #eef2f0;
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--g3);
+      }
+      .bar i.b2 {
+        background: #4f8fd6;
+      }
+      .bar i.b3 {
+        background: #e0a030;
+      }
+      .bar i.b4 {
+        background: var(--gd);
+      }
+
+      /* actor cards */
+      .card {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+      }
+      .ico {
+        width: 52px;
+        height: 52px;
+        border-radius: 10px;
+        display: grid;
+        place-items: center;
+        font-size: 24px;
+        flex-shrink: 0;
+        background: #ecfdf5;
+      }
+      .ico.blue {
+        background: #eff6ff;
+      }
+      .ico.amber {
+        background: #fffbeb;
+      }
+      .ico.gray {
+        background: #f3f4f6;
+      }
+      .card .info {
+        flex: 1;
+      }
+      .card h3 {
+        font-size: 15px;
+        display: inline-block;
+        margin-right: 8px;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 24px;
+        font-size: 12px;
+        color: var(--mut);
+        margin: 8px 0;
+      }
+      .meta strong {
+        color: #1f2937;
+      }
+      .desc {
+        font-size: 12px;
+        color: #4b5563;
+        background: #f9fafb;
+        border-radius: 6px;
+        padding: 8px 10px;
+      }
+      .acts {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .card.off {
+        opacity: 0.7;
+        background: #fafafa;
+      }
+
+      /* tables */
+      .tbl {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow-x: auto;
+        margin-bottom: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 720px;
+      }
+      th {
+        background: #f9fafb;
+        text-align: left;
+        font-size: 12px;
+        color: var(--mut);
+        padding: 11px 16px;
+        border-bottom: 1px solid var(--line);
+      }
+      td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 13px;
+        vertical-align: middle;
+      }
+      tr:last-child td {
+        border: 0;
+      }
+      tbody tr:hover td {
+        background: #f9fcfa;
+      }
+      td small {
+        display: block;
+        color: var(--mut);
+        font-size: 11px;
+        margin-top: 2px;
+      }
+      .r {
+        text-align: right;
+      }
+      .link {
+        background: none;
+        border: 0;
+        font-weight: 600;
+        color: var(--g);
+        font-size: 13px;
+      }
+      .link.red {
+        color: var(--red);
+      }
+
+      /* stage strip */
+      .stages {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0;
+        margin-bottom: 20px;
+      }
+      .stage {
+        background: #fff;
+        border: 1px solid var(--line);
+        padding: 14px 16px;
+        position: relative;
+      }
+      .stage:first-child {
+        border-radius: 10px 0 0 10px;
+      }
+      .stage:last-child {
+        border-radius: 0 10px 10px 0;
+      }
+      .stage b {
+        display: block;
+        font-size: 22px;
+        color: var(--ink);
+      }
+      .stage span {
+        font-size: 12px;
+        color: var(--mut);
+      }
+      .stage em {
+        display: block;
+        font-style: normal;
+        font-size: 11px;
+        color: var(--g);
+        font-weight: 600;
+        margin-top: 4px;
+      }
+
+      /* alert */
+      .alert {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        justify-content: space-between;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 10px;
+        padding: 14px 18px;
+        margin-bottom: 20px;
+      }
+      .alert p {
+        font-size: 12px;
+        color: #7f1d1d;
+        margin-top: 2px;
+      }
+      .alert.ok {
+        background: #ecfdf5;
+        border-color: #bbf7d0;
+      }
+      .alert.ok p {
+        color: #166534;
+      }
+
+      /* categories */
+      .cats {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 16px;
+      }
+      .cat {
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .cat header {
+        display: flex;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background: #f9fafb;
+        border-bottom: 1px solid var(--line);
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .cat header span {
+        color: var(--g);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .cat div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 16px;
+        border-bottom: 1px solid #f3f4f6;
+        font-size: 13px;
+      }
+      .cat div:last-child {
+        border: 0;
+      }
+      .cat div span a {
+        margin-left: 10px;
+        color: var(--mut);
+      }
+
+      /* modal (CSS :target) */
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.5);
+        display: none;
+        place-items: center;
+        z-index: 200;
+        padding: 16px;
+      }
+      .modal:target {
+        display: grid;
+      }
+      .dlg {
+        width: 100%;
+        max-width: 480px;
+        background: #fff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+      }
+      .dlg > header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .dlg > header h3 {
+        font-size: 16px;
+      }
+      .dlg > header a {
+        font-size: 20px;
+        color: var(--mut);
+        line-height: 1;
+      }
+      .dlg > section {
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+      .dlg > footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 14px 20px;
+        background: #f9fafb;
+        border-top: 1px solid var(--line);
+      }
+      .fg label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 6px;
+      }
+      .fg input,
+      .fg select,
+      .fg textarea {
+        width: 100%;
+        height: 38px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        padding: 0 12px;
+        font-size: 13px;
+        outline: none;
+        background: #fff;
+      }
+      .fg textarea {
+        height: 72px;
+        padding: 10px 12px;
+        resize: vertical;
+      }
+      .fg input:focus,
+      .fg select:focus,
+      .fg textarea:focus {
+        border-color: var(--g);
+        box-shadow: 0 0 0 3px rgba(39, 141, 73, 0.15);
+      }
+      .g2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .cancel {
+        display: inline-flex;
+        align-items: center;
+        height: 36px;
+        padding: 0 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        background: #fff;
+        font-weight: 600;
+        color: #374151;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--g);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 960px) {
+        .app {
+          height: auto;
+          overflow: visible;
+        }
+        .body {
+          flex-direction: column;
+        }
+        .side {
+          width: 100%;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+        .side nav {
+          flex-direction: row;
+          overflow-x: auto;
+          padding-bottom: 10px;
+        }
+        .side label {
+          white-space: nowrap;
+        }
+        .side-foot,
+        .search,
+        .me div {
+          display: none;
+        }
+        .brand {
+          width: auto;
+        }
+        .metrics,
+        .stages,
+        .cols {
+          grid-template-columns: 1fr 1fr;
+        }
+        .cols {
+          grid-template-columns: 1fr;
+        }
+        .card {
+          flex-direction: column;
+        }
+        .acts {
+          flex-direction: row;
+        }
+        .head,
+        .alert {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+      @media (max-width: 560px) {
+        .metrics,
+        .stages,
+        .g2 {
+          grid-template-columns: 1fr;
+        }
+        .main {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <input class="tab-radio" type="radio" name="tab" id="t1" checked />
+    <input class="tab-radio" type="radio" name="tab" id="t2" />
+    <input class="tab-radio" type="radio" name="tab" id="t3" />
+    <input class="tab-radio" type="radio" name="tab" id="t4" />
+    <input class="tab-radio" type="radio" name="tab" id="t5" />
+    <input class="tab-radio" type="radio" name="tab" id="t6" />
+    <input class="tab-radio" type="radio" name="tab" id="t7" />
+
+    <div class="app">
+      <header class="top">
+        <div class="brand">
+          <img
+            src="https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png"
+            alt="Logo"
+          />
+          <b>AGRICHAIN ADMIN</b>
+        </div>
+        <div class="search">
+          <input
+            type="text"
+            placeholder="Tìm tài khoản, chủ thể, mã lô, mã chuyến, mã hợp đồng..."
+          />
+        </div>
+        <div class="me">
+          <div class="avatar">AD</div>
+          <div>
+            <span>Quản Trị Viên Hệ Thống</span
+            ><small>Super Administrator</small>
+          </div>
+        </div>
+      </header>
+
+      <div class="body">
+        <aside class="side">
+          <div>
+            <h4>Quản trị hệ thống</h4>
+            <nav>
+              <label for="t1"><i>📊</i><span>Tổng quan</span></label>
+              <label for="t2"
+                ><i>🛡️</i><span>Chủ thể &amp; tài khoản</span><em>3</em></label
+              >
+              <label for="t3"><i>🗂️</i><span>Danh mục dùng chung</span></label>
+            </nav>
+            <h4>Giám sát chuỗi cung ứng</h4>
+            <nav>
+              <label for="t4"><i>📦</i><span>Lô hàng toàn chuỗi</span></label>
+              <label for="t5"
+                ><i>🔬</i><span>Kiểm định &amp; thu hồi</span><em>2</em></label
+              >
+              <label for="t6"><i>🚚</i><span>Vận chuyển</span></label>
+              <label for="t7"
+                ><i>⛓️</i><span>Nhật ký &amp; toàn vẹn</span></label
+              >
+            </nav>
+          </div>
+          <div class="side-foot">
+            <span class="dot"></span
+            ><span>AgriChain Core: <b>v2.4.0 (Active)</b></span>
+          </div>
+        </aside>
+
+        <main class="main">
+          <!-- 1. TỔNG QUAN -->
+          <section class="panel p1">
+            <div class="metrics">
+              <div class="metric">
+                <span>Nông trại đang canh tác</span
+                ><b>128<small>NÔNG TRẠI</small></b>
+              </div>
+              <div class="metric">
+                <span>Mùa vụ đang chạy</span><b>214<small>MÙA VỤ</small></b>
+              </div>
+              <div class="metric">
+                <span>Lô đang lưu thông</span><b>86<small>LÔ</small></b>
+              </div>
+              <div class="metric warn">
+                <span>Cảnh báo cần xử lý</span><b>5<small>MỤC</small></b>
+              </div>
+            </div>
+            <div class="cols">
+              <div class="box">
+                <h3>Việc cần xử lý <span class="tag red">5 mục</span></h3>
+                <ul class="todo">
+                  <li>
+                    <div>
+                      <b>Hồ sơ chủ thể chờ duyệt</b>
+                      <p>
+                        3 đơn vị vừa đăng ký: 1 nông trại, 1 cơ sở sơ chế, 1 đơn
+                        vị vận chuyển
+                      </p>
+                    </div>
+                    <label class="btn out" for="t2">Xem</label>
+                  </li>
+                  <li>
+                    <div>
+                      <b>Lô #LH-8790 không đạt chuẩn VietGAP</b>
+                      <p>
+                        Cơ quan kiểm định đã đình chỉ tem chứng nhận hôm nay
+                      </p>
+                    </div>
+                    <label class="btn out" for="t5">Xử lý</label>
+                  </li>
+                  <li>
+                    <div>
+                      <b>Chuyến #VC-3021 vượt ngưỡng nhiệt độ</b>
+                      <p>Xe 65C-128.45 ghi nhận 12°C, ngưỡng cho phép 4–8°C</p>
+                    </div>
+                    <label class="btn out" for="t6">Xem</label>
+                  </li>
+                  <li>
+                    <div>
+                      <b>Cơ sở sơ chế bị vô hiệu hóa</b>
+                      <p>
+                        HTX Bến Tre Fresh, giao dịch chuỗi từ node này đang bị
+                        chặn
+                      </p>
+                    </div>
+                    <label class="btn out" for="t2">Xem</label>
+                  </li>
+                </ul>
+              </div>
+              <div class="box">
+                <h3>Lô hàng theo chặng</h3>
+                <div class="bar-row">
+                  <span>Canh tác</span>
+                  <div class="bar"><i style="width: 48%"></i></div>
+                  <b>42</b>
+                </div>
+                <div class="bar-row">
+                  <span>Sơ chế</span>
+                  <div class="bar"><i class="b4" style="width: 21%"></i></div>
+                  <b>18</b>
+                </div>
+                <div class="bar-row">
+                  <span>Kiểm định</span>
+                  <div class="bar"><i class="b3" style="width: 13%"></i></div>
+                  <b>11</b>
+                </div>
+                <div class="bar-row">
+                  <span>Vận chuyển</span>
+                  <div class="bar"><i class="b2" style="width: 17%"></i></div>
+                  <b>15</b>
+                </div>
+                <div class="alert ok" style="margin: 16px 0 0">
+                  <div>
+                    <b>100% khối hợp lệ</b>
+                    <p>Lần đối soát gần nhất: 15 phút trước</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 2. CHỦ THỂ & TÀI KHOẢN -->
+          <section class="panel p2">
+            <div class="metrics">
+              <div class="metric">
+                <span>Tổng số chủ thể chuỗi</span><b>42<small>ĐƠN VỊ</small></b>
+              </div>
+              <div class="metric"><span>Đang hoạt động</span><b>41</b></div>
+              <div class="metric warn">
+                <span>Đang bị vô hiệu hóa</span><b>1<small>CHỦ THỂ</small></b>
+              </div>
+              <div class="metric">
+                <span>Chờ duyệt đăng ký</span><b>3<small>HỒ SƠ</small></b>
+              </div>
+            </div>
+            <div class="head">
+              <div>
+                <h2>Chủ thể tham gia chuỗi</h2>
+                <p>
+                  Mỗi chủ thể là một node với quyền hạn riêng trên Smart
+                  Contract.
+                </p>
+              </div>
+              <a class="btn" href="#modal-actor">+ Đăng ký chủ thể</a>
+            </div>
+
+            <div class="card">
+              <div class="ico">🚜</div>
+              <div class="info">
+                <h3>Vườn Cam A1</h3>
+                <span class="tag mono">#FARM-01111</span>
+                <span class="tag green">Nông trại / HTX canh tác</span>
+                <div class="meta">
+                  <span>Đại diện: <strong>Nguyễn Văn A</strong></span
+                  ><span>Mã định danh: <strong>1802198001</strong></span
+                  ><span>Node: <strong class="mono">0x52a9...01ce</strong></span
+                  ><span
+                    >Trạng thái:
+                    <strong style="color: #15803d">Đang hoạt động</strong></span
+                  >
+                </div>
+                <div class="desc">
+                  <b>Quyền hạn chuỗi:</b> Quản lý nông trại, mùa vụ, ghi nhật ký
+                  vật tư, xuất lô thu hoạch, đặt lịch kiểm định, tạo yêu cầu vận
+                  chuyển.
+                </div>
+              </div>
+              <div class="acts">
+                <button class="btn del">Vô hiệu hóa</button
+                ><button class="btn out">Phân quyền</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="ico">🏭</div>
+              <div class="info">
+                <h3>HTX Sơ Chế &amp; Chế Biến Mekong</h3>
+                <span class="tag mono">#NODE-CS-01</span>
+                <span class="tag green">Cơ sở sơ chế / đóng gói</span>
+                <div class="meta">
+                  <span>Đại diện: <strong>Trần Văn Long</strong></span
+                  ><span>MST: <strong>1802198291</strong></span
+                  ><span>Node: <strong class="mono">0x81b7...d319</strong></span
+                  ><span
+                    >Trạng thái:
+                    <strong style="color: #15803d">Đang hoạt động</strong></span
+                  >
+                </div>
+                <div class="desc">
+                  <b>Quyền hạn chuỗi:</b> Tiếp nhận hoặc từ chối lô, cân thực
+                  tế, khởi tạo lô sơ chế, tách/gộp lô, ký số bao bì, bàn giao
+                  vận chuyển.
+                </div>
+              </div>
+              <div class="acts">
+                <button class="btn del">Vô hiệu hóa</button
+                ><button class="btn out">Phân quyền</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="ico blue">🏅</div>
+              <div class="info">
+                <h3>Trung Tâm Giám Định Vùng 2</h3>
+                <span class="tag mono">#NODE-KD-02</span>
+                <span class="tag blue">Cơ quan kiểm định</span>
+                <div class="meta">
+                  <span
+                    >Đại diện: <strong>Sở Nông nghiệp &amp; PTNT</strong></span
+                  ><span>Chứng nhận: <strong>VietGAP / GlobalGAP</strong></span
+                  ><span>Node: <strong class="mono">0x34f1...99bc</strong></span
+                  ><span
+                    >Trạng thái:
+                    <strong style="color: #15803d">Đang hoạt động</strong></span
+                  >
+                </div>
+                <div class="desc">
+                  <b>Quyền hạn chuỗi:</b> Chấp thuận hoặc từ chối hồ sơ, hẹn lấy
+                  mẫu, niêm phong, nhập chỉ số xét nghiệm, ký số và công bố
+                  chứng nhận, đình chỉ tem.
+                </div>
+              </div>
+              <div class="acts">
+                <button class="btn del">Vô hiệu hóa</button
+                ><button class="btn out">Phân quyền</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="ico amber">🚚</div>
+              <div class="info">
+                <h3>Mekong Express Logistics</h3>
+                <span class="tag mono">#NODE-VC-04</span>
+                <span class="tag amber">Đơn vị vận chuyển</span>
+                <div class="meta">
+                  <span>Đại diện: <strong>Lê Quốc Bảo</strong></span
+                  ><span>MST: <strong>1801455620</strong></span
+                  ><span>Node: <strong class="mono">0x9ad0...4e72</strong></span
+                  ><span
+                    >Trạng thái:
+                    <strong style="color: #15803d">Đang hoạt động</strong></span
+                  >
+                </div>
+                <div class="desc">
+                  <b>Quyền hạn chuỗi:</b> Nhận chuyến, quét QR lấy hàng, ghi
+                  hành trình GPS, xác nhận giao hàng, ký biên bản giao nhận điện
+                  tử.
+                </div>
+              </div>
+              <div class="acts">
+                <button class="btn del">Vô hiệu hóa</button
+                ><button class="btn out">Phân quyền</button>
+              </div>
+            </div>
+
+            <div class="card off">
+              <div class="ico gray">🏭</div>
+              <div class="info">
+                <h3>HTX Bến Tre Fresh</h3>
+                <span class="tag mono">#NODE-CS-07</span>
+                <span class="tag red">Đã vô hiệu hóa</span>
+                <div class="meta">
+                  <span>Đại diện: <strong>Phạm Thị Hoa</strong></span
+                  ><span>MST: <strong>1300774511</strong></span
+                  ><span
+                    >Lý do: <strong>Vi phạm quy trình tách/gộp lô</strong></span
+                  >
+                </div>
+              </div>
+              <div class="acts">
+                <button class="btn out">Kích hoạt lại</button>
+              </div>
+            </div>
+
+            <div class="head" style="margin-top: 28px">
+              <div>
+                <h2>Tài khoản người dùng</h2>
+                <p>Định danh cá nhân thuộc các chủ thể tham gia chuỗi.</p>
+              </div>
+              <a class="btn" href="#modal-user">+ Thêm tài khoản</a>
+            </div>
+            <div class="tbl">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tên đăng nhập</th>
+                    <th>Họ và tên</th>
+                    <th>Chủ thể trực thuộc</th>
+                    <th>Vai trò</th>
+                    <th>Trạng thái</th>
+                    <th class="r">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="mono"><b>nongdan_nguyenvana</b></td>
+                    <td>Nguyễn Văn A</td>
+                    <td style="color: #16a34a; font-weight: 600">
+                      Vườn Cam A1
+                    </td>
+                    <td>Nông dân</td>
+                    <td><span class="tag green">Hoạt động</span></td>
+                    <td class="r">
+                      <button class="link red">Khóa tài khoản</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="mono"><b>soche_tranvanlong</b></td>
+                    <td>Trần Văn Long</td>
+                    <td style="color: #16a34a; font-weight: 600">
+                      HTX Sơ Chế Mekong
+                    </td>
+                    <td>Cơ sở sơ chế</td>
+                    <td><span class="tag green">Hoạt động</span></td>
+                    <td class="r">
+                      <button class="link red">Khóa tài khoản</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="mono"><b>kiemdinh_ttgd2</b></td>
+                    <td>Võ Minh Khoa</td>
+                    <td style="color: #16a34a; font-weight: 600">
+                      Trung Tâm Giám Định V2
+                    </td>
+                    <td>Kiểm định viên</td>
+                    <td><span class="tag green">Hoạt động</span></td>
+                    <td class="r">
+                      <button class="link red">Khóa tài khoản</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="mono"><b>taixe_hung65c</b></td>
+                    <td>Nguyễn Văn Hùng</td>
+                    <td style="color: #16a34a; font-weight: 600">
+                      Mekong Express Logistics
+                    </td>
+                    <td>Tài xế vận chuyển</td>
+                    <td><span class="tag green">Hoạt động</span></td>
+                    <td class="r">
+                      <button class="link red">Khóa tài khoản</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td class="mono"><b>taixe_minhtri</b></td>
+                    <td>Nguyễn Minh Trí</td>
+                    <td style="color: #16a34a; font-weight: 600">
+                      Mekong Express Logistics
+                    </td>
+                    <td>Tài xế vận chuyển</td>
+                    <td><span class="tag red">Bị khóa</span></td>
+                    <td class="r"><button class="link">Mở khóa</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 3. DANH MỤC -->
+          <section class="panel p3">
+            <div class="head">
+              <div>
+                <h2>Danh mục chuẩn hóa toàn ngành</h2>
+                <p>
+                  Nông dân, cơ sở sơ chế và cơ quan kiểm định cùng chọn từ các
+                  danh mục này.
+                </p>
+              </div>
+              <a class="btn" href="#modal-cat">+ Thêm danh mục</a>
+            </div>
+            <div class="cats">
+              <div class="cat">
+                <header>Giống cây trồng <span>3 giống</span></header>
+                <div>
+                  Quýt Đường miền Tây
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Cam Sành Tiền Giang
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Bưởi Da Xanh Bến Tre
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+              </div>
+              <div class="cat">
+                <header>Tiêu chuẩn kiểm định <span>2 chuẩn</span></header>
+                <div>
+                  VietGAP trồng trọt
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  GlobalGAP xuất khẩu
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+              </div>
+              <div class="cat">
+                <header>Chỉ số xét nghiệm <span>3 chỉ số</span></header>
+                <div>
+                  Dư lượng thuốc BVTV (mg/kg)
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Kim loại nặng (Pb, Cd)
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Độ Brix <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+              </div>
+              <div class="cat">
+                <header>Vật tư &amp; phân bón <span>2 loại</span></header>
+                <div>
+                  Phân bón NPK 20-20-15
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Thuốc trừ sâu Decis 2.5EC
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+              </div>
+              <div class="cat">
+                <header>Quy cách đóng gói <span>3 loại</span></header>
+                <div>
+                  Thùng carton 10 kg
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Túi lưới 2 kg
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Khay xốp bọc màng 500 g
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+              </div>
+              <div class="cat">
+                <header>
+                  Phương tiện &amp; ngưỡng bảo quản <span>2 loại</span>
+                </header>
+                <div>
+                  Xe lạnh 4–8°C
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+                <div>
+                  Xe thường có bạt che
+                  <span><a href="#">Sửa</a><a href="#">Xóa</a></span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- 4. LÔ HÀNG TOÀN CHUỖI -->
+          <section class="panel p4">
+            <div class="stages">
+              <div class="stage">
+                <span>Canh tác (nông dân)</span><b>42</b><em>Lô thu hoạch</em>
+              </div>
+              <div class="stage">
+                <span>Sơ chế (cơ sở)</span><b>18</b><em>Tiếp nhận, tách/gộp</em>
+              </div>
+              <div class="stage">
+                <span>Kiểm định</span><b>11</b><em>Chờ mẫu, chờ kết quả</em>
+              </div>
+              <div class="stage">
+                <span>Vận chuyển</span><b>15</b><em>Đang trên đường</em>
+              </div>
+            </div>
+            <div class="head">
+              <div>
+                <h2>Theo dõi trạng thái lô toàn chuỗi</h2>
+                <p>
+                  Mỗi lô hiển thị chặng hiện tại và mã Hash gần nhất ghi lên sổ
+                  cái.
+                </p>
+              </div>
+              <span class="tag green">100% khối hợp lệ</span>
+            </div>
+            <div class="tbl">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mã lô</th>
+                    <th>Nguồn gốc</th>
+                    <th>Chặng hiện tại</th>
+                    <th>Khối lượng</th>
+                    <th>Hash</th>
+                    <th class="r">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><b>#LH-8824</b><small>Lô thu hoạch</small></td>
+                    <td>Vườn Cam A1, mùa vụ Quýt Đường</td>
+                    <td><span class="tag">Chờ sơ chế</span></td>
+                    <td>1.500 kg</td>
+                    <td class="mono hash">0x3d12...88fe</td>
+                    <td class="r">
+                      <button class="link">Xem hành trình</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><b>#LH-8801</b><small>Lô thu hoạch</small></td>
+                    <td>Vườn Cam A1 → HTX Mekong</td>
+                    <td>
+                      <span class="tag blue">Đang tiếp nhận, cân thực tế</span>
+                    </td>
+                    <td>2.000 kg</td>
+                    <td class="mono hash">0x61aa...b210</td>
+                    <td class="r">
+                      <button class="link">Xem hành trình</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>#SC-2026-004</b><small>Lô sơ chế (gộp từ 2 lô)</small>
+                    </td>
+                    <td>HTX Sơ Chế Mekong</td>
+                    <td>
+                      <span class="tag amber">Chờ lấy mẫu kiểm định</span>
+                    </td>
+                    <td>1.850 kg</td>
+                    <td class="mono hash">0xb7e3...12c9</td>
+                    <td class="r">
+                      <button class="link">Xem hành trình</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><b>#SC-2026-001</b><small>Lô thành phẩm</small></td>
+                    <td>Trà Vinh → Tổng kho Bách Hóa Xanh</td>
+                    <td>
+                      <span class="tag blue">Đang vận chuyển chuỗi lạnh</span>
+                    </td>
+                    <td>1.200 kg</td>
+                    <td class="mono hash">0x7c49...a74c</td>
+                    <td class="r">
+                      <button class="link">Xem hành trình</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><b>#SC-2026-000</b><small>Lô thành phẩm</small></td>
+                    <td>HTX Mekong → Siêu thị Co.opmart</td>
+                    <td>
+                      <span class="tag green">Đã giao, đã ký biên bản</span>
+                    </td>
+                    <td>900 kg</td>
+                    <td class="mono hash">0x02f8...6ad1</td>
+                    <td class="r">
+                      <button class="link">Xem hành trình</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><b>#LH-8790</b><small>Lô thu hoạch</small></td>
+                    <td>Vườn Bưởi B3</td>
+                    <td><span class="tag red">Bị đình chỉ</span></td>
+                    <td>800 kg</td>
+                    <td class="mono hash">0xe419...77aa</td>
+                    <td class="r">
+                      <button class="link red">Xem lý do</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 5. KIỂM ĐỊNH & THU HỒI -->
+          <section class="panel p5">
+            <div class="metrics">
+              <div class="metric">
+                <span>Yêu cầu kiểm định mới</span><b>9<small>HỒ SƠ</small></b>
+              </div>
+              <div class="metric"><span>Đã hẹn lấy mẫu</span><b>6</b></div>
+              <div class="metric">
+                <span>Chứng nhận đã công bố</span><b>73</b>
+              </div>
+              <div class="metric warn">
+                <span>Lô bị đình chỉ</span><b>2<small>LÔ</small></b>
+              </div>
+            </div>
+            <div class="alert">
+              <div>
+                <b>Lô #LH-8790 không đạt chuẩn VietGAP</b>
+                <p>
+                  Dư lượng Decis vượt ngưỡng. Tem chứng nhận đã bị đình chỉ, lô
+                  chưa được thu hồi khỏi các điểm bán.
+                </p>
+              </div>
+              <a class="btn del" href="#modal-recall">Thu hồi lô</a>
+            </div>
+            <div class="head">
+              <div>
+                <h2>Hồ sơ kiểm định</h2>
+                <p>
+                  Từ yêu cầu của nông dân đến chứng nhận ký số do cơ quan kiểm
+                  định công bố.
+                </p>
+              </div>
+            </div>
+            <div class="tbl">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Hồ sơ</th>
+                    <th>Nông trại</th>
+                    <th>Tiêu chuẩn</th>
+                    <th>Lịch lấy mẫu</th>
+                    <th>Trạng thái</th>
+                    <th class="r">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><b>#KD-2201</b></td>
+                    <td>Vườn Cam A1</td>
+                    <td>VietGAP trồng trọt</td>
+                    <td>12/10/2026</td>
+                    <td><span class="tag amber">Chờ lấy mẫu</span></td>
+                    <td class="r"><button class="link">Chi tiết</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>#KD-2198</b></td>
+                    <td>Vườn Quýt C2</td>
+                    <td>GlobalGAP xuất khẩu</td>
+                    <td>08/10/2026</td>
+                    <td>
+                      <span class="tag blue">Đã niêm phong, chờ kết quả</span>
+                    </td>
+                    <td class="r"><button class="link">Chi tiết</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>#KD-2187</b></td>
+                    <td>Vườn Cam A1</td>
+                    <td>VietGAP trồng trọt</td>
+                    <td>02/10/2026</td>
+                    <td>
+                      <span class="tag green">Đã công bố chứng nhận</span>
+                    </td>
+                    <td class="r">
+                      <button class="link">Tải chứng thư</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><b>#KD-2180</b></td>
+                    <td>Vườn Bưởi B3</td>
+                    <td>VietGAP trồng trọt</td>
+                    <td>29/09/2026</td>
+                    <td>
+                      <span class="tag red">Không đạt, đình chỉ tem</span>
+                    </td>
+                    <td class="r"><button class="link red">Xử lý</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 6. VẬN CHUYỂN -->
+          <section class="panel p6">
+            <div class="metrics">
+              <div class="metric"><span>Chuyến chờ nhận</span><b>4</b></div>
+              <div class="metric">
+                <span>Đang vận chuyển</span><b>19<small>CHUYẾN</small></b>
+              </div>
+              <div class="metric"><span>Đã giao hôm nay</span><b>11</b></div>
+              <div class="metric warn">
+                <span>Cảnh báo hành trình</span><b>1<small>CHUYẾN</small></b>
+              </div>
+            </div>
+            <div class="head">
+              <div>
+                <h2>Giám sát chuyến vận chuyển</h2>
+                <p>
+                  Theo dõi nhận chuyến, lấy hàng, nhật ký GPS và biên bản giao
+                  nhận điện tử.
+                </p>
+              </div>
+              <button class="btn out">Xuất Excel / CSV</button>
+            </div>
+            <div class="tbl">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Mã chuyến</th>
+                    <th>Lộ trình</th>
+                    <th>Xe / Tài xế</th>
+                    <th>Nhiệt độ</th>
+                    <th>Trạng thái</th>
+                    <th class="r">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><b>#VC-3021</b><small>Lô #SC-2026-001</small></td>
+                    <td>Trà Vinh → TP.HCM</td>
+                    <td>65C-128.45<small>Nguyễn Văn Hùng</small></td>
+                    <td style="color: #dc2626; font-weight: 700">12°C</td>
+                    <td><span class="tag red">Vượt ngưỡng</span></td>
+                    <td class="r"><button class="link">Xem GPS</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>#VC-3019</b><small>Lô #SC-2026-003</small></td>
+                    <td>Cần Thơ → Đà Nẵng</td>
+                    <td>65H-044.12<small>Lê Văn Tâm</small></td>
+                    <td>6°C</td>
+                    <td><span class="tag blue">Đang vận chuyển</span></td>
+                    <td class="r"><button class="link">Xem GPS</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>#VC-3017</b><small>Lô #SC-2026-002</small></td>
+                    <td>Tiền Giang → Cần Thơ</td>
+                    <td>63C-210.77<small>Phạm Hữu Phúc</small></td>
+                    <td>5°C</td>
+                    <td><span class="tag amber">Chờ lấy hàng</span></td>
+                    <td class="r"><button class="link">Chi tiết</button></td>
+                  </tr>
+                  <tr>
+                    <td><b>#VC-3012</b><small>Lô #SC-2026-000</small></td>
+                    <td>Vĩnh Long → TP.HCM</td>
+                    <td>64C-099.31<small>Trần Quốc Việt</small></td>
+                    <td>7°C</td>
+                    <td>
+                      <span class="tag green">Đã giao, đã ký biên bản</span>
+                    </td>
+                    <td class="r">
+                      <button class="link">Xem biên bản</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- 7. NHẬT KÝ & TOÀN VẸN -->
+          <section class="panel p7">
+            <div class="alert ok">
+              <div>
+                <b>Kiểm tra tính toàn vẹn chuỗi dữ liệu</b>
+                <p>
+                  Đối chiếu Hash khối giữa CSDL tập trung và sổ cái Smart
+                  Contract. Lần gần nhất: 42.918 khối khớp hoàn toàn.
+                </p>
+              </div>
+              <button class="btn">Chạy kiểm tra ngay</button>
+            </div>
+            <div class="head">
+              <div>
+                <h2>Nhật ký thao tác quản trị và chuỗi</h2>
+                <p>
+                  Mọi thay đổi quyền, khóa tài khoản và giao dịch bị chặn đều
+                  được ghi lại.
+                </p>
+              </div>
+            </div>
+            <div class="tbl">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Thời gian</th>
+                    <th>Tác nhân</th>
+                    <th>Hành động</th>
+                    <th>Đối tượng</th>
+                    <th>Tx Hash</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>08/10/2026 09:41</td>
+                    <td>admin</td>
+                    <td><span class="tag red">Vô hiệu hóa chủ thể</span></td>
+                    <td>HTX Bến Tre Fresh</td>
+                    <td class="mono hash">0x91c2...03ab</td>
+                  </tr>
+                  <tr>
+                    <td>08/10/2026 09:12</td>
+                    <td>kiemdinh_ttgd2</td>
+                    <td>
+                      <span class="tag red">Đình chỉ tem chứng nhận</span>
+                    </td>
+                    <td>Lô #LH-8790</td>
+                    <td class="mono hash">0xe419...77aa</td>
+                  </tr>
+                  <tr>
+                    <td>08/10/2026 08:30</td>
+                    <td>taixe_hung65c</td>
+                    <td><span class="tag blue">Cập nhật GPS</span></td>
+                    <td>Chuyến #VC-3021</td>
+                    <td class="mono hash">0x7c49...a74c</td>
+                  </tr>
+                  <tr>
+                    <td>07/10/2026 16:05</td>
+                    <td>soche_tranvanlong</td>
+                    <td><span class="tag amber">Gộp lô</span></td>
+                    <td>#SC-2026-004</td>
+                    <td class="mono hash">0xb7e3...12c9</td>
+                  </tr>
+                  <tr>
+                    <td>07/10/2026 14:20</td>
+                    <td>admin</td>
+                    <td><span class="tag green">Tạo tài khoản</span></td>
+                    <td>taixe_minhtri</td>
+                    <td class="mono hash">0x4ab0...e5f1</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <!-- MODALS -->
+    <div class="modal" id="modal-actor">
+      <div class="dlg">
+        <header>
+          <h3>Đăng ký chủ thể mới</h3>
+          <a href="#" aria-label="Đóng">×</a>
+        </header>
+        <section>
+          <div class="fg">
+            <label>Loại hình chủ thể (*)</label
+            ><select>
+              <option>Nông trại / Hợp tác xã canh tác</option>
+              <option>Cơ sở sơ chế &amp; đóng gói</option>
+              <option>Cơ quan kiểm định</option>
+              <option>Đơn vị vận chuyển</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Tên doanh nghiệp / chủ thể (*)</label
+            ><input
+              type="text"
+              placeholder="Ví dụ: Công ty Cổ phần Nông sản Nam Bộ"
+            />
+          </div>
+          <div class="g2">
+            <div class="fg">
+              <label>Mã số thuế / giấy phép</label
+              ><input type="text" placeholder="0312984920" />
+            </div>
+            <div class="fg">
+              <label>Node / Public key</label
+              ><input type="text" placeholder="0x..." />
+            </div>
+          </div>
+        </section>
+        <footer>
+          <a class="cancel" href="#">Hủy</a
+          ><a class="btn" href="#">Tạo chủ thể</a>
+        </footer>
+      </div>
+    </div>
+
+    <div class="modal" id="modal-user">
+      <div class="dlg">
+        <header>
+          <h3>Thêm tài khoản đăng nhập</h3>
+          <a href="#" aria-label="Đóng">×</a>
+        </header>
+        <section>
+          <div class="fg">
+            <label>Tên đăng nhập (*)</label
+            ><input type="text" placeholder="Ví dụ: taixe_minhtri" />
+          </div>
+          <div class="fg">
+            <label>Họ và tên</label
+            ><input type="text" placeholder="Nguyễn Minh Trí" />
+          </div>
+          <div class="g2">
+            <div class="fg">
+              <label>Chủ thể trực thuộc</label
+              ><select>
+                <option>Vườn Cam A1</option>
+                <option>HTX Sơ Chế Mekong</option>
+                <option>Trung Tâm Giám Định V2</option>
+                <option>Mekong Express Logistics</option>
+              </select>
+            </div>
+            <div class="fg">
+              <label>Vai trò</label
+              ><select>
+                <option>Nông dân</option>
+                <option>Cơ sở sơ chế</option>
+                <option>Kiểm định viên</option>
+                <option>Tài xế vận chuyển</option>
+              </select>
+            </div>
+          </div>
+        </section>
+        <footer>
+          <a class="cancel" href="#">Hủy</a
+          ><a class="btn" href="#">Tạo tài khoản</a>
+        </footer>
+      </div>
+    </div>
+
+    <div class="modal" id="modal-cat">
+      <div class="dlg">
+        <header>
+          <h3>Thêm danh mục dùng chung</h3>
+          <a href="#" aria-label="Đóng">×</a>
+        </header>
+        <section>
+          <div class="fg">
+            <label>Loại danh mục</label
+            ><select>
+              <option>Giống cây trồng</option>
+              <option>Tiêu chuẩn kiểm định</option>
+              <option>Chỉ số xét nghiệm</option>
+              <option>Vật tư &amp; phân bón</option>
+              <option>Quy cách đóng gói</option>
+              <option>Phương tiện &amp; ngưỡng bảo quản</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Tên mục (*)</label
+            ><input type="text" placeholder="Ví dụ: Quýt Đường miền Tây" />
+          </div>
+        </section>
+        <footer>
+          <a class="cancel" href="#">Hủy</a
+          ><a class="btn" href="#">Lưu danh mục</a>
+        </footer>
+      </div>
+    </div>
+
+    <div class="modal" id="modal-recall">
+      <div class="dlg">
+        <header>
+          <h3>Thu hồi lô #LH-8790</h3>
+          <a href="#" aria-label="Đóng">×</a>
+        </header>
+        <section>
+          <p>
+            Lô sẽ bị chặn mọi giao dịch tiếp theo trên chuỗi, và người quét mã
+            QR sẽ thấy cảnh báo thu hồi.
+          </p>
+          <div class="fg">
+            <label>Lý do thu hồi (*)</label
+            ><textarea
+              placeholder="Dư lượng thuốc BVTV vượt ngưỡng cho phép..."
+            ></textarea>
+          </div>
+        </section>
+        <footer>
+          <a class="cancel" href="#">Hủy</a
+          ><a class="btn" style="background: #dc2626" href="#"
+            >Xác nhận thu hồi</a
+          >
+        </footer>
+      </div>
+    </div>
+  </body>
+</html>
