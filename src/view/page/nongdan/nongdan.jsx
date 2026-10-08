@@ -8,6 +8,9 @@ import {
   Eye,
   CheckCircle2,
   Clock,
+  XCircle,
+  MoreVertical,
+  Pencil,
 } from "lucide-react";
 import "../../css/nongdan.css";
 import { useNavigate } from "react-router-dom";
@@ -729,7 +732,6 @@ const DashboardPage = () => {
   };
 
   const handleOpenAddSeason = () => {
-    // Mùa vụ thuộc về 1 nông trại: lấy từ bộ lọc, hoặc nông trại duy nhất
     const maNongTrai =
       seasonFarmId || (farms.length === 1 ? farms[0].ma_nong_trai : "");
 
@@ -748,10 +750,9 @@ const DashboardPage = () => {
   };
 
   const handleEditSeason = async (season) => {
+    setOpenDropdown(null);
     try {
-      const response = await fetch(
-        `${API_URL}/api/mua-vu/${season.ma_mua_vu}`,
-      );
+      const response = await fetch(`${API_URL}/api/mua-vu/${season.ma_mua_vu}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -815,7 +816,6 @@ const DashboardPage = () => {
       prev.map((row) => {
         if (row.key !== key) return row;
 
-        // Đổi loại vật tư thì phải chọn lại tên phân/thuốc
         if (field === "loai_vat_tu") {
           return { ...row, loai_vat_tu: value, ma_vat_tu: "" };
         }
@@ -837,9 +837,7 @@ const DashboardPage = () => {
     if (
       seasonMaterials.some(
         (row) =>
-          !row.ma_vat_tu ||
-          !(Number(row.lieu_luong) > 0) ||
-          !row.ngay_su_dung,
+          !row.ma_vat_tu || !(Number(row.lieu_luong) > 0) || !row.ngay_su_dung,
       )
     ) {
       alert(
@@ -848,7 +846,6 @@ const DashboardPage = () => {
       return;
     }
 
-    // Gửi multipart/form-data để kèm được file ảnh
     const formData = new FormData();
     formData.append("ma_nong_trai", seasonModalFarmId);
     formData.append("ma_thua_dat", seasonForm.ma_thua_dat);
@@ -1450,19 +1447,13 @@ const DashboardPage = () => {
                   </div>
 
                   <div className="season-actions">
-                    <button
-                      className="btn-outline-green"
-                      onClick={() => handleEditSeason(season)}
-                    >
-                      ✏️ cập nhật mùa vụ
-                    </button>
-
                     <div className="dropdown-container">
                       <button
-                        className="btn-more"
+                        className="btn-more-dots"
+                        title="Tùy chọn"
                         onClick={() => handleToggleDropdown(season.ma_mua_vu)}
                       >
-                        ⋮
+                        <MoreVertical size={18} />
                       </button>
 
                       {openDropdown === season.ma_mua_vu && (
@@ -1473,10 +1464,19 @@ const DashboardPage = () => {
                               handlechitietmuavu(e, season.ma_mua_vu)
                             }
                           >
+                            <Eye size={15} />
                             Xem chi tiết
+                          </div>
+                          <div
+                            className="dropdown-item"
+                            onClick={() => handleEditSeason(season)}
+                          >
+                            <Pencil size={15} />
+                            Cập nhật mùa vụ
                           </div>
                           <div className="dropdown-divider"></div>
                           <div className="dropdown-item">
+                            <CheckCircle2 size={15} />
                             Đánh dấu sẵn sàng
                           </div>
                           <div className="dropdown-divider"></div>
@@ -1484,6 +1484,7 @@ const DashboardPage = () => {
                             className="dropdown-item danger"
                             onClick={() => handleDeleteSeason(season.ma_mua_vu)}
                           >
+                            <XCircle size={15} />
                             Xóa
                           </div>
                         </div>
@@ -1503,7 +1504,9 @@ const DashboardPage = () => {
               <div className="metrics-row">
                 <div className="metric-card">
                   <div className="metric-title">Số lô chờ thu hoạch</div>
-                  <div className="metric-number">{batchStats.cho_thu_hoach}</div>
+                  <div className="metric-number">
+                    {batchStats.cho_thu_hoach}
+                  </div>
                 </div>
 
                 <div className="metric-card">
@@ -1559,88 +1562,113 @@ const DashboardPage = () => {
                       </tr>
                     )}
 
-                    {batches.map((batch) => (
-                      <tr key={batch.ma_lo_nong_san}>
-                        <td>{batch.ma_lo_nong_san}</td>
-                        <td>{batch.ma_nong_trai || "—"}</td>
-                        <td>{batch.loai_cay_trong || "—"}</td>
-                        <td>{batch.ten_thua_dat || "—"}</td>
-                        <td>
-                          {formatQuantity(
-                            batch.so_luong_hien_tai,
-                            batch.don_vi_tinh,
-                          )}
-                        </td>
-                        <td>{formatDate(batch.ngay_thu_hoach) || "—"}</td>
-                        <td>
-                          <div className="status-icon-cell">
-                            <span
-                              className={`status-icon ${
-                                batch.giai_doan_hien_tai === "CREATED"
-                                  ? "empty"
-                                  : "success"
-                              }`}
-                              title={
-                                BATCH_STAGE_LABELS[batch.giai_doan_hien_tai] ||
-                                batch.giai_doan_hien_tai
-                              }
-                            >
-                              {batch.giai_doan_hien_tai === "CREATED" ? "" : "✓"}
-                            </span>
-                            <div className="dropdown-container">
-                              <button
-                                className="btn-more"
-                                onClick={() =>
-                                  handleToggleDropdown(
-                                    `batch-${batch.ma_lo_nong_san}`,
-                                  )
-                                }
-                              >
-                                ⋮
-                              </button>
+                    {batches.map((batch) => {
+                      const isDropdownActive =
+                        openDropdown === `batch-${batch.ma_lo_nong_san}`;
 
-                              {openDropdown ===
-                                `batch-${batch.ma_lo_nong_san}` && (
-                                <div className="dropdown-menu">
-                                  <div
-                                    className="dropdown-item"
-                                    onClick={(e) =>
-                                      handlechitietmuavu(
-                                        e,
-                                        batch.ma_mua_vu,
-                                        batch.ma_lo_nong_san,
-                                      )
-                                    }
-                                  >
-                                    Xem chi tiết
-                                  </div>
-                                  <div className="dropdown-divider"></div>
-                                  <div
-                                    className="dropdown-item"
-                                    onClick={() => handleEditBatch(batch)}
-                                  >
-                                    Cập nhật
-                                  </div>
-                                  <div className="dropdown-divider"></div>
-                                  <div className="dropdown-item">
-                                    Yêu cầu kiểm định
-                                  </div>
-                                  <div className="dropdown-divider"></div>
-                                  <div
-                                    className="dropdown-item danger"
-                                    onClick={() =>
-                                      handleDeleteBatch(batch.ma_lo_nong_san)
-                                    }
-                                  >
-                                    Xóa
-                                  </div>
-                                </div>
+                      return (
+                        <tr
+                          key={batch.ma_lo_nong_san}
+                          className={
+                            isDropdownActive ? "row-has-open-menu" : ""
+                          }
+                        >
+                          <td>{batch.ma_lo_nong_san}</td>
+                          <td>{batch.ma_nong_trai || "—"}</td>
+                          <td>{batch.loai_cay_trong || "—"}</td>
+                          <td>{batch.ten_thua_dat || "—"}</td>
+                          <td>
+                            {formatQuantity(
+                              batch.so_luong_hien_tai,
+                              batch.don_vi_tinh,
+                            )}
+                          </td>
+                          <td>{formatDate(batch.ngay_thu_hoach) || "—"}</td>
+                          <td>
+                            <div className="status-icon-cell">
+                              {batch.giai_doan_hien_tai === "CREATED" ? (
+                                <span
+                                  className="status-icon-modern empty"
+                                  title={
+                                    BATCH_STAGE_LABELS[
+                                      batch.giai_doan_hien_tai
+                                    ] || batch.giai_doan_hien_tai
+                                  }
+                                >
+                                  <span className="empty-indicator"></span>
+                                </span>
+                              ) : (
+                                <span
+                                  className="status-icon-modern success"
+                                  title={
+                                    BATCH_STAGE_LABELS[
+                                      batch.giai_doan_hien_tai
+                                    ] || batch.giai_doan_hien_tai
+                                  }
+                                >
+                                  <CheckCircle2 size={16} />
+                                </span>
                               )}
+
+                              <div className="dropdown-container">
+                                <button
+                                  className="btn-more-dots"
+                                  title="Tùy chọn"
+                                  onClick={() =>
+                                    handleToggleDropdown(
+                                      `batch-${batch.ma_lo_nong_san}`,
+                                    )
+                                  }
+                                >
+                                  <MoreVertical size={18} />
+                                </button>
+
+                                {isDropdownActive && (
+                                  <div className="dropdown-menu">
+                                    <div
+                                      className="dropdown-item"
+                                      onClick={(e) =>
+                                        handlechitietmuavu(
+                                          e,
+                                          batch.ma_mua_vu,
+                                          batch.ma_lo_nong_san,
+                                        )
+                                      }
+                                    >
+                                      <Eye size={15} />
+                                      Xem chi tiết
+                                    </div>
+                                    <div className="dropdown-divider"></div>
+                                    <div
+                                      className="dropdown-item"
+                                      onClick={() => handleEditBatch(batch)}
+                                    >
+                                      <Pencil size={15} />
+                                      Cập nhật
+                                    </div>
+                                    <div className="dropdown-divider"></div>
+                                    <div className="dropdown-item">
+                                      <CalendarCheck size={15} />
+                                      Yêu cầu kiểm định
+                                    </div>
+                                    <div className="dropdown-divider"></div>
+                                    <div
+                                      className="dropdown-item danger"
+                                      onClick={() =>
+                                        handleDeleteBatch(batch.ma_lo_nong_san)
+                                      }
+                                    >
+                                      <XCircle size={15} />
+                                      Xóa
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1648,7 +1676,7 @@ const DashboardPage = () => {
           )}
 
           {/* =================================================
-              TAB LỊCH HẸN KIỂM ĐỊNH (TỰ FIT KHUNG, KHÔNG TRÀN)
+              TAB LỊCH HẸN KIỂM ĐỊNH
           ================================================== */}
           {activeTab === "inspection" && (
             <div className="inspection-view-wrapper">
@@ -1680,13 +1708,13 @@ const DashboardPage = () => {
                       </td>
                       <td className="nowrap-cell">
                         <span className="status-pill success">
-                          <CheckCircle2 size={14} />
+                          <CheckCircle2 size={15} />
                           Đã chấp nhận
                         </span>
                       </td>
                       <td className="col-actions">
                         <button type="button" className="btn-action-view">
-                          <Eye size={14} />
+                          <Eye size={15} />
                           Xem phiếu
                         </button>
                       </td>
@@ -1705,12 +1733,13 @@ const DashboardPage = () => {
                       </td>
                       <td className="nowrap-cell">
                         <span className="status-pill warning">
-                          <Clock size={14} />
+                          <Clock size={15} />
                           Chờ phê duyệt
                         </span>
                       </td>
                       <td className="col-actions">
                         <button type="button" className="btn-action-edit">
+                          <Pencil size={15} />
                           Sửa lịch
                         </button>
                       </td>
@@ -1728,10 +1757,14 @@ const DashboardPage = () => {
                         Hồ sơ canh tác chưa cập nhật đủ nhật ký
                       </td>
                       <td className="nowrap-cell">
-                        <span className="status-pill danger">Từ chối</span>
+                        <span className="status-pill danger">
+                          <XCircle size={15} />
+                          Từ chối
+                        </span>
                       </td>
                       <td className="col-actions">
                         <button type="button" className="btn-action-retry">
+                          <Clock size={15} />
                           Gửi lại đơn
                         </button>
                       </td>
@@ -1800,7 +1833,6 @@ const DashboardPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* DÒNG 1 */}
                     <tr>
                       <td className="col-code tracking-code">VD-LOG-9901</td>
                       <td>
@@ -1819,19 +1851,18 @@ const DashboardPage = () => {
                       <td className="export-time">04/10/2026 - 16:30</td>
                       <td>
                         <span className="status-pill info">
-                          <Truck size={14} />
+                          <Truck size={15} />
                           Đang vận chuyển
                         </span>
                       </td>
                       <td className="col-actions">
                         <button type="button" className="btn-action-detail">
-                          <Eye size={14} />
+                          <Eye size={15} />
                           Chi tiết
                         </button>
                       </td>
                     </tr>
 
-                    {/* DÒNG 2 */}
                     <tr>
                       <td className="col-code tracking-code">VD-LOG-8812</td>
                       <td>
@@ -1850,19 +1881,18 @@ const DashboardPage = () => {
                       <td className="export-time">02/10/2026 - 09:15</td>
                       <td>
                         <span className="status-pill success">
-                          <CheckCircle2 size={14} />
+                          <CheckCircle2 size={15} />
                           Đã hoàn thành
                         </span>
                       </td>
                       <td className="col-actions">
                         <button type="button" className="btn-action-detail">
-                          <Eye size={14} />
+                          <Eye size={15} />
                           Chi tiết
                         </button>
                       </td>
                     </tr>
 
-                    {/* DÒNG 3 */}
                     <tr>
                       <td className="col-code tracking-code">VD-LOG-7721</td>
                       <td>
@@ -1881,19 +1911,18 @@ const DashboardPage = () => {
                       <td className="export-time">04/10/2026 - 17:00</td>
                       <td>
                         <span className="status-pill warning">
-                          <Clock size={14} />
+                          <Clock size={15} />
                           Chờ chấp nhận
                         </span>
                       </td>
                       <td className="col-actions">
                         <button type="button" className="btn-action-detail">
-                          <Eye size={14} />
+                          <Eye size={15} />
                           Chi tiết
                         </button>
                       </td>
                     </tr>
 
-                    {/* DÒNG 4 */}
                     <tr>
                       <td className="col-code tracking-code">VD-LOG-6655</td>
                       <td>
@@ -1912,13 +1941,13 @@ const DashboardPage = () => {
                       <td className="export-time">04/10/2026 - 17:30</td>
                       <td>
                         <span className="status-pill purple">
-                          <Clock size={14} />
+                          <Clock size={15} />
                           Chờ tiếp nhận
                         </span>
                       </td>
                       <td className="col-actions">
                         <button type="button" className="btn-action-detail">
-                          <Eye size={14} />
+                          <Eye size={15} />
                           Chi tiết
                         </button>
                       </td>
@@ -2150,7 +2179,9 @@ const DashboardPage = () => {
 
               {seasonImagePreview && (
                 <div className="form-group">
-                  <label>{seasonImage ? "Ảnh xem trước" : "Ảnh hiện tại"}</label>
+                  <label>
+                    {seasonImage ? "Ảnh xem trước" : "Ảnh hiện tại"}
+                  </label>
                   <img
                     src={seasonImagePreview}
                     alt="Xem trước"
@@ -2250,7 +2281,10 @@ const DashboardPage = () => {
                           >
                             <option value="">-- Chọn vật tư --</option>
                             {options.map((item) => (
-                              <option key={item.ma_vat_tu} value={item.ma_vat_tu}>
+                              <option
+                                key={item.ma_vat_tu}
+                                value={item.ma_vat_tu}
+                              >
                                 {item.ten_vat_tu}
                               </option>
                             ))}
@@ -2259,7 +2293,8 @@ const DashboardPage = () => {
 
                         <div className="form-group">
                           <label>
-                            Liều lượng{selected ? ` (${selected.don_vi_tinh})` : ""}
+                            Liều lượng
+                            {selected ? ` (${selected.don_vi_tinh})` : ""}
                           </label>
                           <input
                             type="number"
@@ -2331,7 +2366,6 @@ const DashboardPage = () => {
 
             <div className="modal-body">
               {(() => {
-                // Thông tin mùa vụ đang chọn (hoặc mùa vụ của lô đang sửa)
                 const season = batchSeasons.find(
                   (item) => item.ma_mua_vu === batchForm.ma_mua_vu,
                 );
@@ -2440,7 +2474,6 @@ const DashboardPage = () => {
             </div>
 
             <div className="modal-body">
-              {/* CHỌN LÔ */}
               <div className="form-group">
                 <label>Chọn lô nông sản</label>
                 <select
@@ -2456,7 +2489,6 @@ const DashboardPage = () => {
                 </select>
               </div>
 
-              {/* TỰ ĐỘNG CẬP NHẬT THÔNG TIN HOẶC ĐỂ CHƯA CÓ THÔNG TIN */}
               <div className="form-grid-2 readonly-grid">
                 <div className="readonly-item">
                   <label>Mã lô</label>

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -13,9 +13,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Eye,
-  Trash2,
   RefreshCw,
-  Building2,
   UserPlus,
   Navigation,
   FileCheck2,
@@ -23,6 +21,9 @@ import {
   Tractor,
   Factory,
   Award,
+  Users,
+  UserCheck,
+  MoreVertical,
 } from "lucide-react";
 import "../../css/admin.css";
 
@@ -42,7 +43,28 @@ export default function AdminDashboard() {
   const [selectedRecallBatch, setSelectedRecallBatch] = useState("#LH-8790");
   const [showGpsModal, setShowGpsModal] = useState(null);
 
-  // ================= DỮ LIỆU CHỦ THỂ =================
+  // Modal Chi tiết & Phân quyền người dùng
+  const [selectedUserDetail, setSelectedUserDetail] = useState(null);
+  const [editingRoleUser, setEditingRoleUser] = useState(null);
+
+  // State quản lý Dropdown Menu đang mở ở dòng tài khoản nào
+  const [openDropdownUser, setOpenDropdownUser] = useState(null);
+  const dropdownRef = useRef(null);
+
+  // Bắt sự kiện click ra ngoài menu để tự đóng
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpenDropdownUser(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  // ================= DỮ LIỆU NÔNG TRẠI / CHỦ THỂ =================
   const [actors, setActors] = useState([
     {
       id: "FARM-01111",
@@ -217,11 +239,12 @@ export default function AdminDashboard() {
         item.username === username ? { ...item, active: !item.active } : item,
       ),
     );
+    setOpenDropdownUser(null);
   };
 
   const handleAddActor = (e) => {
     e.preventDefault();
-    if (!newActor.name) return alert("Vui lòng điền tên chủ thể");
+    if (!newActor.name) return alert("Vui lòng điền tên nông trại");
     const created = {
       id: `#NODE-${Math.floor(1000 + Math.random() * 9000)}`,
       name: newActor.name,
@@ -257,6 +280,18 @@ export default function AdminDashboard() {
       org: "Vườn Cam A1",
       role: "Nông dân",
     });
+  };
+
+  const handleSaveEditRoleUser = (e) => {
+    e.preventDefault();
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.username === editingRoleUser.username
+          ? { ...u, role: editingRoleUser.role }
+          : u,
+      ),
+    );
+    setEditingRoleUser(null);
   };
 
   const handleAddCategoryItem = (e) => {
@@ -296,7 +331,7 @@ export default function AdminDashboard() {
         <div className="header-search-bar">
           <input
             type="text"
-            placeholder="Tìm tài khoản, chủ thể, mã lô, mã chuyến, mã hợp đồng..."
+            placeholder="Tìm tài khoản, nông trại, mã lô, mã chuyến, mã hợp đồng..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -328,11 +363,19 @@ export default function AdminDashboard() {
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab("actors")}
-                className={`nav-item-btn ${activeTab === "actors" ? "active" : ""}`}
+                onClick={() => setActiveTab("farms")}
+                className={`nav-item-btn ${activeTab === "farms" ? "active" : ""}`}
               >
                 <ShieldCheck size={18} />
-                <span>Chủ thể & tài khoản</span>
+                <span>Nông trại</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("users")}
+                className={`nav-item-btn ${activeTab === "users" ? "active" : ""}`}
+              >
+                <Users size={18} />
+                <span>Tài khoản người dùng</span>
               </button>
               <button
                 type="button"
@@ -396,29 +439,33 @@ export default function AdminDashboard() {
           {/* TAB 1: TỔNG QUAN */}
           {activeTab === "overview" && (
             <div>
-              <div className="metrics-row">
-                <div className="metric-card">
-                  <span className="metric-title">Nông trại đang canh tác</span>
-                  <div className="metric-number">
-                    128 <span className="metric-unit">NÔNG TRẠI</span>
+              <div className="sticky-top-section">
+                <div className="metrics-row">
+                  <div className="metric-card">
+                    <span className="metric-title">
+                      Nông trại đang canh tác
+                    </span>
+                    <div className="metric-number">
+                      128 <span className="metric-unit">NÔNG TRẠI</span>
+                    </div>
                   </div>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-title">Mùa vụ đang chạy</span>
-                  <div className="metric-number">
-                    214 <span className="metric-unit">MÙA VỤ</span>
+                  <div className="metric-card">
+                    <span className="metric-title">Mùa vụ đang chạy</span>
+                    <div className="metric-number">
+                      214 <span className="metric-unit">MÙA VỤ</span>
+                    </div>
                   </div>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-title">Lô đang lưu thông</span>
-                  <div className="metric-number">
-                    86 <span className="metric-unit">LÔ</span>
+                  <div className="metric-card">
+                    <span className="metric-title">Lô đang lưu thông</span>
+                    <div className="metric-number">
+                      86 <span className="metric-unit">LÔ</span>
+                    </div>
                   </div>
-                </div>
-                <div className="metric-card warn">
-                  <span className="metric-title">Cảnh báo cần xử lý</span>
-                  <div className="metric-number">
-                    5 <span className="metric-unit">MỤC</span>
+                  <div className="metric-card warn">
+                    <span className="metric-title">Cảnh báo cần xử lý</span>
+                    <div className="metric-number">
+                      5 <span className="metric-unit">MỤC</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -447,7 +494,7 @@ export default function AdminDashboard() {
                     >
                       <div>
                         <strong style={{ fontSize: 13.5, color: "#1f2937" }}>
-                          Hồ sơ chủ thể chờ duyệt
+                          Hồ sơ đăng ký chờ duyệt
                         </strong>
                         <p
                           style={{
@@ -462,7 +509,7 @@ export default function AdminDashboard() {
                       </div>
                       <button
                         className="btn-action-view"
-                        onClick={() => setActiveTab("actors")}
+                        onClick={() => setActiveTab("farms")}
                       >
                         Xem
                       </button>
@@ -557,7 +604,7 @@ export default function AdminDashboard() {
                       </div>
                       <button
                         className="btn-action-view"
-                        onClick={() => setActiveTab("actors")}
+                        onClick={() => setActiveTab("farms")}
                       >
                         Xem
                       </button>
@@ -707,51 +754,56 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 2: CHỦ THỂ & TÀI KHOẢN */}
-          {activeTab === "actors" && (
+          {/* TAB 2: NÔNG TRẠI */}
+          {activeTab === "farms" && (
             <div>
-              <div className="metrics-row">
-                <div className="metric-card">
-                  <span className="metric-title">Tổng số chủ thể chuỗi</span>
-                  <div className="metric-number">
-                    {actors.length} <span className="metric-unit">ĐƠN VỊ</span>
+              <div className="sticky-top-section">
+                <div className="metrics-row">
+                  <div className="metric-card">
+                    <span className="metric-title">
+                      Tổng số nông trại & đối tác
+                    </span>
+                    <div className="metric-number">
+                      {actors.length}{" "}
+                      <span className="metric-unit">ĐƠN VỊ</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Đang hoạt động</span>
+                    <div className="metric-number">
+                      {actors.filter((a) => a.active).length}
+                    </div>
+                  </div>
+                  <div className="metric-card warn">
+                    <span className="metric-title">Đang bị vô hiệu hóa</span>
+                    <div className="metric-number">
+                      {actors.filter((a) => !a.active).length}{" "}
+                      <span className="metric-unit">CHỦ THỂ</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Chờ duyệt đăng ký</span>
+                    <div className="metric-number">
+                      3 <span className="metric-unit">HỒ SƠ</span>
+                    </div>
                   </div>
                 </div>
-                <div className="metric-card">
-                  <span className="metric-title">Đang hoạt động</span>
-                  <div className="metric-number">
-                    {actors.filter((a) => a.active).length}
-                  </div>
-                </div>
-                <div className="metric-card warn">
-                  <span className="metric-title">Đang bị vô hiệu hóa</span>
-                  <div className="metric-number">
-                    {actors.filter((a) => !a.active).length}{" "}
-                    <span className="metric-unit">CHỦ THỂ</span>
-                  </div>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-title">Chờ duyệt đăng ký</span>
-                  <div className="metric-number">
-                    3 <span className="metric-unit">HỒ SƠ</span>
-                  </div>
-                </div>
-              </div>
 
-              <div className="content-head">
-                <div>
-                  <h2>Chủ thể tham gia chuỗi</h2>
-                  <p>
-                    Mỗi chủ thể là một node với quyền hạn riêng trên Smart
-                    Contract.
-                  </p>
+                <div className="content-head">
+                  <div>
+                    <h2>Quản lý Nông Trại & Chuỗi Liên Kết</h2>
+                    <p>
+                      Mỗi nông trại là một node xác thực có thẩm quyền độc lập
+                      trên Smart Contract.
+                    </p>
+                  </div>
+                  <button
+                    className="btn-primary-action"
+                    onClick={() => setShowActorModal(true)}
+                  >
+                    <Plus size={16} /> Đăng ký nông trại
+                  </button>
                 </div>
-                <button
-                  className="btn-primary-action"
-                  onClick={() => setShowActorModal(true)}
-                >
-                  <Plus size={16} /> Đăng ký chủ thể
-                </button>
               </div>
 
               {actors.map((actor) => (
@@ -826,25 +878,63 @@ export default function AdminDashboard() {
                     </button>
                     <button
                       className="btn-action-edit"
-                      onClick={() => alert(`Phân quyền cho ${actor.name}`)}
+                      onClick={() => alert(`Xem chi tiết hồ sơ: ${actor.name}`)}
                     >
-                      Phân quyền
+                      <Eye size={12} /> Xem chi tiết
                     </button>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
 
-              <div className="content-head" style={{ marginTop: 32 }}>
-                <div>
-                  <h2>Tài khoản người dùng</h2>
-                  <p>Định danh cá nhân thuộc các chủ thể tham gia chuỗi.</p>
+          {/* TAB 3: TÀI KHOẢN NGƯỜI DÙNG */}
+          {activeTab === "users" && (
+            <div>
+              <div className="sticky-top-section">
+                <div className="metrics-row">
+                  <div className="metric-card">
+                    <span className="metric-title">Tổng số tài khoản</span>
+                    <div className="metric-number">
+                      {users.length} <span className="metric-unit">USER</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Đang hoạt động</span>
+                    <div className="metric-number">
+                      {users.filter((u) => u.active).length}
+                    </div>
+                  </div>
+                  <div className="metric-card warn">
+                    <span className="metric-title">Tài khoản bị khóa</span>
+                    <div className="metric-number">
+                      {users.filter((u) => !u.active).length}{" "}
+                      <span className="metric-unit">USER</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Vai trò quản trị</span>
+                    <div className="metric-number">
+                      1 <span className="metric-unit">SUPER ADMIN</span>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  className="btn-primary-action"
-                  onClick={() => setShowUserModal(true)}
-                >
-                  <UserPlus size={16} /> Thêm tài khoản
-                </button>
+
+                <div className="content-head">
+                  <div>
+                    <h2>Danh sách tài khoản người dùng</h2>
+                    <p>
+                      Quản lý quyền truy cập và phân công vai trò nhân sự trong
+                      hệ thống.
+                    </p>
+                  </div>
+                  <button
+                    className="btn-primary-action"
+                    onClick={() => setShowUserModal(true)}
+                  >
+                    <UserPlus size={16} /> Thêm tài khoản
+                  </button>
+                </div>
               </div>
 
               <div className="table-container">
@@ -855,8 +945,10 @@ export default function AdminDashboard() {
                       <th>Họ và tên</th>
                       <th>Chủ thể trực thuộc</th>
                       <th>Vai trò</th>
-                      <th>Trạng thái</th>
-                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                      <th style={{ textAlign: "center" }}>Trạng thái</th>
+                      <th style={{ textAlign: "center", width: 80 }}>
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -870,24 +962,98 @@ export default function AdminDashboard() {
                           {user.org}
                         </td>
                         <td>{user.role}</td>
-                        <td>
+                        <td style={{ textAlign: "center" }}>
                           <span
                             className={`status-pill ${user.active ? "success" : "danger"}`}
                           >
                             {user.active ? "Hoạt động" : "Bị khóa"}
                           </span>
                         </td>
-                        <td style={{ textAlign: "right" }}>
-                          <button
-                            className={
-                              user.active
-                                ? "btn-action-retry"
-                                : "btn-action-view"
+                        <td
+                          style={{ textAlign: "center", position: "relative" }}
+                        >
+                          <div
+                            className="dropdown-wrapper"
+                            ref={
+                              openDropdownUser === user.username
+                                ? dropdownRef
+                                : null
                             }
-                            onClick={() => toggleUserStatus(user.username)}
                           >
-                            {user.active ? "Khóa tài khoản" : "Mở khóa"}
-                          </button>
+                            {/* Nút 3 chấm tối giản, hiện đại */}
+                            <button
+                              type="button"
+                              className={`btn-action-more ${
+                                openDropdownUser === user.username
+                                  ? "active"
+                                  : ""
+                              }`}
+                              title="Tùy chọn thao tác"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenDropdownUser(
+                                  openDropdownUser === user.username
+                                    ? null
+                                    : user.username,
+                                );
+                              }}
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+
+                            {/* Dropdown Menu Popup */}
+                            {openDropdownUser === user.username && (
+                              <div className="action-dropdown-menu">
+                                <button
+                                  type="button"
+                                  className="dropdown-item"
+                                  onClick={() => {
+                                    setSelectedUserDetail(user);
+                                    setOpenDropdownUser(null);
+                                  }}
+                                >
+                                  <Eye size={15} color="#2563eb" />
+                                  <span>Xem chi tiết</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className="dropdown-item"
+                                  onClick={() => {
+                                    setEditingRoleUser({ ...user });
+                                    setOpenDropdownUser(null);
+                                  }}
+                                >
+                                  <UserCheck size={15} color="#16a34a" />
+                                  <span>Phân quyền & Vai trò</span>
+                                </button>
+
+                                <div className="dropdown-divider"></div>
+
+                                <button
+                                  type="button"
+                                  className={`dropdown-item ${
+                                    user.active ? "danger" : "success"
+                                  }`}
+                                  onClick={() =>
+                                    toggleUserStatus(user.username)
+                                  }
+                                >
+                                  {user.active ? (
+                                    <>
+                                      <Lock size={15} color="#dc2626" />
+                                      <span>Khóa tài khoản</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Unlock size={15} color="#16a34a" />
+                                      <span>Mở tài khoản</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -897,23 +1063,25 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 3: DANH MỤC DÙNG CHUNG */}
+          {/* TAB 4: DANH MỤC DÙNG CHUNG */}
           {activeTab === "catalog" && (
             <div>
-              <div className="content-head">
-                <div>
-                  <h2>Danh mục chuẩn hóa toàn ngành</h2>
-                  <p>
-                    Nông dân, cơ sở sơ chế và cơ quan kiểm định cùng chọn từ các
-                    danh mục này.
-                  </p>
+              <div className="sticky-top-section">
+                <div className="content-head">
+                  <div>
+                    <h2>Danh mục chuẩn hóa toàn ngành</h2>
+                    <p>
+                      Nông dân, cơ sở sơ chế và cơ quan kiểm định cùng chọn từ
+                      các danh mục này.
+                    </p>
+                  </div>
+                  <button
+                    className="btn-primary-action"
+                    onClick={() => setShowCatModal(true)}
+                  >
+                    <Plus size={16} /> Thêm danh mục
+                  </button>
                 </div>
-                <button
-                  className="btn-primary-action"
-                  onClick={() => setShowCatModal(true)}
-                >
-                  <Plus size={16} /> Thêm danh mục
-                </button>
               </div>
 
               <div
@@ -1013,45 +1181,47 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 4: LÔ HÀNG TOÀN CHUỖI */}
+          {/* TAB 5: LÔ HÀNG TOÀN CHUỖI */}
           {activeTab === "batches" && (
             <div>
-              <div className="metrics-row">
-                <div className="metric-card">
-                  <span className="metric-title">Canh tác (Nông dân)</span>
-                  <div className="metric-number">
-                    42 <span className="metric-unit">LÔ THU HOẠCH</span>
+              <div className="sticky-top-section">
+                <div className="metrics-row">
+                  <div className="metric-card">
+                    <span className="metric-title">Canh tác (Nông dân)</span>
+                    <div className="metric-number">
+                      42 <span className="metric-unit">LÔ THU HOẠCH</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Sơ chế (Cơ sở)</span>
+                    <div className="metric-number">
+                      18 <span className="metric-unit">TÁCH/GỘP</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Kiểm định</span>
+                    <div className="metric-number">
+                      11 <span className="metric-unit">CHỜ MẪU/KẾT QUẢ</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Vận chuyển</span>
+                    <div className="metric-number">
+                      15 <span className="metric-unit">ĐANG TRÊN ĐƯỜNG</span>
+                    </div>
                   </div>
                 </div>
-                <div className="metric-card">
-                  <span className="metric-title">Sơ chế (Cơ sở)</span>
-                  <div className="metric-number">
-                    18 <span className="metric-unit">TÁCH/GỘP</span>
-                  </div>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-title">Kiểm định</span>
-                  <div className="metric-number">
-                    11 <span className="metric-unit">CHỜ MẪU/KẾT QUẢ</span>
-                  </div>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-title">Vận chuyển</span>
-                  <div className="metric-number">
-                    15 <span className="metric-unit">ĐANG TRÊN ĐƯỜNG</span>
-                  </div>
-                </div>
-              </div>
 
-              <div className="content-head">
-                <div>
-                  <h2>Theo dõi trạng thái lô toàn chuỗi</h2>
-                  <p>
-                    Mỗi lô hiển thị chặng hiện tại và mã Hash gần nhất ghi lên
-                    sổ cái Smart Contract.
-                  </p>
+                <div className="content-head">
+                  <div>
+                    <h2>Theo dõi trạng thái lô toàn chuỗi</h2>
+                    <p>
+                      Mỗi lô hiển thị chặng hiện tại và mã Hash gần nhất ghi lên
+                      sổ cái Smart Contract.
+                    </p>
+                  </div>
+                  <span className="status-pill success">100% Khối hợp lệ</span>
                 </div>
-                <span className="status-pill success">100% Khối hợp lệ</span>
               </div>
 
               <div className="table-container">
@@ -1063,7 +1233,7 @@ export default function AdminDashboard() {
                       <th>Chặng hiện tại</th>
                       <th>Khối lượng</th>
                       <th>Tx Hash</th>
-                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                      <th style={{ textAlign: "center" }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1085,7 +1255,7 @@ export default function AdminDashboard() {
                       >
                         0x3d12...88fe
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">
                           <Eye size={12} /> Hành trình
                         </button>
@@ -1111,7 +1281,7 @@ export default function AdminDashboard() {
                       >
                         0x61aa...b210
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">
                           <Eye size={12} /> Hành trình
                         </button>
@@ -1137,7 +1307,7 @@ export default function AdminDashboard() {
                       >
                         0xb7e3...12c9
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">
                           <Eye size={12} /> Hành trình
                         </button>
@@ -1163,7 +1333,7 @@ export default function AdminDashboard() {
                       >
                         0x7c49...a74c
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">
                           <Eye size={12} /> Hành trình
                         </button>
@@ -1187,7 +1357,7 @@ export default function AdminDashboard() {
                       >
                         0xe419...77aa
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button
                           className="btn-action-retry"
                           onClick={() => {
@@ -1205,58 +1375,60 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 5: KIỂM ĐỊNH & THU HỒI */}
+          {/* TAB 6: KIỂM ĐỊNH & THU HỒI */}
           {activeTab === "inspection" && (
             <div>
-              <div className="metrics-row">
-                <div className="metric-card">
-                  <span className="metric-title">Yêu cầu kiểm định mới</span>
-                  <div className="metric-number">
-                    9 <span className="metric-unit">HỒ SƠ</span>
+              <div className="sticky-top-section">
+                <div className="metrics-row">
+                  <div className="metric-card">
+                    <span className="metric-title">Yêu cầu kiểm định mới</span>
+                    <div className="metric-number">
+                      9 <span className="metric-unit">HỒ SƠ</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Đã hẹn lấy mẫu</span>
+                    <div className="metric-number">6</div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Chứng nhận đã công bố</span>
+                    <div className="metric-number">73</div>
+                  </div>
+                  <div className="metric-card warn">
+                    <span className="metric-title">Lô bị đình chỉ</span>
+                    <div className="metric-number">
+                      2 <span className="metric-unit">LÔ</span>
+                    </div>
                   </div>
                 </div>
-                <div className="metric-card">
-                  <span className="metric-title">Đã hẹn lấy mẫu</span>
-                  <div className="metric-number">6</div>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-title">Chứng nhận đã công bố</span>
-                  <div className="metric-number">73</div>
-                </div>
-                <div className="metric-card warn">
-                  <span className="metric-title">Lô bị đình chỉ</span>
-                  <div className="metric-number">
-                    2 <span className="metric-unit">LÔ</span>
+
+                <div className="alert-box">
+                  <div>
+                    <b>Lô #LH-8790 không đạt chuẩn VietGAP</b>
+                    <p>
+                      Dư lượng Decis vượt ngưỡng. Tem chứng nhận đã bị đình chỉ,
+                      lô chưa được thu hồi khỏi các điểm bán.
+                    </p>
                   </div>
+                  <button
+                    className="btn-action-retry"
+                    onClick={() => {
+                      setSelectedRecallBatch("#LH-8790");
+                      setShowRecallModal(true);
+                    }}
+                  >
+                    Thu hồi lô
+                  </button>
                 </div>
-              </div>
 
-              <div className="alert-box">
-                <div>
-                  <b>Lô #LH-8790 không đạt chuẩn VietGAP</b>
-                  <p>
-                    Dư lượng Decis vượt ngưỡng. Tem chứng nhận đã bị đình chỉ,
-                    lô chưa được thu hồi khỏi các điểm bán.
-                  </p>
-                </div>
-                <button
-                  className="btn-action-retry"
-                  onClick={() => {
-                    setSelectedRecallBatch("#LH-8790");
-                    setShowRecallModal(true);
-                  }}
-                >
-                  Thu hồi lô
-                </button>
-              </div>
-
-              <div className="content-head">
-                <div>
-                  <h2>Hồ sơ kiểm định</h2>
-                  <p>
-                    Từ yêu cầu của nông dân đến chứng nhận ký số do cơ quan kiểm
-                    định công bố.
-                  </p>
+                <div className="content-head">
+                  <div>
+                    <h2>Hồ sơ kiểm định</h2>
+                    <p>
+                      Từ yêu cầu của nông dân đến chứng nhận ký số do cơ quan
+                      kiểm định công bố.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1269,7 +1441,7 @@ export default function AdminDashboard() {
                       <th>Tiêu chuẩn</th>
                       <th>Lịch lấy mẫu</th>
                       <th>Trạng thái</th>
-                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                      <th style={{ textAlign: "center" }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1283,7 +1455,7 @@ export default function AdminDashboard() {
                       <td>
                         <span className="status-pill warning">Chờ lấy mẫu</span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">Chi tiết</button>
                       </td>
                     </tr>
@@ -1299,7 +1471,7 @@ export default function AdminDashboard() {
                           Đã niêm phong, chờ kết quả
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">Chi tiết</button>
                       </td>
                     </tr>
@@ -1315,7 +1487,7 @@ export default function AdminDashboard() {
                           Đã công bố chứng nhận
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">
                           Tải chứng thư
                         </button>
@@ -1333,7 +1505,7 @@ export default function AdminDashboard() {
                           Không đạt, đình chỉ tem
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button
                           className="btn-action-retry"
                           onClick={() => {
@@ -1351,46 +1523,48 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 6: VẬN CHUYỂN */}
+          {/* TAB 7: VẬN CHUYỂN */}
           {activeTab === "shipping" && (
             <div>
-              <div className="metrics-row">
-                <div className="metric-card">
-                  <span className="metric-title">Chuyến chờ nhận</span>
-                  <div className="metric-number">4</div>
-                </div>
-                <div className="metric-card">
-                  <span className="metric-title">Đang vận chuyển</span>
-                  <div className="metric-number">
-                    19 <span className="metric-unit">CHUYẾN</span>
+              <div className="sticky-top-section">
+                <div className="metrics-row">
+                  <div className="metric-card">
+                    <span className="metric-title">Chuyến chờ nhận</span>
+                    <div className="metric-number">4</div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Đang vận chuyển</span>
+                    <div className="metric-number">
+                      19 <span className="metric-unit">CHUYẾN</span>
+                    </div>
+                  </div>
+                  <div className="metric-card">
+                    <span className="metric-title">Đã giao hôm nay</span>
+                    <div className="metric-number">11</div>
+                  </div>
+                  <div className="metric-card warn">
+                    <span className="metric-title">Cảnh báo hành trình</span>
+                    <div className="metric-number">
+                      1 <span className="metric-unit">CHUYẾN</span>
+                    </div>
                   </div>
                 </div>
-                <div className="metric-card">
-                  <span className="metric-title">Đã giao hôm nay</span>
-                  <div className="metric-number">11</div>
-                </div>
-                <div className="metric-card warn">
-                  <span className="metric-title">Cảnh báo hành trình</span>
-                  <div className="metric-number">
-                    1 <span className="metric-unit">CHUYẾN</span>
-                  </div>
-                </div>
-              </div>
 
-              <div className="content-head">
-                <div>
-                  <h2>Giám sát chuyến vận chuyển</h2>
-                  <p>
-                    Theo dõi nhận chuyến, lấy hàng, nhật ký GPS và biên bản giao
-                    nhận điện tử.
-                  </p>
+                <div className="content-head">
+                  <div>
+                    <h2>Giám sát chuyến vận chuyển</h2>
+                    <p>
+                      Theo dõi nhận chuyến, lấy hàng, nhật ký GPS và biên bản
+                      giao nhận điện tử.
+                    </p>
+                  </div>
+                  <button
+                    className="btn-action-edit"
+                    onClick={() => alert("Đang xuất báo cáo...")}
+                  >
+                    Xuất Excel / CSV
+                  </button>
                 </div>
-                <button
-                  className="btn-action-edit"
-                  onClick={() => alert("Đang xuất báo cáo...")}
-                >
-                  Xuất Excel / CSV
-                </button>
               </div>
 
               <div className="table-container">
@@ -1402,7 +1576,7 @@ export default function AdminDashboard() {
                       <th>Xe / Tài xế</th>
                       <th>Nhiệt độ</th>
                       <th>Trạng thái</th>
-                      <th style={{ textAlign: "right" }}>Thao tác</th>
+                      <th style={{ textAlign: "center" }}>Thao tác</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1426,7 +1600,7 @@ export default function AdminDashboard() {
                       <td>
                         <span className="status-pill danger">Vượt ngưỡng</span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button
                           className="btn-action-edit"
                           onClick={() => setShowGpsModal("#VC-3021")}
@@ -1455,7 +1629,7 @@ export default function AdminDashboard() {
                           Đang vận chuyển
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button
                           className="btn-action-edit"
                           onClick={() => setShowGpsModal("#VC-3019")}
@@ -1484,7 +1658,7 @@ export default function AdminDashboard() {
                           Chờ lấy hàng
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">Chi tiết</button>
                       </td>
                     </tr>
@@ -1508,7 +1682,7 @@ export default function AdminDashboard() {
                           Đã giao, đã ký
                         </span>
                       </td>
-                      <td style={{ textAlign: "right" }}>
+                      <td style={{ textAlign: "center" }}>
                         <button className="btn-action-view">
                           <FileCheck2 size={12} /> Biên bản
                         </button>
@@ -1520,39 +1694,41 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 7: NHẬT KÝ & TOÀN VẸN */}
+          {/* TAB 8: NHẬT KÝ & TOÀN VẸN */}
           {activeTab === "integrity" && (
             <div>
-              <div className="alert-box ok">
-                <div>
-                  <b>Kiểm tra tính toàn vẹn chuỗi dữ liệu</b>
-                  <p>
-                    Đối chiếu Hash khối giữa CSDL tập trung và sổ cái Smart
-                    Contract. Lần gần nhất:{" "}
-                    <b>{blocksVerified.toLocaleString()} khối</b> khớp hoàn
-                    toàn.
-                  </p>
+              <div className="sticky-top-section">
+                <div className="alert-box ok">
+                  <div>
+                    <b>Kiểm tra tính toàn vẹn chuỗi dữ liệu</b>
+                    <p>
+                      Đối chiếu Hash khối giữa CSDL tập trung và sổ cái Smart
+                      Contract. Lần gần nhất:{" "}
+                      <b>{blocksVerified.toLocaleString()} khối</b> khớp hoàn
+                      toàn.
+                    </p>
+                  </div>
+                  <button
+                    className="btn-primary-action"
+                    onClick={handleVerifyChain}
+                    disabled={isVerifying}
+                  >
+                    <RefreshCw
+                      size={15}
+                      className={isVerifying ? "spin-icon" : ""}
+                    />
+                    {isVerifying ? "Đang kiểm tra..." : "Chạy kiểm tra ngay"}
+                  </button>
                 </div>
-                <button
-                  className="btn-primary-action"
-                  onClick={handleVerifyChain}
-                  disabled={isVerifying}
-                >
-                  <RefreshCw
-                    size={15}
-                    className={isVerifying ? "spin-icon" : ""}
-                  />
-                  {isVerifying ? "Đang kiểm tra..." : "Chạy kiểm tra ngay"}
-                </button>
-              </div>
 
-              <div className="content-head">
-                <div>
-                  <h2>Nhật ký thao tác quản trị và chuỗi</h2>
-                  <p>
-                    Mọi thay đổi quyền, khóa tài khoản và giao dịch bị chặn đều
-                    được ghi lại.
-                  </p>
+                <div className="content-head">
+                  <div>
+                    <h2>Nhật ký thao tác quản trị và chuỗi</h2>
+                    <p>
+                      Mọi thay đổi quyền, khóa tài khoản và giao dịch bị chặn
+                      đều được ghi lại.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -1575,7 +1751,7 @@ export default function AdminDashboard() {
                       </td>
                       <td>
                         <span className="status-pill danger">
-                          Vô hiệu hóa chủ thể
+                          Vô hiệu hóa nông trại
                         </span>
                       </td>
                       <td>HTX Bến Tre Fresh</td>
@@ -1662,12 +1838,148 @@ export default function AdminDashboard() {
         </main>
       </div>
 
-      {/* ================= MODAL ĐĂNG KÝ CHỦ THỂ ================= */}
+      {/* ================= MODAL XEM CHI TIẾT TÀI KHOẢN ================= */}
+      {selectedUserDetail && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>Thông tin chi tiết tài khoản</h3>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setSelectedUserDetail(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="user-detail-card">
+                <div className="detail-row">
+                  <span className="detail-label">Tên đăng nhập:</span>
+                  <span className="detail-value mono font-bold">
+                    {selectedUserDetail.username}
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Họ và tên:</span>
+                  <span className="detail-value">
+                    {selectedUserDetail.name}
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Đơn vị trực thuộc:</span>
+                  <span className="detail-value" style={{ color: "#16a34a" }}>
+                    {selectedUserDetail.org}
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Vai trò:</span>
+                  <span className="detail-value">
+                    {selectedUserDetail.role}
+                  </span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Trạng thái:</span>
+                  <span
+                    className={`status-pill ${
+                      selectedUserDetail.active ? "success" : "danger"
+                    }`}
+                  >
+                    {selectedUserDetail.active ? "Hoạt động" : "Bị khóa"}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setSelectedUserDetail(null)}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= MODAL PHÂN QUYỀN & VAI TRÒ ================= */}
+      {editingRoleUser && (
+        <div className="modal-overlay">
+          <form className="modal-container" onSubmit={handleSaveEditRoleUser}>
+            <div className="modal-header">
+              <h3>Phân quyền & Vai trò tài khoản</h3>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setEditingRoleUser(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Tài khoản người dùng</label>
+                <input
+                  type="text"
+                  value={`${editingRoleUser.name} (${editingRoleUser.username})`}
+                  disabled
+                  style={{ background: "#f3f4f6", cursor: "not-allowed" }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Đơn vị trực thuộc</label>
+                <input
+                  type="text"
+                  value={editingRoleUser.org}
+                  disabled
+                  style={{ background: "#f3f4f6", cursor: "not-allowed" }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Vai trò / Quyền hạn trên Smart Contract (*)</label>
+                <select
+                  value={editingRoleUser.role}
+                  onChange={(e) =>
+                    setEditingRoleUser({
+                      ...editingRoleUser,
+                      role: e.target.value,
+                    })
+                  }
+                >
+                  <option>Nông dân</option>
+                  <option>Cơ sở sơ chế</option>
+                  <option>Kiểm định viên</option>
+                  <option>Tài xế vận chuyển</option>
+                </select>
+                <small style={{ color: "#6b7280", marginTop: 6, fontSize: 12 }}>
+                  Quyền hạn mới sẽ được cập nhật đồng bộ lên sổ cái phân quyền
+                  Smart Contract.
+                </small>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setEditingRoleUser(null)}
+              >
+                Hủy
+              </button>
+              <button type="submit" className="btn-save">
+                Cập nhật vai trò
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= MODAL ĐĂNG KÝ NÔNG TRẠI ================= */}
       {showActorModal && (
         <div className="modal-overlay">
           <form className="modal-container" onSubmit={handleAddActor}>
             <div className="modal-header">
-              <h3>Đăng ký chủ thể mới</h3>
+              <h3>Đăng ký nông trại / chủ thể mới</h3>
               <button
                 type="button"
                 className="btn-close-modal"
@@ -1678,7 +1990,7 @@ export default function AdminDashboard() {
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Loại hình chủ thể (*)</label>
+                <label>Loại hình (*)</label>
                 <select
                   value={newActor.type}
                   onChange={(e) =>
@@ -1692,10 +2004,10 @@ export default function AdminDashboard() {
                 </select>
               </div>
               <div className="form-group">
-                <label>Tên doanh nghiệp / chủ thể (*)</label>
+                <label>Tên nông trại / đơn vị (*)</label>
                 <input
                   type="text"
-                  placeholder="Ví dụ: Công ty Cổ phần Nông sản Nam Bộ"
+                  placeholder="Ví dụ: Vườn Trái Cây Hữu Cơ Nam Bộ"
                   value={newActor.name}
                   onChange={(e) =>
                     setNewActor({ ...newActor, name: e.target.value })
@@ -1737,7 +2049,7 @@ export default function AdminDashboard() {
                 Hủy
               </button>
               <button type="submit" className="btn-save">
-                Tạo chủ thể
+                Tạo nông trại
               </button>
             </div>
           </form>
@@ -1749,7 +2061,7 @@ export default function AdminDashboard() {
         <div className="modal-overlay">
           <form className="modal-container" onSubmit={handleAddUser}>
             <div className="modal-header">
-              <h3>Thêm tài khoản đăng nhập</h3>
+              <h3>Thêm tài khoản người dùng</h3>
               <button
                 type="button"
                 className="btn-close-modal"
@@ -1772,7 +2084,7 @@ export default function AdminDashboard() {
                 />
               </div>
               <div className="form-group">
-                <label>Họ và tên</label>
+                <label>Họ và tên (*)</label>
                 <input
                   type="text"
                   placeholder="Nguyễn Minh Trí"

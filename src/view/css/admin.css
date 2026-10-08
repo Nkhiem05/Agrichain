@@ -212,14 +212,27 @@
   max-width: 1380px;
   overflow-y: auto;
   overflow-x: hidden;
+  position: relative;
 }
 
 .admin .dashboard-content::-webkit-scrollbar {
   width: 6px;
 }
+
 .admin .dashboard-content::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 4px;
+}
+
+/* ================= STICKY TOP SECTION (GIỮ NGUYÊN KHI CUỘN) ================= */
+.admin .sticky-top-section {
+  position: sticky;
+  top: -24px;
+  z-index: 20;
+  background-color: #f7f9fa;
+  padding-top: 24px;
+  padding-bottom: 4px;
+  margin-top: -24px;
 }
 
 /* ================= METRICS ROW ================= */
@@ -227,7 +240,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .admin .metric-card {
@@ -292,6 +305,7 @@
   border-radius: 10px;
   padding: 16px 20px;
   margin-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .admin .content-head h2 {
@@ -319,6 +333,7 @@
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   transition: background 0.15s ease;
 }
@@ -327,20 +342,31 @@
   background-color: #257247;
 }
 
-.admin .btn-action-view {
+/* Các nút hành động bảng chặng kiểm định/vận chuyển */
+.admin .btn-action-view,
+.admin .btn-action-edit,
+.admin .btn-action-retry {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
+  min-width: 96px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-sizing: border-box;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.admin .btn-action-view {
   background-color: #ecfdf5;
   color: #059669;
   border: 1px solid #a7f3d0;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
 }
 
 .admin .btn-action-view:hover {
@@ -348,19 +374,9 @@
 }
 
 .admin .btn-action-edit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
   background-color: #eff6ff;
   color: #2563eb;
   border: 1px solid #bfdbfe;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
 }
 
 .admin .btn-action-edit:hover {
@@ -368,23 +384,141 @@
 }
 
 .admin .btn-action-retry {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
   background-color: #fef2f2;
   color: #dc2626;
   border: 1px solid #fecaca;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
 }
 
 .admin .btn-action-retry:hover {
   background-color: #fee2e2;
+}
+
+/* ================= DROPDOWN MENU 3 CHẤM (THAO TÁC TÀI KHOẢN) ================= */
+.admin .dropdown-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Nút 3 chấm tối giản, hiện đại (Clean Minimalist Button) */
+.admin .btn-action-more {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  outline: none;
+}
+
+.admin .btn-action-more:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.admin .btn-action-more.active {
+  background-color: #e2e8f0;
+  border-color: #94a3b8;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Khung Dropdown Popup */
+.admin .action-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 192px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow:
+    0 10px 25px -5px rgba(15, 23, 42, 0.1),
+    0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  padding: 6px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: dropdownFadeIn 0.16s ease-out;
+}
+
+/* Mũi tên tam giác hướng lên */
+.admin .action-dropdown-menu::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 11px;
+  width: 10px;
+  height: 10px;
+  background-color: #ffffff;
+  border-left: 1px solid #e2e8f0;
+  border-top: 1px solid #e2e8f0;
+  transform: rotate(45deg);
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin .dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.admin .dropdown-item:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.admin .dropdown-item.danger {
+  color: #dc2626;
+}
+
+.admin .dropdown-item.danger:hover {
+  background-color: #fef2f2;
+  color: #b91c1c;
+}
+
+.admin .dropdown-item.success {
+  color: #16a34a;
+}
+
+.admin .dropdown-item.success:hover {
+  background-color: #f0fdf4;
+  color: #15803d;
+}
+
+.admin .dropdown-divider {
+  height: 1px;
+  background-color: #f1f5f9;
+  margin: 4px 0;
 }
 
 /* ================= CARDS & BOXES ================= */
@@ -480,12 +614,14 @@
 .admin .status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  min-width: 96px;
+  text-align: center;
 }
 
 .admin .status-pill.success {
@@ -522,8 +658,9 @@
   background-color: #ffffff;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
-  overflow-x: auto;
+  overflow: visible;
   margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .admin .admin-table {
@@ -676,6 +813,33 @@
 .admin .modal-body {
   padding: 20px 24px;
   overflow-y: auto;
+}
+
+.admin .user-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: #f9fafb;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.admin .detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13.5px;
+}
+
+.admin .detail-label {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.admin .detail-value {
+  color: #111827;
+  font-weight: 600;
 }
 
 .admin .form-group {
