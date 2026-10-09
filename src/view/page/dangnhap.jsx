@@ -75,8 +75,7 @@ const LoginPage = () => {
           break;
 
         case "ADMIN":
-          // Hiện tại app chưa có route admin React chính thức
-          alert("Đăng nhập quản trị viên thành công");
+          navigate("/admin");
           break;
 
         case "PROCESSOR":

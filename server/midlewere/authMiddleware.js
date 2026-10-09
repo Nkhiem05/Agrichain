@@ -27,4 +27,18 @@ const checkAuth = (req, res, next) => {
   });
 };
 
-module.exports = { checkAuth };
+// Chỉ cho phép khi vai trò của người dùng (đã giải mã từ token) nằm trong danh sách cho phép.
+// Dùng sau checkAuth: checkAuth, requireRole("ADMIN")
+const requireRole =
+  (...allowedRoles) =>
+  (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.vai_tro)) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền thực hiện chức năng này",
+      });
+    }
+    next();
+  };
+
+module.exports = { checkAuth, requireRole };

@@ -1,0 +1,1178 @@
+From a025dc1d8c73527887411e00efbb294e84723305 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 8 Oct 2026 12:02:25 +0000
+Subject: [PATCH] =?UTF-8?q?Y=C3=AAu=20c=E1=BA=A7u=20ki=E1=BB=83m=20=C4=91?=
+ =?UTF-8?q?=E1=BB=8Bnh=20(backend=20+=20giao=20di=E1=BB=87n)=20v=C3=A0=20s?=
+ =?UTF-8?q?=E1=BB=ADa=20menu=20thao=20t=C3=A1c=20b=E1=BB=8B=20c=E1=BA=AFt?=
+ =?UTF-8?q?=20=E1=BB=9F=20b=E1=BA=A3ng=20l=C3=B4?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- API: GET /api/kiem-dinh/co-quan, POST /api/kiem-dinh/yeu-cau, GET /api/kiem-dinh/yeu-cau/cua-toi (dùng checkAuth, lấy danh tính nông dân từ token)
+- Chặn gửi trùng khi lô còn hồ sơ đang xử lý hoặc đã đạt chuẩn; chặn lô đã rời nông trại/đã hủy; chỉ chủ lô mới gửi được
+- Popup Yêu cầu kiểm định ở bảng lô; tab Lịch hẹn kiểm định lấy dữ liệu thật, có Gửi lại đơn khi bị từ chối/không đạt
+- Menu thao tác của bảng lô đặt position: fixed, tự mở lên trên khi sát đáy, không còn bị bảng cắt
+- Thêm lại server/migration/mua_vu_vat_tu.sql
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01APqjcfbheAQ8BGSuQfPrwc
+---
+ server/controller/yeucauKiemdinhController.js | 386 +++++++++++++
+ server/migration/mua_vu_vat_tu.sql            |  49 ++
+ server/routes/kiemdinhRoutes.js               |  13 +
+ src/view/css/nongdan.css                      |  33 ++
+ src/view/page/nongdan/nongdan.jsx             | 537 +++++++++++++++---
+ 5 files changed, 940 insertions(+), 78 deletions(-)
+ create mode 100644 server/controller/yeucauKiemdinhController.js
+ create mode 100644 server/migration/mua_vu_vat_tu.sql
+
+diff --git a/server/controller/yeucauKiemdinhController.js b/server/controller/yeucauKiemdinhController.js
+new file mode 100644
+index 0000000..c056210
+--- /dev/null
++++ b/server/controller/yeucauKiemdinhController.js
+@@ -0,0 +1,386 @@
++const db = require("../config/db");
++
++/*
++==================================================
++YÊU CẦU KIỂM ĐỊNH (phía nông dân)
++Nông dân gửi hồ sơ kiểm định cho một lô nông sản tới cơ quan kiểm định.
++Danh tính nông dân lấy từ token đăng nhập (req.user, do checkAuth gắn vào).
++==================================================
++*/
++
++// Lỗi nghiệp vụ: ném ra trong transaction để trả về đúng mã HTTP
++class ApiError extends Error {
++  constructor(status, message) {
++    super(message);
++    this.status = status;
++  }
++}
++
++const TIEU_CHUAN = ["VIETGAP", "GLOBALGAP", "ORGANIC"];
++const MAX_NOI_DUNG = 1000;
++
++// Lô đã rời nông trại thì không còn kiểm định tại nông trại được nữa
++const GIAI_DOAN_KHONG_KIEM_DINH = [
++  "IN_TRANSIT",
++  "RECEIVED",
++  "DISTRIBUTED",
++  "COMPLETED",
++];
++
++const cleanText = (value) => {
++  if (value === undefined || value === null) return null;
++  const text = String(value).trim();
++  return text === "" ? null : text;
++};
++
++// Trả về { status, message } cho lỗi nghiệp vụ, còn lại là lỗi 500
++const sendError = (res, err, logMessage, fallbackMessage) => {
++  if (err instanceof ApiError) {
++    return res.status(err.status).json({
++      success: false,
++      message: err.message,
++    });
++  }
++
++  console.error(logMessage, err);
++  return res.status(500).json({
++    success: false,
++    message: fallbackMessage,
++  });
++};
++
++// Chạy callback trong 1 transaction, tự rollback nếu có lỗi
++const withTransaction = async (callback) => {
++  const connection = await db.getConnection();
++
++  try {
++    await connection.beginTransaction();
++    const result = await callback(connection);
++    await connection.commit();
++    return result;
++  } catch (err) {
++    await connection.rollback();
++    throw err;
++  } finally {
++    connection.release();
++  }
++};
++
++// Chỉ nông dân/hợp tác xã mới được gửi và xem yêu cầu của mình
++const getFarmerId = (req) => {
++  const user = req.user;
++
++  if (!user?.ma_nguoi_dung) {
++    throw new ApiError(401, "Vui lòng đăng nhập để thực hiện chức năng này");
++  }
++
++  if (user.vai_tro !== "FARMER_COOP") {
++    throw new ApiError(403, "Chỉ nông dân/hợp tác xã mới được gửi yêu cầu kiểm định");
++  }
++
++  return user.ma_nguoi_dung;
++};
++
++// Sinh mã dạng PREFIX001... (mã kiểm định) hoặc PREFIX-1001... (mã hồ sơ)
++const generateCode = async (connection, column, prefix, minDigits, floor = 0) => {
++  const [rows] = await connection.query(
++    `
++    SELECT COALESCE(MAX(CAST(SUBSTRING(${column}, ?) AS UNSIGNED)), 0) AS max_no
++    FROM kiem_dinh_lo_hang
++    WHERE ${column} REGEXP ?
++    `,
++    [prefix.length + 1, `^${prefix}[0-9]+$`],
++  );
++
++  const next = Math.max(Number(rows[0].max_no), floor) + 1;
++  return prefix + String(next).padStart(minDigits, "0");
++};
++
++/*
++==================================================
++DANH SÁCH CƠ QUAN KIỂM ĐỊNH (cho ô chọn cơ quan)
++==================================================
++*/
++
++const getAuthorities = async (req, res) => {
++  try {
++    const [rows] = await db.execute(
++      `
++      SELECT ma_nguoi_dung AS ma_co_quan, ho_ten AS ten_co_quan
++      FROM nguoi_dung
++      WHERE vai_tro = 'CERT_AUTHORITY'
++        AND trang_thai = 1
++      ORDER BY ho_ten ASC
++      `,
++    );
++
++    return res.json({ success: true, data: rows });
++  } catch (err) {
++    return sendError(
++      res,
++      err,
++      "Lỗi lấy danh sách cơ quan kiểm định:",
++      "Không thể lấy danh sách cơ quan kiểm định",
++    );
++  }
++};
++
++/*
++==================================================
++GỬI YÊU CẦU KIỂM ĐỊNH
++==================================================
++*/
++
++const createRequest = async (req, res) => {
++  try {
++    const maNguoiDung = getFarmerId(req);
++
++    const ma_lo_nong_san = cleanText(req.body?.ma_lo_nong_san);
++    const ma_co_quan = cleanText(req.body?.ma_co_quan);
++    const tieu_chuan = (
++      cleanText(req.body?.tieu_chuan_dang_ky) || "VIETGAP"
++    ).toUpperCase();
++    const noi_dung_de_nghi = cleanText(req.body?.noi_dung_de_nghi);
++
++    if (!ma_lo_nong_san) {
++      throw new ApiError(400, "Vui lòng chọn lô nông sản cần kiểm định");
++    }
++
++    if (!ma_co_quan) {
++      throw new ApiError(400, "Vui lòng chọn cơ quan kiểm định");
++    }
++
++    if (!TIEU_CHUAN.includes(tieu_chuan)) {
++      throw new ApiError(400, "Tiêu chuẩn phải là VIETGAP, GLOBALGAP hoặc ORGANIC");
++    }
++
++    if (noi_dung_de_nghi && noi_dung_de_nghi.length > MAX_NOI_DUNG) {
++      throw new ApiError(
++        400,
++        `Nội dung đề nghị tối đa ${MAX_NOI_DUNG} ký tự`,
++      );
++    }
++
++    // Mã kiểm định/hồ sơ do server sinh; thử lại nếu 2 request cùng lúc sinh trùng mã
++    let result;
++
++    for (let attempt = 1; ; attempt++) {
++      try {
++        result = await withTransaction(async (connection) => {
++          // Khóa dòng lô để 2 yêu cầu cùng lúc cho một lô xếp hàng nhau
++          const [lots] = await connection.execute(
++            `
++            SELECT
++              lo.giai_doan_hien_tai,
++              lo.tinh_trang_su_dung,
++              lo.ma_nguoi_quan_ly,
++              nt.ma_nguoi_dung AS ma_chu_nong_trai
++            FROM lo_nong_san lo
++            LEFT JOIN mua_vu mv
++              ON lo.ma_mua_vu = mv.ma_mua_vu
++            LEFT JOIN nong_trai nt
++              ON mv.ma_nong_trai = nt.ma_nong_trai
++            WHERE lo.ma_lo_nong_san = ?
++            LIMIT 1
++            FOR UPDATE
++            `,
++            [ma_lo_nong_san],
++          );
++
++          // Lô không tồn tại hoặc không thuộc nông dân này: báo chung một lỗi
++          if (
++            lots.length === 0 ||
++            lots[0].tinh_trang_su_dung === "CANCELLED" ||
++            (lots[0].ma_chu_nong_trai !== maNguoiDung &&
++              lots[0].ma_nguoi_quan_ly !== maNguoiDung)
++          ) {
++            throw new ApiError(404, "Không tìm thấy lô nông sản");
++          }
++
++          const lot = lots[0];
++
++          if (
++            lot.tinh_trang_su_dung !== "ACTIVE" ||
++            GIAI_DOAN_KHONG_KIEM_DINH.includes(lot.giai_doan_hien_tai)
++          ) {
++            throw new ApiError(
++              409,
++              "Lô đã rời nông trại hoặc không còn hoạt động nên không thể gửi kiểm định",
++            );
++          }
++
++          const [authorities] = await connection.execute(
++            `
++            SELECT ma_nguoi_dung
++            FROM nguoi_dung
++            WHERE ma_nguoi_dung = ?
++              AND vai_tro = 'CERT_AUTHORITY'
++              AND trang_thai = 1
++            LIMIT 1
++            `,
++            [ma_co_quan],
++          );
++
++          if (authorities.length === 0) {
++            throw new ApiError(404, "Không tìm thấy cơ quan kiểm định");
++          }
++
++          // Còn hồ sơ đang xử lý, hoặc lô đã được công bố đạt chuẩn thì không gửi thêm
++          const [existing] = await connection.execute(
++            `
++            SELECT ma_ho_so, trang_thai_ho_so, ket_luan
++            FROM kiem_dinh_lo_hang
++            WHERE ma_lo_nong_san = ?
++              AND (
++                trang_thai_ho_so IN ('CHO_TIEP_NHAN', 'DA_HEN_LICH', 'DA_LAY_MAU')
++                OR (trang_thai_ho_so = 'DA_CONG_BO' AND ket_luan = 'PASSED')
++              )
++            LIMIT 1
++            `,
++            [ma_lo_nong_san],
++          );
++
++          if (existing.length > 0) {
++            throw new ApiError(
++              409,
++              existing[0].trang_thai_ho_so === "DA_CONG_BO"
++                ? `Lô đã được kiểm định đạt chuẩn (hồ sơ ${existing[0].ma_ho_so})`
++                : `Lô đang có hồ sơ kiểm định ${existing[0].ma_ho_so} chưa hoàn tất`,
++            );
++          }
++
++          const ma_kiem_dinh = await generateCode(
++            connection,
++            "ma_kiem_dinh",
++            "KD",
++            3,
++          );
++          const ma_ho_so = await generateCode(
++            connection,
++            "ma_ho_so",
++            "HS-KD-",
++            4,
++            1000,
++          );
++
++          await connection.execute(
++            `
++            INSERT INTO kiem_dinh_lo_hang
++            (
++              ma_kiem_dinh,
++              ma_ho_so,
++              ma_lo_nong_san,
++              ma_co_quan,
++              tieu_chuan_dang_ky,
++              noi_dung_de_nghi
++            )
++            VALUES (?, ?, ?, ?, ?, ?)
++            `,
++            [
++              ma_kiem_dinh,
++              ma_ho_so,
++              ma_lo_nong_san,
++              ma_co_quan,
++              tieu_chuan,
++              noi_dung_de_nghi,
++            ],
++          );
++
++          return { ma_kiem_dinh, ma_ho_so };
++        });
++
++        break;
++      } catch (err) {
++        if (err.code === "ER_DUP_ENTRY" && attempt < 3) continue;
++        throw err;
++      }
++    }
++
++    return res.status(201).json({
++      success: true,
++      message: "Gửi yêu cầu kiểm định thành công",
++      data: result,
++    });
++  } catch (err) {
++    if (err.code === "ER_NO_SUCH_TABLE") {
++      console.error("Thiếu bảng kiem_dinh_lo_hang:", err.message);
++      return res.status(500).json({
++        success: false,
++        message: "CSDL chưa có bảng kiểm định (kiem_dinh_lo_hang)",
++      });
++    }
++
++    return sendError(
++      res,
++      err,
++      "Lỗi gửi yêu cầu kiểm định:",
++      "Không thể gửi yêu cầu kiểm định",
++    );
++  }
++};
++
++/*
++==================================================
++DANH SÁCH YÊU CẦU KIỂM ĐỊNH CỦA TÔI (tab "Lịch hẹn kiểm định")
++==================================================
++*/
++
++const getMyRequests = async (req, res) => {
++  try {
++    const maNguoiDung = getFarmerId(req);
++
++    const [rows] = await db.execute(
++      `
++      SELECT
++        kd.ma_kiem_dinh,
++        kd.ma_ho_so,
++        kd.ma_lo_nong_san,
++        kd.ma_co_quan,
++        co_quan.ho_ten AS ten_co_quan,
++        kd.tieu_chuan_dang_ky,
++        kd.noi_dung_de_nghi,
++        DATE_FORMAT(kd.ngay_hen_lay_mau, '%Y-%m-%d') AS ngay_hen_lay_mau,
++        TIME_FORMAT(kd.gio_hen_lay_mau, '%H:%i') AS gio_hen_lay_mau,
++        kd.ghi_chu_chuan_bi,
++        kd.trang_thai_ho_so,
++        kd.ket_luan,
++        kd.created_at,
++        mv.loai_cay_trong,
++        lo.so_luong_hien_tai,
++        lo.don_vi_tinh
++      FROM kiem_dinh_lo_hang kd
++      JOIN lo_nong_san lo
++        ON kd.ma_lo_nong_san = lo.ma_lo_nong_san
++      LEFT JOIN mua_vu mv
++        ON lo.ma_mua_vu = mv.ma_mua_vu
++      LEFT JOIN nong_trai nt
++        ON mv.ma_nong_trai = nt.ma_nong_trai
++      LEFT JOIN nguoi_dung co_quan
++        ON kd.ma_co_quan = co_quan.ma_nguoi_dung
++      WHERE (nt.ma_nguoi_dung = ? OR lo.ma_nguoi_quan_ly = ?)
++      ORDER BY kd.created_at DESC, kd.ma_kiem_dinh DESC
++      `,
++      [maNguoiDung, maNguoiDung],
++    );
++
++    return res.json({ success: true, data: rows });
++  } catch (err) {
++    // Chưa có bảng kiểm định thì coi như chưa có yêu cầu nào
++    if (err.code === "ER_NO_SUCH_TABLE") {
++      return res.json({ success: true, data: [] });
++    }
++
++    return sendError(
++      res,
++      err,
++      "Lỗi lấy yêu cầu kiểm định:",
++      "Không thể lấy danh sách yêu cầu kiểm định",
++    );
++  }
++};
++
++module.exports = {
++  getAuthorities,
++  createRequest,
++  getMyRequests,
++};
+diff --git a/server/migration/mua_vu_vat_tu.sql b/server/migration/mua_vu_vat_tu.sql
+new file mode 100644
+index 0000000..fd610ea
+--- /dev/null
++++ b/server/migration/mua_vu_vat_tu.sql
+@@ -0,0 +1,49 @@
++-- Migration: vật tư (phân bón / thuốc BVTV) sử dụng trong mùa vụ
++-- Chạy sau khi đã import truy_xuat_nong_san.sql:
++--   mysql -u <user> -p truy_xuat_nong_san < server/migration/mua_vu_vat_tu.sql
++
++SET NAMES utf8mb4;
++
++CREATE TABLE IF NOT EXISTS `danh_muc_vat_tu` (
++  `ma_vat_tu` varchar(50) NOT NULL,
++  `loai_vat_tu` enum('PHAN_BON','THUOC_BVTV') NOT NULL,
++  `ten_vat_tu` varchar(150) NOT NULL,
++  `don_vi_tinh` varchar(30) NOT NULL,
++  `trang_thai` tinyint(1) NOT NULL DEFAULT 1,
++  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
++  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
++  PRIMARY KEY (`ma_vat_tu`),
++  KEY `idx_vat_tu_loai` (`loai_vat_tu`, `trang_thai`)
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++CREATE TABLE IF NOT EXISTS `mua_vu_vat_tu` (
++  `ma_su_dung` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
++  `ma_mua_vu` varchar(50) NOT NULL,
++  `ma_vat_tu` varchar(50) NOT NULL,
++  `lieu_luong` decimal(12,3) NOT NULL,
++  `ngay_su_dung` date NOT NULL,
++  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
++  PRIMARY KEY (`ma_su_dung`),
++  KEY `idx_mua_vu_vat_tu_mua_vu` (`ma_mua_vu`),
++  KEY `idx_mua_vu_vat_tu_vat_tu` (`ma_vat_tu`),
++  CONSTRAINT `fk_mua_vu_vat_tu_mua_vu` FOREIGN KEY (`ma_mua_vu`) REFERENCES `mua_vu` (`ma_mua_vu`) ON DELETE CASCADE ON UPDATE CASCADE,
++  CONSTRAINT `fk_mua_vu_vat_tu_vat_tu` FOREIGN KEY (`ma_vat_tu`) REFERENCES `danh_muc_vat_tu` (`ma_vat_tu`) ON UPDATE CASCADE
++) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
++
++-- Ảnh mùa vụ (đường dẫn dạng /uploads/seasons/xxx.jpg)
++-- Dùng MariaDB (XAMPP). Nếu dùng MySQL, bỏ "IF NOT EXISTS" và chỉ chạy 1 lần.
++ALTER TABLE `mua_vu`
++  ADD COLUMN IF NOT EXISTS `anh_mua_vu` varchar(500) DEFAULT NULL AFTER `ngay_thu_hoach_du_kien`;
++
++-- Danh mục mẫu để có dữ liệu cho ô "Tên phân thuốc" (thêm/sửa tuỳ nhu cầu)
++INSERT IGNORE INTO `danh_muc_vat_tu` (`ma_vat_tu`, `loai_vat_tu`, `ten_vat_tu`, `don_vi_tinh`) VALUES
++('PB001', 'PHAN_BON', 'Phân Urê', 'kg'),
++('PB002', 'PHAN_BON', 'Phân NPK 16-16-8', 'kg'),
++('PB003', 'PHAN_BON', 'Phân DAP', 'kg'),
++('PB004', 'PHAN_BON', 'Phân Kali clorua (KCl)', 'kg'),
++('PB005', 'PHAN_BON', 'Phân hữu cơ vi sinh', 'kg'),
++('TB001', 'THUOC_BVTV', 'Abamectin', 'lít'),
++('TB002', 'THUOC_BVTV', 'Mancozeb', 'kg'),
++('TB003', 'THUOC_BVTV', 'Imidacloprid', 'lít'),
++('TB004', 'THUOC_BVTV', 'Hexaconazole', 'lít'),
++('TB005', 'THUOC_BVTV', 'Đồng oxychloride', 'kg');
+diff --git a/server/routes/kiemdinhRoutes.js b/server/routes/kiemdinhRoutes.js
+index 0718dd6..09f2082 100644
+--- a/server/routes/kiemdinhRoutes.js
++++ b/server/routes/kiemdinhRoutes.js
+@@ -1,7 +1,20 @@
+ const express = require("express");
+ const router = express.Router();
+ const kiemdinhController = require("../controller/kiemdinhController");
++const yeucauKiemdinhController = require("../controller/yeucauKiemdinhController");
++const { checkAuth } = require("../midlewere/authMiddleware");
+ 
+ router.get("/", kiemdinhController.taidlyeucaukiemdinh);
+ 
++// Nông dân gửi yêu cầu kiểm định (cần đăng nhập, danh tính lấy từ token)
++router.get("/co-quan", checkAuth, yeucauKiemdinhController.getAuthorities);
++
++router.get(
++  "/yeu-cau/cua-toi",
++  checkAuth,
++  yeucauKiemdinhController.getMyRequests,
++);
++
++router.post("/yeu-cau", checkAuth, yeucauKiemdinhController.createRequest);
++
+ module.exports = router;
+diff --git a/src/view/css/nongdan.css b/src/view/css/nongdan.css
+index 637e183..fab2881 100644
+--- a/src/view/css/nongdan.css
++++ b/src/view/css/nongdan.css
+@@ -1074,6 +1074,39 @@
+     margin: 4px 0;
+   }
+ 
++  /* Menu thao tác của bảng lô: đặt theo toạ độ màn hình để không bị bảng cắt */
++  .dropdown-menu.dropdown-fixed {
++    position: fixed;
++    top: auto;
++    right: auto;
++    z-index: 1000;
++  }
++
++  /* Mở lên phía trên: mũi tên ở đáy menu */
++  .dropdown-menu.dropdown-up::before {
++    top: auto;
++    bottom: -5px;
++    transform: rotate(225deg);
++  }
++
++  /* Ô nhập văn bản nhiều dòng trong popup */
++  .modal-body .form-group textarea {
++    width: 100%;
++    padding: 10px 12px;
++    border: 1px solid #d1d5db;
++    border-radius: 6px;
++    font-size: 14px;
++    font-family: inherit;
++    resize: vertical;
++    box-sizing: border-box;
++  }
++
++  .modal-body .form-group textarea:focus {
++    outline: none;
++    border-color: #278d49;
++  }
++
++
+   @keyframes fadeInDropdown {
+     from {
+       opacity: 0;
+diff --git a/src/view/page/nongdan/nongdan.jsx b/src/view/page/nongdan/nongdan.jsx
+index e7452c2..b9abc53 100644
+--- a/src/view/page/nongdan/nongdan.jsx
++++ b/src/view/page/nongdan/nongdan.jsx
+@@ -75,6 +75,46 @@ const BATCH_STAGE_LABELS = {
+   COMPLETED: "Hoàn tất",
+ };
+ 
++// Header gửi kèm token đăng nhập (token được lưu ở trang đăng nhập)
++const authHeaders = () => {
++  const token = localStorage.getItem("token");
++  return token ? { Authorization: `Bearer ${token}` } : {};
++};
++
++// Giá trị chỉ-đọc trong popup: đậm khi đã có dữ liệu, xám khi chưa có
++const readonlyValueStyle = (hasValue) => ({
++  color: hasValue ? "#1f2937" : "#9ca3af",
++  fontWeight: hasValue ? 600 : 400,
++});
++
++const EMPTY_INSPECTION_FORM = {
++  ma_co_quan: "",
++  tieu_chuan_dang_ky: "VIETGAP",
++  noi_dung_de_nghi: "",
++};
++
++// Trạng thái hồ sơ kiểm định -> nhãn + kiểu hiển thị ở tab Lịch hẹn kiểm định
++const getInspectionStatus = (item) => {
++  switch (item.trang_thai_ho_so) {
++    case "CHO_TIEP_NHAN":
++      return { label: "Chờ phê duyệt", tone: "warning" };
++    case "DA_HEN_LICH":
++      return { label: "Đã hẹn lịch", tone: "success" };
++    case "DA_LAY_MAU":
++      return { label: "Đã lấy mẫu", tone: "success" };
++    case "DA_CONG_BO":
++      return item.ket_luan === "PASSED"
++        ? { label: "Đạt chuẩn", tone: "success" }
++        : { label: "Không đạt", tone: "danger" };
++    case "TU_CHOI":
++      return { label: "Từ chối", tone: "danger" };
++    case "THU_HOI":
++      return { label: "Đã thu hồi", tone: "danger" };
++    default:
++      return { label: item.trang_thai_ho_so, tone: "warning" };
++  }
++};
++
+ const DashboardPage = () => {
+   const navigate = useNavigate();
+ 
+@@ -191,6 +231,30 @@ const DashboardPage = () => {
+   // Mùa vụ đang triển khai để chọn khi tạo lô
+   const [batchSeasons, setBatchSeasons] = useState([]);
+ 
++  // =========================================================
++  // MENU THAO TÁC CỦA BẢNG LÔ (hiển thị cố định để không bị bảng cắt)
++  // =========================================================
++  const [batchMenuPos, setBatchMenuPos] = useState({
++    right: 0,
++    top: 0,
++    bottom: 0,
++    up: false,
++  });
++
++  // =========================================================
++  // YÊU CẦU KIỂM ĐỊNH
++  // =========================================================
++  const [showInspectionModal, setShowInspectionModal] = useState(false);
++  const [inspectionBatch, setInspectionBatch] = useState(null);
++  const [inspectionForm, setInspectionForm] = useState(EMPTY_INSPECTION_FORM);
++  const [authorities, setAuthorities] = useState([]);
++  const [authorityError, setAuthorityError] = useState("");
++  const [savingInspection, setSavingInspection] = useState(false);
++
++  const [inspections, setInspections] = useState([]);
++  const [loadingInspections, setLoadingInspections] = useState(false);
++  const [inspectionError, setInspectionError] = useState("");
++
+   // =========================================================
+   // DỮ LIỆU LÔ HÀNG ĐỂ CHỌN KHI TẠO LỆNH VẬN CHUYỂN
+   // =========================================================
+@@ -308,6 +372,26 @@ const DashboardPage = () => {
+     }
+   };
+ 
++  // Menu của bảng lô đặt theo toạ độ màn hình (position: fixed) nên không bị
++  // vùng cuộn của bảng cắt mất; mở lên phía trên nếu bên dưới không đủ chỗ
++  const handleToggleBatchMenu = (e, id) => {
++    if (openDropdown === id) {
++      setOpenDropdown(null);
++      return;
++    }
++
++    const rect = e.currentTarget.getBoundingClientRect();
++    const MENU_HEIGHT = 230;
++
++    setBatchMenuPos({
++      right: window.innerWidth - rect.right,
++      top: rect.bottom + 6,
++      bottom: window.innerHeight - rect.top + 6,
++      up: window.innerHeight - rect.bottom < MENU_HEIGHT,
++    });
++    setOpenDropdown(id);
++  };
++
+   useEffect(() => {
+     const handleClickOutside = (e) => {
+       if (!e.target.closest(".dropdown-container")) {
+@@ -321,6 +405,21 @@ const DashboardPage = () => {
+     };
+   }, []);
+ 
++  // Menu cố định không đi theo khi cuộn/đổi cỡ cửa sổ nên đóng lại
++  useEffect(() => {
++    if (openDropdown === null) return;
++
++    const close = () => setOpenDropdown(null);
++
++    window.addEventListener("scroll", close, true);
++    window.addEventListener("resize", close);
++
++    return () => {
++      window.removeEventListener("scroll", close, true);
++      window.removeEventListener("resize", close);
++    };
++  }, [openDropdown]);
++
+   // =========================================================
+   // CHUYỂN TRANG CHI TIẾT
+   // =========================================================
+@@ -1076,6 +1175,132 @@ const DashboardPage = () => {
+     }
+   };
+ 
++  // =========================================================
++  // YÊU CẦU KIỂM ĐỊNH
++  // =========================================================
++  const fetchInspections = async () => {
++    setLoadingInspections(true);
++    setInspectionError("");
++
++    try {
++      const response = await fetch(`${API_URL}/api/kiem-dinh/yeu-cau/cua-toi`, {
++        headers: authHeaders(),
++      });
++      const data = await response.json();
++
++      if (!response.ok) {
++        setInspectionError(data.message || "Không thể lấy danh sách kiểm định");
++        return;
++      }
++
++      setInspections(data.data || []);
++    } catch (error) {
++      console.error("Lỗi lấy danh sách yêu cầu kiểm định:", error);
++      setInspectionError("Không thể kết nối tới backend");
++    } finally {
++      setLoadingInspections(false);
++    }
++  };
++
++  useEffect(() => {
++    if (activeTab === "inspection") {
++      fetchInspections();
++    }
++  }, [activeTab]);
++
++  const fetchAuthorities = async () => {
++    setAuthorityError("");
++
++    try {
++      const response = await fetch(`${API_URL}/api/kiem-dinh/co-quan`, {
++        headers: authHeaders(),
++      });
++      const data = await response.json();
++
++      if (!response.ok) {
++        // Thường do chưa có token (cần đăng nhập lại) hoặc token hết hạn
++        setAuthorityError(
++          `${data.message || "Không thể lấy danh sách cơ quan kiểm định"}. Vui lòng đăng nhập lại.`,
++        );
++      }
++
++      const list = response.ok ? data.data || [] : [];
++      setAuthorities(list);
++
++      // Chỉ có một cơ quan thì chọn sẵn
++      if (list.length === 1) {
++        setInspectionForm((prev) => ({
++          ...prev,
++          ma_co_quan: prev.ma_co_quan || list[0].ma_co_quan,
++        }));
++      }
++    } catch (error) {
++      console.error("Lỗi lấy danh sách cơ quan kiểm định:", error);
++      setAuthorityError("Không thể kết nối tới backend");
++      setAuthorities([]);
++    }
++  };
++
++  // lot: { ma_lo_nong_san, loai_cay_trong, so_luong_hien_tai, don_vi_tinh }
++  const handleOpenInspection = (lot) => {
++    setOpenDropdown(null);
++    setInspectionBatch(lot);
++    setInspectionForm(EMPTY_INSPECTION_FORM);
++    fetchAuthorities();
++    setShowInspectionModal(true);
++  };
++
++  const handleCloseInspectionModal = () => {
++    setShowInspectionModal(false);
++    setInspectionBatch(null);
++    setInspectionForm(EMPTY_INSPECTION_FORM);
++  };
++
++  const handleInspectionInputChange = (e) => {
++    const { name, value } = e.target;
++    setInspectionForm((prev) => ({
++      ...prev,
++      [name]: value,
++    }));
++  };
++
++  const handleSubmitInspection = async () => {
++    if (!inspectionForm.ma_co_quan) {
++      alert("Vui lòng chọn cơ quan kiểm định");
++      return;
++    }
++
++    setSavingInspection(true);
++
++    try {
++      const response = await fetch(`${API_URL}/api/kiem-dinh/yeu-cau`, {
++        method: "POST",
++        headers: { "Content-Type": "application/json", ...authHeaders() },
++        body: JSON.stringify({
++          ma_lo_nong_san: inspectionBatch.ma_lo_nong_san,
++          ...inspectionForm,
++        }),
++      });
++      const data = await response.json();
++
++      if (!response.ok) {
++        alert(data.message || "Gửi yêu cầu kiểm định thất bại");
++        return;
++      }
++
++      alert(`${data.message}. Mã hồ sơ: #${data.data.ma_ho_so}`);
++      handleCloseInspectionModal();
++      setActiveTab("inspection");
++      // Đang ở sẵn tab này (gửi lại đơn) thì không có gì tự tải lại danh sách
++      await fetchInspections();
++    } catch (error) {
++      console.error("Lỗi gửi yêu cầu kiểm định:", error);
++      alert("Không thể kết nối tới backend");
++    } finally {
++      setSavingInspection(false);
++    }
++  };
++
+   // =========================================================
+   // XÓA LÔ THU HOẠCH
+   // =========================================================
+@@ -1590,8 +1815,9 @@ const DashboardPage = () => {
+                             <div className="dropdown-container">
+                               <button
+                                 className="btn-more"
+-                                onClick={() =>
+-                                  handleToggleDropdown(
++                                onClick={(e) =>
++                                  handleToggleBatchMenu(
++                                    e,
+                                     `batch-${batch.ma_lo_nong_san}`,
+                                   )
+                                 }
+@@ -1601,7 +1827,17 @@ const DashboardPage = () => {
+ 
+                               {openDropdown ===
+                                 `batch-${batch.ma_lo_nong_san}` && (
+-                                <div className="dropdown-menu">
++                                <div
++                                  className={`dropdown-menu dropdown-fixed ${
++                                    batchMenuPos.up ? "dropdown-up" : ""
++                                  }`}
++                                  style={{
++                                    right: batchMenuPos.right,
++                                    ...(batchMenuPos.up
++                                      ? { bottom: batchMenuPos.bottom }
++                                      : { top: batchMenuPos.top }),
++                                  }}
++                                >
+                                   <div
+                                     className="dropdown-item"
+                                     onClick={(e) =>
+@@ -1622,7 +1858,17 @@ const DashboardPage = () => {
+                                     Cập nhật
+                                   </div>
+                                   <div className="dropdown-divider"></div>
+-                                  <div className="dropdown-item">
++                                  <div
++                                    className="dropdown-item"
++                                    onClick={() =>
++                                      handleOpenInspection({
++                                        ma_lo_nong_san: batch.ma_lo_nong_san,
++                                        loai_cay_trong: batch.loai_cay_trong,
++                                        so_luong_hien_tai: batch.so_luong_hien_tai,
++                                        don_vi_tinh: batch.don_vi_tinh,
++                                      })
++                                    }
++                                  >
+                                     Yêu cầu kiểm định
+                                   </div>
+                                   <div className="dropdown-divider"></div>
+@@ -1666,76 +1912,95 @@ const DashboardPage = () => {
+                     </tr>
+                   </thead>
+                   <tbody>
+-                    <tr>
+-                      <td className="col-code tracking-code">LH-2026-001</td>
+-                      <td className="nowrap-cell">
+-                        <span className="batch-code-badge">LA1-11111111</span>
+-                      </td>
+-                      <td className="agency-name">
+-                        Trung tâm Kiểm nghiệm Nông nghiệp Vùng 2
+-                      </td>
+-                      <td className="inspection-date">12/10/2026 (08:30)</td>
+-                      <td className="inspection-note">
+-                        Kiểm định dư lượng thuốc BVTV tại vườn
+-                      </td>
+-                      <td className="nowrap-cell">
+-                        <span className="status-pill success">
+-                          <CheckCircle2 size={14} />
+-                          Đã chấp nhận
+-                        </span>
+-                      </td>
+-                      <td className="col-actions">
+-                        <button type="button" className="btn-action-view">
+-                          <Eye size={14} />
+-                          Xem phiếu
+-                        </button>
+-                      </td>
+-                    </tr>
+-                    <tr>
+-                      <td className="col-code tracking-code">LH-2026-002</td>
+-                      <td className="nowrap-cell">
+-                        <span className="batch-code-badge">LA2-22091104</span>
+-                      </td>
+-                      <td className="agency-name">
+-                        Viện Tiêu chuẩn Chất lượng AgriCheck
+-                      </td>
+-                      <td className="inspection-date">16/10/2026 (14:00)</td>
+-                      <td className="inspection-note">
+-                        Lấy mẫu test độ ngọt và chuẩn VietGAP
+-                      </td>
+-                      <td className="nowrap-cell">
+-                        <span className="status-pill warning">
+-                          <Clock size={14} />
+-                          Chờ phê duyệt
+-                        </span>
+-                      </td>
+-                      <td className="col-actions">
+-                        <button type="button" className="btn-action-edit">
+-                          Sửa lịch
+-                        </button>
+-                      </td>
+-                    </tr>
+-                    <tr>
+-                      <td className="col-code tracking-code">LH-2026-003</td>
+-                      <td className="nowrap-cell">
+-                        <span className="batch-code-badge">LA1-09091801</span>
+-                      </td>
+-                      <td className="agency-name">
+-                        Chi cục Trồng trọt & BVTV Tỉnh
+-                      </td>
+-                      <td className="inspection-date">02/10/2026 (09:00)</td>
+-                      <td className="inspection-note">
+-                        Hồ sơ canh tác chưa cập nhật đủ nhật ký
+-                      </td>
+-                      <td className="nowrap-cell">
+-                        <span className="status-pill danger">Từ chối</span>
+-                      </td>
+-                      <td className="col-actions">
+-                        <button type="button" className="btn-action-retry">
+-                          Gửi lại đơn
+-                        </button>
+-                      </td>
+-                    </tr>
++                    {loadingInspections && (
++                      <tr>
++                        <td colSpan={7}>Đang tải danh sách kiểm định...</td>
++                      </tr>
++                    )}
++
++                    {inspectionError && (
++                      <tr>
++                        <td colSpan={7}>{inspectionError}</td>
++                      </tr>
++                    )}
++
++                    {!loadingInspections &&
++                      !inspectionError &&
++                      inspections.length === 0 && (
++                        <tr>
++                          <td colSpan={7}>
++                            Chưa có yêu cầu kiểm định nào. Vào tab Quản lý lô
++                            thu hoạch, bấm ⋮ rồi chọn "Yêu cầu kiểm định".
++                          </td>
++                        </tr>
++                      )}
++
++                    {inspections.map((item) => {
++                      const status = getInspectionStatus(item);
++                      const canResend =
++                        item.trang_thai_ho_so === "TU_CHOI" ||
++                        (item.trang_thai_ho_so === "DA_CONG_BO" &&
++                          item.ket_luan !== "PASSED");
++
++                      return (
++                        <tr key={item.ma_kiem_dinh}>
++                          <td className="col-code tracking-code">
++                            {item.ma_ho_so}
++                          </td>
++                          <td className="nowrap-cell">
++                            <span className="batch-code-badge">
++                              {item.ma_lo_nong_san}
++                            </span>
++                          </td>
++                          <td className="agency-name">
++                            {item.ten_co_quan || item.ma_co_quan}
++                          </td>
++                          <td className="inspection-date">
++                            {item.ngay_hen_lay_mau
++                              ? `${formatDate(item.ngay_hen_lay_mau)}${
++                                  item.gio_hen_lay_mau
++                                    ? ` (${item.gio_hen_lay_mau})`
++                                    : ""
++                                }`
++                              : "Chưa hẹn"}
++                          </td>
++                          <td className="inspection-note">
++                            {item.ghi_chu_chuan_bi ||
++                              item.noi_dung_de_nghi ||
++                              item.tieu_chuan_dang_ky}
++                          </td>
++                          <td className="nowrap-cell">
++                            <span className={`status-pill ${status.tone}`}>
++                              {status.tone === "success" && (
++                                <CheckCircle2 size={14} />
++                              )}
++                              {status.tone === "warning" && <Clock size={14} />}
++                              {status.label}
++                            </span>
++                          </td>
++                          <td className="col-actions">
++                            {canResend ? (
++                              <button
++                                type="button"
++                                className="btn-action-retry"
++                                onClick={() =>
++                                  handleOpenInspection({
++                                    ma_lo_nong_san: item.ma_lo_nong_san,
++                                    loai_cay_trong: item.loai_cay_trong,
++                                    so_luong_hien_tai: item.so_luong_hien_tai,
++                                    don_vi_tinh: item.don_vi_tinh,
++                                  })
++                                }
++                              >
++                                Gửi lại đơn
++                              </button>
++                            ) : (
++                              "—"
++                            )}
++                          </td>
++                        </tr>
++                      );
++                    })}
+                   </tbody>
+                 </table>
+               </div>
+@@ -2360,22 +2625,30 @@ const DashboardPage = () => {
+                     <div className="form-grid-2 readonly-grid">
+                       <div className="readonly-item">
+                         <label>Mã nông trại</label>
+-                        <span>{info?.ma_nong_trai || "Chưa có dữ liệu"}</span>
++                        <span style={readonlyValueStyle(!!info?.ma_nong_trai)}>
++                          {info?.ma_nong_trai || "Chưa có dữ liệu"}
++                        </span>
+                       </div>
+ 
+                       <div className="readonly-item">
+                         <label>Thửa đất</label>
+-                        <span>{info?.ten_thua_dat || "Chưa có dữ liệu"}</span>
++                        <span style={readonlyValueStyle(!!info?.ten_thua_dat)}>
++                          {info?.ten_thua_dat || "Chưa có dữ liệu"}
++                        </span>
+                       </div>
+ 
+                       <div className="readonly-item">
+                         <label>Mùa vụ</label>
+-                        <span>{info?.loai_cay_trong || "Chưa có dữ liệu"}</span>
++                        <span style={readonlyValueStyle(!!info?.loai_cay_trong)}>
++                          {info?.loai_cay_trong || "Chưa có dữ liệu"}
++                        </span>
+                       </div>
+ 
+                       <div className="readonly-item">
+                         <label>Giống cây</label>
+-                        <span>{info?.giong_cay || "Chưa có dữ liệu"}</span>
++                        <span style={readonlyValueStyle(!!info?.giong_cay)}>
++                          {info?.giong_cay || "Chưa có dữ liệu"}
++                        </span>
+                       </div>
+                     </div>
+                   </>
+@@ -2429,6 +2702,114 @@ const DashboardPage = () => {
+         </div>
+       )}
+ 
++      {/* =====================================================
++          POPUP YÊU CẦU KIỂM ĐỊNH
++      ====================================================== */}
++      {showInspectionModal && inspectionBatch && (
++        <div className="modal-overlay">
++          <div className="modal-container">
++            <div className="modal-header">
++              <h3>Yêu Cầu Kiểm Định</h3>
++            </div>
++
++            <div className="modal-body">
++              <div className="form-grid-2 readonly-grid">
++                <div className="readonly-item">
++                  <label>Mã lô</label>
++                  <span style={readonlyValueStyle(true)}>
++                    {inspectionBatch.ma_lo_nong_san}
++                  </span>
++                </div>
++
++                <div className="readonly-item">
++                  <label>Mùa vụ</label>
++                  <span
++                    style={readonlyValueStyle(!!inspectionBatch.loai_cay_trong)}
++                  >
++                    {inspectionBatch.loai_cay_trong || "—"}
++                  </span>
++                </div>
++
++                <div className="readonly-item">
++                  <label>Sản lượng</label>
++                  <span style={readonlyValueStyle(true)}>
++                    {formatQuantity(
++                      inspectionBatch.so_luong_hien_tai,
++                      inspectionBatch.don_vi_tinh,
++                    )}
++                  </span>
++                </div>
++              </div>
++
++              <div className="form-group">
++                <label>Cơ quan kiểm định</label>
++                <select
++                  name="ma_co_quan"
++                  value={inspectionForm.ma_co_quan}
++                  onChange={handleInspectionInputChange}
++                >
++                  <option value="">-- Chọn cơ quan kiểm định --</option>
++                  {authorities.map((item) => (
++                    <option key={item.ma_co_quan} value={item.ma_co_quan}>
++                      {item.ten_co_quan}
++                    </option>
++                  ))}
++                </select>
++                {authorityError && (
++                  <p style={{ color: "#dc2626", fontSize: 12, marginTop: 6 }}>
++                    {authorityError}
++                  </p>
++                )}
++              </div>
++
++              <div className="form-group">
++                <label>Tiêu chuẩn đăng ký</label>
++                <select
++                  name="tieu_chuan_dang_ky"
++                  value={inspectionForm.tieu_chuan_dang_ky}
++                  onChange={handleInspectionInputChange}
++                >
++                  <option value="VIETGAP">VietGAP</option>
++                  <option value="GLOBALGAP">GlobalGAP</option>
++                  <option value="ORGANIC">Hữu cơ (Organic)</option>
++                </select>
++              </div>
++
++              <div className="form-group">
++                <label>Nội dung đề nghị</label>
++                <textarea
++                  name="noi_dung_de_nghi"
++                  rows={4}
++                  maxLength={1000}
++                  placeholder="Ví dụ: Kiểm định dư lượng thuốc BVTV tại vườn"
++                  value={inspectionForm.noi_dung_de_nghi}
++                  onChange={handleInspectionInputChange}
++                />
++              </div>
++            </div>
++
++            <div className="modal-footer">
++              <button
++                type="button"
++                className="btn-cancel"
++                onClick={handleCloseInspectionModal}
++              >
++                Hủy
++              </button>
++
++              <button
++                type="button"
++                className="btn-save"
++                onClick={handleSubmitInspection}
++                disabled={savingInspection}
++              >
++                {savingInspection ? "Đang gửi..." : "Gửi yêu cầu"}
++              </button>
++            </div>
++          </div>
++        </div>
++      )}
++
+       {/* =====================================================
+           POPUP TẠO LỆNH VẬN CHUYỂN & BÀN GIAO
+       ====================================================== */}
+-- 
+2.43.0
+

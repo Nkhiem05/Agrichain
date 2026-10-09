@@ -12,6 +12,10 @@ const muavuRoutes = require("./routes/muavuRoutes");
 const lothuhoachRoutes = require("./routes/lothuhoachRoutes");
 const nongtraiRoutes = require("./routes/nongtraiRoutes");
 const vanchuyenRoutes = require("./routes/vanchuyenRoutes");
+const adminTongQuanRoutes = require("./routes/routes_admin/tongquanRoutes");
+const adminNongTraiRoutes = require("./routes/routes_admin/nongtraiRoutes");
+const adminTaiKhoanRoutes = require("./routes/routes_admin/taikhoanRoutes");
+const adminDanhMucRoutes = require("./routes/routes_admin/danhmucRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -25,7 +29,6 @@ app.get("/", (req, res) => {
 });
 
 // Login
-app.use("/api", authRoutes);
 app.use("/api", authRoutes);
 
 //resgister
@@ -48,6 +51,12 @@ app.use("/api/nong-trai", nongtraiRoutes);
 
 // Vận chuyển & bàn giao
 app.use("/api/van-chuyen", vanchuyenRoutes);
+
+// Quản trị hệ thống (admin) - mỗi trang 1 controller + routes riêng
+app.use("/api/admin/tong-quan", adminTongQuanRoutes);
+app.use("/api/admin/nong-trai", adminNongTraiRoutes);
+app.use("/api/admin", adminTaiKhoanRoutes); // /tai-khoan... và /yeu-cau-tai-khoan...
+app.use("/api/admin/danh-muc", adminDanhMucRoutes);
 
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);
