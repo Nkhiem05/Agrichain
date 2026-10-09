@@ -962,6 +962,49 @@
     margin: 4px 0;
   }
 
+  /* Menu thao tác của bảng lô: đặt theo toạ độ màn hình để không bị bảng cắt */
+  .dropdown-menu.dropdown-fixed {
+    position: fixed;
+    top: auto;
+    right: auto;
+    z-index: 1000;
+  }
+
+  /* Mở lên phía trên: mũi tên ở đáy menu */
+  .dropdown-menu.dropdown-up::before {
+    top: auto;
+    bottom: -5px;
+    transform: rotate(225deg);
+  }
+
+  /* Ô nhập văn bản nhiều dòng trong popup */
+  .modal-body .form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    box-sizing: border-box;
+  }
+
+  .modal-body .form-group textarea:focus {
+    outline: none;
+    border-color: #278d49;
+  }
+
+  /* Nút hành động nguy hiểm (hủy lệnh) trong popup */
+  .btn-save.btn-danger-solid {
+    background-color: #dc2626;
+  }
+
+  .btn-save.btn-danger-solid:hover {
+    background-color: #b91c1c;
+  }
+
+
+
   @keyframes fadeInDropdown {
     from {
       opacity: 0;
@@ -1035,6 +1078,7 @@
   .form-group input[type="text"],
   .form-group input[type="number"],
   .form-group input[type="date"],
+  .form-group input[type="datetime-local"],
   .form-group select {
     height: 42px;
     border: 1px solid #d1d5db;

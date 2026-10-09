@@ -10,7 +10,6 @@ const registerRoutes = require("./routes/registerRoutes");
 const kiemdinhRoutes = require("./routes/kiemdinhRoutes");
 const muavuRoutes = require("./routes/muavuRoutes");
 const lothuhoachRoutes = require("./routes/lothuhoachRoutes");
-const nongtraiRoutes = require("./routes/nongtraiRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -24,7 +23,6 @@ app.get("/", (req, res) => {
 });
 
 // Login
-app.use("/api", authRoutes);
 app.use("/api", authRoutes);
 
 //resgister
@@ -41,9 +39,6 @@ app.use("/api/mua-vu", muavuRoutes);
 
 // Lô thu hoạch
 app.use("/api/lo-thu-hoach", lothuhoachRoutes);
-
-// Chi tiết nông trại
-app.use("/api/nong-trai", nongtraiRoutes);
 
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);

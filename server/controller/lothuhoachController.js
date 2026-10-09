@@ -186,6 +186,29 @@ const assertBatchEditable = async (connection, maLo) => {
   } catch (err) {
     if (err.code !== "ER_NO_SUCH_TABLE") throw err;
   }
+
+  // Lô đang có lệnh vận chuyển còn hiệu lực thì không đổi số liệu (bảng có thể chưa được tạo)
+  try {
+    const [shipments] = await connection.execute(
+      `
+      SELECT ma_van_don
+      FROM lenh_van_chuyen
+      WHERE ma_lo_nong_san = ?
+        AND trang_thai NOT IN ('TU_CHOI', 'DA_HUY')
+      LIMIT 1
+      `,
+      [maLo],
+    );
+
+    if (shipments.length > 0) {
+      throw new ApiError(
+        409,
+        `Lô đang có lệnh vận chuyển ${shipments[0].ma_van_don} nên không thể thay đổi`,
+      );
+    }
+  } catch (err) {
+    if (err.code !== "ER_NO_SUCH_TABLE") throw err;
+  }
 };
 
 // Lô nông sản cần có sản phẩm: dùng sản phẩm trùng tên cây trồng, chưa có thì tạo mới.

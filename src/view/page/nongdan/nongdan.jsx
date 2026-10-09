@@ -78,6 +78,80 @@ const BATCH_STAGE_LABELS = {
   COMPLETED: "Hoàn tất",
 };
 
+// Header gửi kèm token đăng nhập (token được lưu ở trang đăng nhập)
+const authHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+// Giá trị chỉ-đọc trong popup: đậm khi đã có dữ liệu, xám khi chưa có
+const readonlyValueStyle = (hasValue) => ({
+  color: hasValue ? "#1f2937" : "#9ca3af",
+  fontWeight: hasValue ? 600 : 400,
+});
+
+// "2026-10-04 16:30" -> "04/10/2026 - 16:30"
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  const [date, time] = value.split(" ");
+  return `${formatDate(date)}${time ? ` - ${time}` : ""}`;
+};
+
+// Giờ hiện tại dạng YYYY-MM-DDTHH:mm cho ô datetime-local (giờ máy, không lệch múi giờ)
+const nowLocalInput = () => {
+  const now = new Date();
+  return `${todayText()}T${String(now.getHours()).padStart(2, "0")}:${String(
+    now.getMinutes(),
+  ).padStart(2, "0")}`;
+};
+
+const EMPTY_SHIPPING_FORM = {
+  ma_lo_nong_san: "",
+  ma_don_vi_van_chuyen: "",
+  ma_ben_nhan: "",
+  thoi_gian_xuat: "",
+  ghi_chu: "",
+};
+
+// Trạng thái lệnh vận chuyển -> nhãn + kiểu hiển thị + icon ở tab Vận chuyển & Bàn giao
+const SHIPPING_STATUS = {
+  CHO_CHAP_NHAN: { label: "Chờ chấp nhận", tone: "warning", icon: "clock" },
+  CHO_LAY_HANG: { label: "Chờ lấy hàng", tone: "warning", icon: "clock" },
+  DANG_VAN_CHUYEN: { label: "Đang vận chuyển", tone: "info", icon: "truck" },
+  CHO_TIEP_NHAN: { label: "Chờ tiếp nhận", tone: "purple", icon: "clock" },
+  HOAN_THANH: { label: "Đã hoàn thành", tone: "success", icon: "check" },
+  TU_CHOI: { label: "Bị từ chối", tone: "danger", icon: "none" },
+  DA_HUY: { label: "Đã hủy", tone: "danger", icon: "none" },
+};
+
+const EMPTY_INSPECTION_FORM = {
+  ma_co_quan: "",
+  tieu_chuan_dang_ky: "VIETGAP",
+  noi_dung_de_nghi: "",
+};
+
+// Trạng thái hồ sơ kiểm định -> nhãn + kiểu hiển thị ở tab Lịch hẹn kiểm định
+const getInspectionStatus = (item) => {
+  switch (item.trang_thai_ho_so) {
+    case "CHO_TIEP_NHAN":
+      return { label: "Chờ phê duyệt", tone: "warning" };
+    case "DA_HEN_LICH":
+      return { label: "Đã hẹn lịch", tone: "success" };
+    case "DA_LAY_MAU":
+      return { label: "Đã lấy mẫu", tone: "success" };
+    case "DA_CONG_BO":
+      return item.ket_luan === "PASSED"
+        ? { label: "Đạt chuẩn", tone: "success" }
+        : { label: "Không đạt", tone: "danger" };
+    case "TU_CHOI":
+      return { label: "Từ chối", tone: "danger" };
+    case "THU_HOI":
+      return { label: "Đã thu hồi", tone: "danger" };
+    default:
+      return { label: item.trang_thai_ho_so, tone: "warning" };
+  }
+};
+
 const DashboardPage = () => {
   const navigate = useNavigate();
 
@@ -195,30 +269,55 @@ const DashboardPage = () => {
   const [batchSeasons, setBatchSeasons] = useState([]);
 
   // =========================================================
-  // DỮ LIỆU LÔ HÀNG ĐỂ CHỌN KHI TẠO LỆNH VẬN CHUYỂN
+  // MENU THAO TÁC CỦA BẢNG LÔ (hiển thị cố định để không bị bảng cắt)
   // =========================================================
-  const availableBatches = [
-    {
-      ma_lo: "LA1-11111111",
-      ten_lo: "Quýt đường loại 1 đợt 1",
-      ma_nong_trai: "FARM11111111",
-      ten_nong_san: "Quýt Đường Mọng Nước",
-      san_luong: "5.000 kg",
-      ngay_thu_hoach: "25/12/2026",
-    },
-    {
-      ma_lo: "LA2-22091104",
-      ten_lo: "Xoài Cát Hòa Lộc xuất khẩu",
-      ma_nong_trai: "FARM22091104",
-      ten_nong_san: "Xoài Cát Hòa Lộc",
-      san_luong: "3.500 kg",
-      ngay_thu_hoach: "15/11/2026",
-    },
-  ];
+  const [batchMenuPos, setBatchMenuPos] = useState({
+    right: 0,
+    top: 0,
+    bottom: 0,
+    up: false,
+  });
 
-  const [selectedBatchCode, setSelectedBatchCode] = useState("");
-  const selectedBatchInfo = availableBatches.find(
-    (b) => b.ma_lo === selectedBatchCode,
+  // =========================================================
+  // YÊU CẦU KIỂM ĐỊNH
+  // =========================================================
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [inspectionBatch, setInspectionBatch] = useState(null);
+  const [inspectionForm, setInspectionForm] = useState(EMPTY_INSPECTION_FORM);
+  const [authorities, setAuthorities] = useState([]);
+  const [authorityError, setAuthorityError] = useState("");
+  const [savingInspection, setSavingInspection] = useState(false);
+
+  const [inspections, setInspections] = useState([]);
+  const [loadingInspections, setLoadingInspections] = useState(false);
+  const [inspectionError, setInspectionError] = useState("");
+
+  // =========================================================
+  // VẬN CHUYỂN & BÀN GIAO
+  // =========================================================
+  const [shippingOrders, setShippingOrders] = useState([]);
+  const [shippingStats, setShippingStats] = useState({
+    dang_van_chuyen: 0,
+    da_ban_giao: 0,
+    khoi_luong_da_xuat_tan: 0,
+  });
+  const [loadingShipping, setLoadingShipping] = useState(false);
+  const [shippingError, setShippingError] = useState("");
+
+  const [shippingForm, setShippingForm] = useState(EMPTY_SHIPPING_FORM);
+  const [readyBatches, setReadyBatches] = useState([]);
+  const [partners, setPartners] = useState({
+    don_vi_van_chuyen: [],
+    ben_nhan: [],
+  });
+  const [partnerError, setPartnerError] = useState("");
+  const [savingShipping, setSavingShipping] = useState(false);
+
+  // Lệnh đang xem chi tiết (null = đóng popup)
+  const [shippingDetail, setShippingDetail] = useState(null);
+
+  const selectedBatchInfo = readyBatches.find(
+    (b) => b.ma_lo_nong_san === shippingForm.ma_lo_nong_san,
   );
 
   // =========================================================
@@ -311,6 +410,26 @@ const DashboardPage = () => {
     }
   };
 
+  // Menu của bảng lô đặt theo toạ độ màn hình (position: fixed) nên không bị
+  // vùng cuộn của bảng cắt mất; mở lên phía trên nếu bên dưới không đủ chỗ
+  const handleToggleBatchMenu = (e, id) => {
+    if (openDropdown === id) {
+      setOpenDropdown(null);
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const MENU_HEIGHT = 230;
+
+    setBatchMenuPos({
+      right: window.innerWidth - rect.right,
+      top: rect.bottom + 6,
+      bottom: window.innerHeight - rect.top + 6,
+      up: window.innerHeight - rect.bottom < MENU_HEIGHT,
+    });
+    setOpenDropdown(id);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (!e.target.closest(".dropdown-container")) {
@@ -323,6 +442,21 @@ const DashboardPage = () => {
       document.removeEventListener("click", handleClickOutside);
     };
   }, []);
+
+  // Menu cố định không đi theo khi cuộn/đổi cỡ cửa sổ nên đóng lại
+  useEffect(() => {
+    if (openDropdown === null) return;
+
+    const close = () => setOpenDropdown(null);
+
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+
+    return () => {
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [openDropdown]);
 
   // =========================================================
   // CHUYỂN TRANG CHI TIẾT
@@ -1074,6 +1208,320 @@ const DashboardPage = () => {
   };
 
   // =========================================================
+  // YÊU CẦU KIỂM ĐỊNH
+  // =========================================================
+  const fetchInspections = async () => {
+    setLoadingInspections(true);
+    setInspectionError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/kiem-dinh/yeu-cau/cua-toi`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setInspectionError(data.message || "Không thể lấy danh sách kiểm định");
+        return;
+      }
+
+      setInspections(data.data || []);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách yêu cầu kiểm định:", error);
+      setInspectionError("Không thể kết nối tới backend");
+    } finally {
+      setLoadingInspections(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "inspection") {
+      fetchInspections();
+    }
+  }, [activeTab]);
+
+  const fetchAuthorities = async () => {
+    setAuthorityError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/kiem-dinh/co-quan`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Thường do chưa có token (cần đăng nhập lại) hoặc token hết hạn
+        setAuthorityError(
+          `${data.message || "Không thể lấy danh sách cơ quan kiểm định"}. Vui lòng đăng nhập lại.`,
+        );
+      }
+
+      const list = response.ok ? data.data || [] : [];
+      setAuthorities(list);
+
+      // Chỉ có một cơ quan thì chọn sẵn
+      if (list.length === 1) {
+        setInspectionForm((prev) => ({
+          ...prev,
+          ma_co_quan: prev.ma_co_quan || list[0].ma_co_quan,
+        }));
+      }
+    } catch (error) {
+      console.error("Lỗi lấy danh sách cơ quan kiểm định:", error);
+      setAuthorityError("Không thể kết nối tới backend");
+      setAuthorities([]);
+    }
+  };
+
+  // lot: { ma_lo_nong_san, loai_cay_trong, so_luong_hien_tai, don_vi_tinh }
+  const handleOpenInspection = (lot) => {
+    setOpenDropdown(null);
+    setInspectionBatch(lot);
+    setInspectionForm(EMPTY_INSPECTION_FORM);
+    fetchAuthorities();
+    setShowInspectionModal(true);
+  };
+
+  const handleCloseInspectionModal = () => {
+    setShowInspectionModal(false);
+    setInspectionBatch(null);
+    setInspectionForm(EMPTY_INSPECTION_FORM);
+  };
+
+  const handleInspectionInputChange = (e) => {
+    const { name, value } = e.target;
+    setInspectionForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmitInspection = async () => {
+    if (!inspectionForm.ma_co_quan) {
+      alert("Vui lòng chọn cơ quan kiểm định");
+      return;
+    }
+
+    setSavingInspection(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/kiem-dinh/yeu-cau`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({
+          ma_lo_nong_san: inspectionBatch.ma_lo_nong_san,
+          ...inspectionForm,
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Gửi yêu cầu kiểm định thất bại");
+        return;
+      }
+
+      alert(`${data.message}. Mã hồ sơ: #${data.data.ma_ho_so}`);
+      handleCloseInspectionModal();
+      setActiveTab("inspection");
+      // Đang ở sẵn tab này (gửi lại đơn) thì không có gì tự tải lại danh sách
+      await fetchInspections();
+    } catch (error) {
+      console.error("Lỗi gửi yêu cầu kiểm định:", error);
+      alert("Không thể kết nối tới backend");
+    } finally {
+      setSavingInspection(false);
+    }
+  };
+
+  // =========================================================
+  // VẬN CHUYỂN & BÀN GIAO
+  // =========================================================
+  const fetchShippingOrders = async () => {
+    setLoadingShipping(true);
+    setShippingError("");
+
+    try {
+      const response = await fetch(`${API_URL}/api/van-chuyen/cua-toi`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        setShippingError(data.message || "Không thể lấy danh sách vận chuyển");
+        return;
+      }
+
+      setShippingOrders(data.data.lenh || []);
+      setShippingStats(data.data.thong_ke);
+    } catch (error) {
+      console.error("Lỗi lấy danh sách lệnh vận chuyển:", error);
+      setShippingError("Không thể kết nối tới backend");
+    } finally {
+      setLoadingShipping(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "shipping") {
+      fetchShippingOrders();
+    }
+  }, [activeTab]);
+
+  // Lô sẵn sàng + đơn vị vận chuyển + cơ sở nhận hàng cho popup tạo lệnh
+  const fetchShippingOptions = async () => {
+    setPartnerError("");
+
+    try {
+      const [batchRes, partnerRes] = await Promise.all([
+        fetch(`${API_URL}/api/van-chuyen/lo-san-sang`, {
+          headers: authHeaders(),
+        }),
+        fetch(`${API_URL}/api/van-chuyen/doi-tac`, { headers: authHeaders() }),
+      ]);
+      const batchData = await batchRes.json();
+      const partnerData = await partnerRes.json();
+
+      if (!batchRes.ok || !partnerRes.ok) {
+        setPartnerError(
+          `${(!batchRes.ok ? batchData : partnerData).message || "Không thể tải dữ liệu"}. Vui lòng đăng nhập lại.`,
+        );
+      }
+
+      const batchList = batchRes.ok ? batchData.data || [] : [];
+      const partnerList = partnerRes.ok
+        ? partnerData.data
+        : { don_vi_van_chuyen: [], ben_nhan: [] };
+
+      setReadyBatches(batchList);
+      setPartners(partnerList);
+
+      // Chỉ có một lựa chọn thì chọn sẵn
+      setShippingForm((prev) => ({
+        ...prev,
+        ma_don_vi_van_chuyen:
+          prev.ma_don_vi_van_chuyen ||
+          (partnerList.don_vi_van_chuyen.length === 1
+            ? partnerList.don_vi_van_chuyen[0].ma_nguoi_dung
+            : ""),
+        ma_ben_nhan:
+          prev.ma_ben_nhan ||
+          (partnerList.ben_nhan.length === 1
+            ? partnerList.ben_nhan[0].ma_nguoi_dung
+            : ""),
+      }));
+    } catch (error) {
+      console.error("Lỗi tải dữ liệu tạo lệnh vận chuyển:", error);
+      setPartnerError("Không thể kết nối tới backend");
+    }
+  };
+
+  const handleOpenShipping = () => {
+    setShippingForm({ ...EMPTY_SHIPPING_FORM, thoi_gian_xuat: nowLocalInput() });
+    setReadyBatches([]);
+    fetchShippingOptions();
+    setShowShippingModal(true);
+  };
+
+  const handleCloseShippingModal = () => {
+    setShowShippingModal(false);
+    setShippingForm(EMPTY_SHIPPING_FORM);
+    setPartnerError("");
+  };
+
+  const handleShippingInputChange = (e) => {
+    const { name, value } = e.target;
+    setShippingForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmitShipping = async () => {
+    if (!shippingForm.ma_lo_nong_san) {
+      alert("Vui lòng chọn lô nông sản cần vận chuyển");
+      return;
+    }
+
+    if (!shippingForm.ma_don_vi_van_chuyen) {
+      alert("Vui lòng chọn đơn vị vận chuyển");
+      return;
+    }
+
+    if (!shippingForm.ma_ben_nhan) {
+      alert("Vui lòng chọn cơ sở nhận hàng");
+      return;
+    }
+
+    setSavingShipping(true);
+
+    try {
+      const response = await fetch(`${API_URL}/api/van-chuyen`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify(shippingForm),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Tạo lệnh vận chuyển thất bại");
+        return;
+      }
+
+      alert(`${data.message}. Mã vận đơn: ${data.data.ma_van_don}`);
+      handleCloseShippingModal();
+      await fetchShippingOrders();
+    } catch (error) {
+      console.error("Lỗi tạo lệnh vận chuyển:", error);
+      alert("Không thể kết nối tới backend");
+    } finally {
+      setSavingShipping(false);
+    }
+  };
+
+  const handleOpenShippingDetail = async (maVanDon) => {
+    try {
+      const response = await fetch(`${API_URL}/api/van-chuyen/${maVanDon}`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Không thể lấy chi tiết lệnh vận chuyển");
+        return;
+      }
+
+      setShippingDetail(data.data);
+    } catch (error) {
+      console.error("Lỗi lấy chi tiết lệnh vận chuyển:", error);
+      alert("Không thể kết nối tới backend");
+    }
+  };
+
+  const handleCancelShipping = async (maVanDon) => {
+    if (!window.confirm("Bạn có chắc muốn hủy lệnh vận chuyển này?")) return;
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/van-chuyen/${maVanDon}/huy`,
+        { method: "PUT", headers: authHeaders() },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Hủy lệnh vận chuyển thất bại");
+        return;
+      }
+
+      alert(data.message);
+      setShippingDetail(null);
+      await fetchShippingOrders();
+    } catch (error) {
+      console.error("Lỗi hủy lệnh vận chuyển:", error);
+      alert("Không thể kết nối tới backend");
+    }
+  };
+
+  // =========================================================
   // XÓA LÔ THU HOẠCH
   // =========================================================
   const handleDeleteBatch = async (maLo) => {
@@ -1614,8 +2062,9 @@ const DashboardPage = () => {
                                 <button
                                   className="btn-more-dots"
                                   title="Tùy chọn"
-                                  onClick={() =>
-                                    handleToggleDropdown(
+                                  onClick={(e) =>
+                                    handleToggleBatchMenu(
+                                      e,
                                       `batch-${batch.ma_lo_nong_san}`,
                                     )
                                   }
@@ -1624,7 +2073,17 @@ const DashboardPage = () => {
                                 </button>
 
                                 {isDropdownActive && (
-                                  <div className="dropdown-menu">
+                                  <div
+                                    className={`dropdown-menu dropdown-fixed ${
+                                      batchMenuPos.up ? "dropdown-up" : ""
+                                    }`}
+                                    style={{
+                                      right: batchMenuPos.right,
+                                      ...(batchMenuPos.up
+                                        ? { bottom: batchMenuPos.bottom }
+                                        : { top: batchMenuPos.top }),
+                                    }}
+                                  >
                                     <div
                                       className="dropdown-item"
                                       onClick={(e) =>
@@ -1647,7 +2106,18 @@ const DashboardPage = () => {
                                       Cập nhật
                                     </div>
                                     <div className="dropdown-divider"></div>
-                                    <div className="dropdown-item">
+                                    <div
+                                      className="dropdown-item"
+                                      onClick={() =>
+                                        handleOpenInspection({
+                                          ma_lo_nong_san: batch.ma_lo_nong_san,
+                                          loai_cay_trong: batch.loai_cay_trong,
+                                          so_luong_hien_tai:
+                                            batch.so_luong_hien_tai,
+                                          don_vi_tinh: batch.don_vi_tinh,
+                                        })
+                                      }
+                                    >
                                       <CalendarCheck size={15} />
                                       Yêu cầu kiểm định
                                     </div>
@@ -1694,81 +2164,97 @@ const DashboardPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="col-code tracking-code">LH-2026-001</td>
-                      <td className="nowrap-cell">
-                        <span className="batch-code-badge">LA1-11111111</span>
-                      </td>
-                      <td className="agency-name">
-                        Trung tâm Kiểm nghiệm Nông nghiệp Vùng 2
-                      </td>
-                      <td className="inspection-date">12/10/2026 (08:30)</td>
-                      <td className="inspection-note">
-                        Kiểm định dư lượng thuốc BVTV tại vườn
-                      </td>
-                      <td className="nowrap-cell">
-                        <span className="status-pill success">
-                          <CheckCircle2 size={15} />
-                          Đã chấp nhận
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        <button type="button" className="btn-action-view">
-                          <Eye size={15} />
-                          Xem phiếu
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="col-code tracking-code">LH-2026-002</td>
-                      <td className="nowrap-cell">
-                        <span className="batch-code-badge">LA2-22091104</span>
-                      </td>
-                      <td className="agency-name">
-                        Viện Tiêu chuẩn Chất lượng AgriCheck
-                      </td>
-                      <td className="inspection-date">16/10/2026 (14:00)</td>
-                      <td className="inspection-note">
-                        Lấy mẫu test độ ngọt và chuẩn VietGAP
-                      </td>
-                      <td className="nowrap-cell">
-                        <span className="status-pill warning">
-                          <Clock size={15} />
-                          Chờ phê duyệt
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        <button type="button" className="btn-action-edit">
-                          <Pencil size={15} />
-                          Sửa lịch
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="col-code tracking-code">LH-2026-003</td>
-                      <td className="nowrap-cell">
-                        <span className="batch-code-badge">LA1-09091801</span>
-                      </td>
-                      <td className="agency-name">
-                        Chi cục Trồng trọt & BVTV Tỉnh
-                      </td>
-                      <td className="inspection-date">02/10/2026 (09:00)</td>
-                      <td className="inspection-note">
-                        Hồ sơ canh tác chưa cập nhật đủ nhật ký
-                      </td>
-                      <td className="nowrap-cell">
-                        <span className="status-pill danger">
-                          <XCircle size={15} />
-                          Từ chối
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        <button type="button" className="btn-action-retry">
-                          <Clock size={15} />
-                          Gửi lại đơn
-                        </button>
-                      </td>
-                    </tr>
+                    {loadingInspections && (
+                      <tr>
+                        <td colSpan={7}>Đang tải danh sách kiểm định...</td>
+                      </tr>
+                    )}
+
+                    {inspectionError && (
+                      <tr>
+                        <td colSpan={7}>{inspectionError}</td>
+                      </tr>
+                    )}
+
+                    {!loadingInspections &&
+                      !inspectionError &&
+                      inspections.length === 0 && (
+                        <tr>
+                          <td colSpan={7}>
+                            Chưa có yêu cầu kiểm định nào. Vào tab Quản lý lô
+                            thu hoạch, bấm ⋮ rồi chọn "Yêu cầu kiểm định".
+                          </td>
+                        </tr>
+                      )}
+
+                    {inspections.map((item) => {
+                      const status = getInspectionStatus(item);
+                      const canResend =
+                        item.trang_thai_ho_so === "TU_CHOI" ||
+                        (item.trang_thai_ho_so === "DA_CONG_BO" &&
+                          item.ket_luan !== "PASSED");
+
+                      return (
+                        <tr key={item.ma_kiem_dinh}>
+                          <td className="col-code tracking-code">
+                            {item.ma_ho_so}
+                          </td>
+                          <td className="nowrap-cell">
+                            <span className="batch-code-badge">
+                              {item.ma_lo_nong_san}
+                            </span>
+                          </td>
+                          <td className="agency-name">
+                            {item.ten_co_quan || item.ma_co_quan}
+                          </td>
+                          <td className="inspection-date">
+                            {item.ngay_hen_lay_mau
+                              ? `${formatDate(item.ngay_hen_lay_mau)}${
+                                  item.gio_hen_lay_mau
+                                    ? ` (${item.gio_hen_lay_mau})`
+                                    : ""
+                                }`
+                              : "Chưa hẹn"}
+                          </td>
+                          <td className="inspection-note">
+                            {item.ghi_chu_chuan_bi ||
+                              item.noi_dung_de_nghi ||
+                              item.tieu_chuan_dang_ky}
+                          </td>
+                          <td className="nowrap-cell">
+                            <span className={`status-pill ${status.tone}`}>
+                              {status.tone === "success" && (
+                                <CheckCircle2 size={15} />
+                              )}
+                              {status.tone === "warning" && <Clock size={15} />}
+                              {status.tone === "danger" && <XCircle size={15} />}
+                              {status.label}
+                            </span>
+                          </td>
+                          <td className="col-actions">
+                            {canResend ? (
+                              <button
+                                type="button"
+                                className="btn-action-retry"
+                                onClick={() =>
+                                  handleOpenInspection({
+                                    ma_lo_nong_san: item.ma_lo_nong_san,
+                                    loai_cay_trong: item.loai_cay_trong,
+                                    so_luong_hien_tai: item.so_luong_hien_tai,
+                                    don_vi_tinh: item.don_vi_tinh,
+                                  })
+                                }
+                              >
+                                <Clock size={15} />
+                                Gửi lại đơn
+                              </button>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -1784,29 +2270,30 @@ const DashboardPage = () => {
                 <div className="metric-card">
                   <div className="metric-title">Đơn đang vận chuyển</div>
                   <div className="metric-number">
-                    2<span className="metric-unit">CHUYẾN</span>
+                    {shippingStats.dang_van_chuyen}
+                    <span className="metric-unit">CHUYẾN</span>
                   </div>
                 </div>
 
                 <div className="metric-card">
                   <div className="metric-title">Đã bàn giao thành công</div>
-                  <div className="metric-number">12</div>
+                  <div className="metric-number">{shippingStats.da_ban_giao}</div>
                 </div>
 
                 <div className="metric-card">
                   <div className="metric-title">Khối lượng đã xuất</div>
                   <div className="metric-number">
-                    24.5<span className="metric-unit">TẤN</span>
+                    {shippingStats.khoi_luong_da_xuat_tan.toLocaleString(
+                      "vi-VN",
+                    )}
+                    <span className="metric-unit">TẤN</span>
                   </div>
                 </div>
 
                 <div className="actions-box">
                   <button
                     className="btn-primary-action"
-                    onClick={() => {
-                      setSelectedBatchCode("");
-                      setShowShippingModal(true);
-                    }}
+                    onClick={handleOpenShipping}
                   >
                     + Tạo lệnh bàn giao
                   </button>
@@ -1833,125 +2320,92 @@ const DashboardPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="col-code tracking-code">VD-LOG-9901</td>
-                      <td>
-                        <span className="batch-code-badge">#SC-2026-002</span>
-                      </td>
-                      <td className="product-name">Cam Sành Đóng Thùng 10kg</td>
-                      <td>
-                        <div className="carrier-name">
-                          Mekong Cold Logistics
-                        </div>
-                        <div className="carrier-sub">
-                          Võ Minh Toàn (51D-891.22)
-                        </div>
-                      </td>
-                      <td className="package-weight">800 kg</td>
-                      <td className="export-time">04/10/2026 - 16:30</td>
-                      <td>
-                        <span className="status-pill info">
-                          <Truck size={15} />
-                          Đang vận chuyển
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        <button type="button" className="btn-action-detail">
-                          <Eye size={15} />
-                          Chi tiết
-                        </button>
-                      </td>
-                    </tr>
+                    {loadingShipping && (
+                      <tr>
+                        <td colSpan={8}>Đang tải danh sách vận chuyển...</td>
+                      </tr>
+                    )}
 
-                    <tr>
-                      <td className="col-code tracking-code">VD-LOG-8812</td>
-                      <td>
-                        <span className="batch-code-badge">#SC-2026-000</span>
-                      </td>
-                      <td className="product-name">Xoài Cát Hòa Lộc Hộp Quà</td>
-                      <td>
-                        <div className="carrier-name">
-                          Giao Hàng Nhanh AgriShip
-                        </div>
-                        <div className="carrier-sub">
-                          Phạm Quốc Bảo (64A-012.89)
-                        </div>
-                      </td>
-                      <td className="package-weight">1,200 kg</td>
-                      <td className="export-time">02/10/2026 - 09:15</td>
-                      <td>
-                        <span className="status-pill success">
-                          <CheckCircle2 size={15} />
-                          Đã hoàn thành
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        <button type="button" className="btn-action-detail">
-                          <Eye size={15} />
-                          Chi tiết
-                        </button>
-                      </td>
-                    </tr>
+                    {shippingError && (
+                      <tr>
+                        <td colSpan={8}>{shippingError}</td>
+                      </tr>
+                    )}
 
-                    <tr>
-                      <td className="col-code tracking-code">VD-LOG-7721</td>
-                      <td>
-                        <span className="batch-code-badge">#SC-2026-003</span>
-                      </td>
-                      <td className="product-name">Bưởi Năm Roi Xuất Khẩu</td>
-                      <td>
-                        <div className="carrier-name">
-                          Vận Tải Lạnh Miền Tây
-                        </div>
-                        <div className="carrier-sub">
-                          Lê Hoàng Phúc (65C-112.56)
-                        </div>
-                      </td>
-                      <td className="package-weight">2,000 kg</td>
-                      <td className="export-time">04/10/2026 - 17:00</td>
-                      <td>
-                        <span className="status-pill warning">
-                          <Clock size={15} />
-                          Chờ chấp nhận
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        <button type="button" className="btn-action-detail">
-                          <Eye size={15} />
-                          Chi tiết
-                        </button>
-                      </td>
-                    </tr>
+                    {!loadingShipping &&
+                      !shippingError &&
+                      shippingOrders.length === 0 && (
+                        <tr>
+                          <td colSpan={8}>
+                            Chưa có lệnh vận chuyển nào. Bấm "+ Tạo lệnh bàn
+                            giao" để bắt đầu.
+                          </td>
+                        </tr>
+                      )}
 
-                    <tr>
-                      <td className="col-code tracking-code">VD-LOG-6655</td>
-                      <td>
-                        <span className="batch-code-badge">#SC-2026-004</span>
-                      </td>
-                      <td className="product-name">
-                        Chanh Không Hạt Đóng Thùng
-                      </td>
-                      <td>
-                        <div className="carrier-name">Mekong Logistics</div>
-                        <div className="carrier-sub">
-                          Nguyễn Văn Hưng (66B-098.33)
-                        </div>
-                      </td>
-                      <td className="package-weight">650 kg</td>
-                      <td className="export-time">04/10/2026 - 17:30</td>
-                      <td>
-                        <span className="status-pill purple">
-                          <Clock size={15} />
-                          Chờ tiếp nhận
-                        </span>
-                      </td>
-                      <td className="col-actions">
-                        <button type="button" className="btn-action-detail">
-                          <Eye size={15} />
-                          Chi tiết
-                        </button>
-                      </td>
-                    </tr>
+                    {shippingOrders.map((order) => {
+                      const status = SHIPPING_STATUS[order.trang_thai] || {
+                        label: order.trang_thai,
+                        tone: "warning",
+                        icon: "none",
+                      };
+
+                      return (
+                        <tr key={order.ma_van_don}>
+                          <td className="col-code tracking-code">
+                            {order.ma_van_don}
+                          </td>
+                          <td>
+                            <span className="batch-code-badge">
+                              {order.ma_lo_nong_san}
+                            </span>
+                          </td>
+                          <td className="product-name">{order.ten_san_pham}</td>
+                          <td>
+                            <div className="carrier-name">
+                              {order.ten_don_vi_van_chuyen}
+                            </div>
+                            <div className="carrier-sub">
+                              {order.ten_tai_xe
+                                ? `${order.ten_tai_xe}${
+                                    order.bien_so_xe
+                                      ? ` (${order.bien_so_xe})`
+                                      : ""
+                                  }`
+                                : "Chưa phân công"}
+                            </div>
+                          </td>
+                          <td className="package-weight">
+                            {formatQuantity(order.khoi_luong, order.don_vi_tinh)}
+                          </td>
+                          <td className="export-time">
+                            {formatDateTime(order.thoi_gian_xuat)}
+                          </td>
+                          <td>
+                            <span className={`status-pill ${status.tone}`}>
+                              {status.icon === "truck" && <Truck size={15} />}
+                              {status.icon === "clock" && <Clock size={15} />}
+                              {status.icon === "check" && (
+                                <CheckCircle2 size={15} />
+                              )}
+                              {status.label}
+                            </span>
+                          </td>
+                          <td className="col-actions">
+                            <button
+                              type="button"
+                              className="btn-action-detail"
+                              onClick={() =>
+                                handleOpenShippingDetail(order.ma_van_don)
+                              }
+                            >
+                              <Eye size={15} />
+                              Chi tiết
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2394,22 +2848,30 @@ const DashboardPage = () => {
                     <div className="form-grid-2 readonly-grid">
                       <div className="readonly-item">
                         <label>Mã nông trại</label>
-                        <span>{info?.ma_nong_trai || "Chưa có dữ liệu"}</span>
+                        <span style={readonlyValueStyle(!!info?.ma_nong_trai)}>
+                          {info?.ma_nong_trai || "Chưa có dữ liệu"}
+                        </span>
                       </div>
 
                       <div className="readonly-item">
                         <label>Thửa đất</label>
-                        <span>{info?.ten_thua_dat || "Chưa có dữ liệu"}</span>
+                        <span style={readonlyValueStyle(!!info?.ten_thua_dat)}>
+                          {info?.ten_thua_dat || "Chưa có dữ liệu"}
+                        </span>
                       </div>
 
                       <div className="readonly-item">
                         <label>Mùa vụ</label>
-                        <span>{info?.loai_cay_trong || "Chưa có dữ liệu"}</span>
+                        <span style={readonlyValueStyle(!!info?.loai_cay_trong)}>
+                          {info?.loai_cay_trong || "Chưa có dữ liệu"}
+                        </span>
                       </div>
 
                       <div className="readonly-item">
                         <label>Giống cây</label>
-                        <span>{info?.giong_cay || "Chưa có dữ liệu"}</span>
+                        <span style={readonlyValueStyle(!!info?.giong_cay)}>
+                          {info?.giong_cay || "Chưa có dữ liệu"}
+                        </span>
                       </div>
                     </div>
                   </>
@@ -2464,6 +2926,114 @@ const DashboardPage = () => {
       )}
 
       {/* =====================================================
+          POPUP YÊU CẦU KIỂM ĐỊNH
+      ====================================================== */}
+      {showInspectionModal && inspectionBatch && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>Yêu Cầu Kiểm Định</h3>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-grid-2 readonly-grid">
+                <div className="readonly-item">
+                  <label>Mã lô</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {inspectionBatch.ma_lo_nong_san}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Mùa vụ</label>
+                  <span
+                    style={readonlyValueStyle(!!inspectionBatch.loai_cay_trong)}
+                  >
+                    {inspectionBatch.loai_cay_trong || "—"}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Sản lượng</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {formatQuantity(
+                      inspectionBatch.so_luong_hien_tai,
+                      inspectionBatch.don_vi_tinh,
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Cơ quan kiểm định</label>
+                <select
+                  name="ma_co_quan"
+                  value={inspectionForm.ma_co_quan}
+                  onChange={handleInspectionInputChange}
+                >
+                  <option value="">-- Chọn cơ quan kiểm định --</option>
+                  {authorities.map((item) => (
+                    <option key={item.ma_co_quan} value={item.ma_co_quan}>
+                      {item.ten_co_quan}
+                    </option>
+                  ))}
+                </select>
+                {authorityError && (
+                  <p style={{ color: "#dc2626", fontSize: 12, marginTop: 6 }}>
+                    {authorityError}
+                  </p>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Tiêu chuẩn đăng ký</label>
+                <select
+                  name="tieu_chuan_dang_ky"
+                  value={inspectionForm.tieu_chuan_dang_ky}
+                  onChange={handleInspectionInputChange}
+                >
+                  <option value="VIETGAP">VietGAP</option>
+                  <option value="GLOBALGAP">GlobalGAP</option>
+                  <option value="ORGANIC">Hữu cơ (Organic)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Nội dung đề nghị</label>
+                <textarea
+                  name="noi_dung_de_nghi"
+                  rows={4}
+                  maxLength={1000}
+                  placeholder="Ví dụ: Kiểm định dư lượng thuốc BVTV tại vườn"
+                  value={inspectionForm.noi_dung_de_nghi}
+                  onChange={handleInspectionInputChange}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={handleCloseInspectionModal}
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSubmitInspection}
+                disabled={savingInspection}
+              >
+                {savingInspection ? "Đang gửi..." : "Gửi yêu cầu"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
           POPUP TẠO LỆNH VẬN CHUYỂN & BÀN GIAO
       ====================================================== */}
       {showShippingModal && (
@@ -2477,76 +3047,245 @@ const DashboardPage = () => {
               <div className="form-group">
                 <label>Chọn lô nông sản</label>
                 <select
-                  value={selectedBatchCode}
-                  onChange={(e) => setSelectedBatchCode(e.target.value)}
+                  name="ma_lo_nong_san"
+                  value={shippingForm.ma_lo_nong_san}
+                  onChange={handleShippingInputChange}
                 >
                   <option value="">-- Chọn lô thu hoạch --</option>
-                  {availableBatches.map((item) => (
-                    <option key={item.ma_lo} value={item.ma_lo}>
-                      {item.ma_lo} - {item.ten_lo}
+                  {readyBatches.map((item) => (
+                    <option key={item.ma_lo_nong_san} value={item.ma_lo_nong_san}>
+                      {item.ma_lo_nong_san} - {item.ten_san_pham}
                     </option>
                   ))}
                 </select>
+                {!partnerError && readyBatches.length === 0 && (
+                  <p style={{ color: "#6b7280", fontSize: 12, marginTop: 6 }}>
+                    Chưa có lô nào sẵn sàng. Lô phải còn ở nông trại, chưa có
+                    lệnh vận chuyển và không chờ kiểm định.
+                  </p>
+                )}
               </div>
 
               <div className="form-grid-2 readonly-grid">
                 <div className="readonly-item">
                   <label>Mã lô</label>
-                  <span
-                    style={{
-                      color: selectedBatchInfo ? "#1f2937" : "#9ca3af",
-                      fontWeight: selectedBatchInfo ? 600 : 400,
-                    }}
-                  >
-                    {selectedBatchInfo?.ma_lo || "Chưa có thông tin"}
+                  <span style={readonlyValueStyle(!!selectedBatchInfo)}>
+                    {selectedBatchInfo?.ma_lo_nong_san || "Chưa có thông tin"}
                   </span>
                 </div>
 
                 <div className="readonly-item">
                   <label>Nông trại</label>
-                  <span
-                    style={{
-                      color: selectedBatchInfo ? "#1f2937" : "#9ca3af",
-                      fontWeight: selectedBatchInfo ? 600 : 400,
-                    }}
-                  >
+                  <span style={readonlyValueStyle(!!selectedBatchInfo)}>
                     {selectedBatchInfo?.ma_nong_trai || "Chưa có thông tin"}
                   </span>
                 </div>
 
                 <div className="readonly-item">
                   <label>Tên nông sản</label>
-                  <span
-                    style={{
-                      color: selectedBatchInfo ? "#1f2937" : "#9ca3af",
-                      fontWeight: selectedBatchInfo ? 600 : 400,
-                    }}
-                  >
-                    {selectedBatchInfo?.ten_nong_san || "Chưa có thông tin"}
+                  <span style={readonlyValueStyle(!!selectedBatchInfo)}>
+                    {selectedBatchInfo?.ten_san_pham || "Chưa có thông tin"}
                   </span>
                 </div>
 
                 <div className="readonly-item">
                   <label>Sản lượng</label>
-                  <span
-                    style={{
-                      color: selectedBatchInfo ? "#1f2937" : "#9ca3af",
-                      fontWeight: selectedBatchInfo ? 600 : 400,
-                    }}
-                  >
-                    {selectedBatchInfo?.san_luong || "Chưa có thông tin"}
+                  <span style={readonlyValueStyle(!!selectedBatchInfo)}>
+                    {selectedBatchInfo
+                      ? formatQuantity(
+                          selectedBatchInfo.so_luong_hien_tai,
+                          selectedBatchInfo.don_vi_tinh,
+                        )
+                      : "Chưa có thông tin"}
                   </span>
                 </div>
 
                 <div className="readonly-item">
                   <label>Ngày thu hoạch</label>
-                  <span
-                    style={{
-                      color: selectedBatchInfo ? "#1f2937" : "#9ca3af",
-                      fontWeight: selectedBatchInfo ? 600 : 400,
-                    }}
-                  >
-                    {selectedBatchInfo?.ngay_thu_hoach || "Chưa có thông tin"}
+                  <span style={readonlyValueStyle(!!selectedBatchInfo)}>
+                    {selectedBatchInfo
+                      ? formatDate(selectedBatchInfo.ngay_thu_hoach) || "—"
+                      : "Chưa có thông tin"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Đơn vị vận chuyển</label>
+                <select
+                  name="ma_don_vi_van_chuyen"
+                  value={shippingForm.ma_don_vi_van_chuyen}
+                  onChange={handleShippingInputChange}
+                >
+                  <option value="">-- Chọn đơn vị vận chuyển --</option>
+                  {partners.don_vi_van_chuyen.map((item) => (
+                    <option key={item.ma_nguoi_dung} value={item.ma_nguoi_dung}>
+                      {item.ho_ten}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Cơ sở nhận hàng (sơ chế / đóng gói)</label>
+                <select
+                  name="ma_ben_nhan"
+                  value={shippingForm.ma_ben_nhan}
+                  onChange={handleShippingInputChange}
+                >
+                  <option value="">-- Chọn cơ sở nhận hàng --</option>
+                  {partners.ben_nhan.map((item) => (
+                    <option key={item.ma_nguoi_dung} value={item.ma_nguoi_dung}>
+                      {item.ho_ten}
+                    </option>
+                  ))}
+                </select>
+                {partnerError && (
+                  <p style={{ color: "#dc2626", fontSize: 12, marginTop: 6 }}>
+                    {partnerError}
+                  </p>
+                )}
+              </div>
+
+              <div className="form-group">
+                <label>Thời gian xuất hàng</label>
+                <input
+                  type="datetime-local"
+                  name="thoi_gian_xuat"
+                  value={shippingForm.thoi_gian_xuat}
+                  onChange={handleShippingInputChange}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Ghi chú (không bắt buộc)</label>
+                <textarea
+                  name="ghi_chu"
+                  rows={3}
+                  maxLength={500}
+                  placeholder="Ví dụ: Giao trước 18h, giữ lạnh 8-10°C"
+                  value={shippingForm.ghi_chu}
+                  onChange={handleShippingInputChange}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={handleCloseShippingModal}
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSubmitShipping}
+                disabled={savingShipping}
+              >
+                {savingShipping ? "Đang tạo..." : "Tạo lệnh"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================
+          POPUP CHI TIẾT LỆNH VẬN CHUYỂN
+      ====================================================== */}
+      {shippingDetail && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>Chi Tiết Vận Chuyển {shippingDetail.ma_van_don}</h3>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-grid-2 readonly-grid">
+                <div className="readonly-item">
+                  <label>Trạng thái</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {SHIPPING_STATUS[shippingDetail.trang_thai]?.label ||
+                      shippingDetail.trang_thai}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Mã lô</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {shippingDetail.ma_lo_nong_san}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Nông sản</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {shippingDetail.ten_san_pham}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Khối lượng</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {formatQuantity(
+                      shippingDetail.khoi_luong,
+                      shippingDetail.don_vi_tinh,
+                    )}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Điểm nhận hàng</label>
+                  <span style={readonlyValueStyle(!!shippingDetail.ten_nong_trai)}>
+                    {shippingDetail.ten_nong_trai
+                      ? `${shippingDetail.ten_nong_trai} (${shippingDetail.dia_diem_nong_trai})`
+                      : "—"}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Điểm giao hàng</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {shippingDetail.ten_ben_nhan}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Đơn vị vận chuyển</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {shippingDetail.ten_don_vi_van_chuyen}
+                    {shippingDetail.sdt_don_vi_van_chuyen
+                      ? ` - ${shippingDetail.sdt_don_vi_van_chuyen}`
+                      : ""}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Tài xế / Biển số</label>
+                  <span style={readonlyValueStyle(!!shippingDetail.ten_tai_xe)}>
+                    {shippingDetail.ten_tai_xe
+                      ? `${shippingDetail.ten_tai_xe}${
+                          shippingDetail.bien_so_xe
+                            ? ` (${shippingDetail.bien_so_xe})`
+                            : ""
+                        }`
+                      : "Chưa phân công"}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Thời gian xuất</label>
+                  <span style={readonlyValueStyle(true)}>
+                    {formatDateTime(shippingDetail.thoi_gian_xuat)}
+                  </span>
+                </div>
+
+                <div className="readonly-item">
+                  <label>Ghi chú</label>
+                  <span style={readonlyValueStyle(!!shippingDetail.ghi_chu)}>
+                    {shippingDetail.ghi_chu || "Không có"}
                   </span>
                 </div>
               </div>
@@ -2556,21 +3295,20 @@ const DashboardPage = () => {
               <button
                 type="button"
                 className="btn-cancel"
-                onClick={() => setShowShippingModal(false)}
+                onClick={() => setShippingDetail(null)}
               >
-                Hủy
+                Đóng
               </button>
 
-              <button
-                type="button"
-                className="btn-save"
-                onClick={() => {
-                  alert("Đã tạo lệnh vận chuyển & bàn giao thành công");
-                  setShowShippingModal(false);
-                }}
-              >
-                Tạo lệnh
-              </button>
+              {shippingDetail.co_the_huy && (
+                <button
+                  type="button"
+                  className="btn-save btn-danger-solid"
+                  onClick={() => handleCancelShipping(shippingDetail.ma_van_don)}
+                >
+                  Hủy lệnh
+                </button>
+              )}
             </div>
           </div>
         </div>
