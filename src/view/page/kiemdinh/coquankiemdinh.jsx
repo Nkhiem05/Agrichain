@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { accepauthority } from "../../../api/coquankiemdinhApi";
 import {
   ClipboardList,
   CalendarClock,
@@ -103,14 +104,6 @@ function Coquankiemdinh() {
     setCurrentTab("results");
   };
 
-  const handleRejectRequest = (code) => {
-    if (
-      window.confirm(`Bạn có chắc chắn muốn từ chối tiếp nhận hồ sơ ${code}?`)
-    ) {
-      alert("Đã gửi lý do từ chối về tài khoản Nông dân.");
-    }
-  };
-
   // Tải dữ liệu cho tab yêu cầu kiểm định
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -133,7 +126,7 @@ function Coquankiemdinh() {
         params.append("tieu_chuan", selectedStandard.toUpperCase());
       }
 
-      const url = `http://localhost:3000/api/kiem-dinh?${params.toString()}`;
+      const url = `http://localhost:3000/api/kiem-dinh/data?${params.toString()}`;
 
       const response = await fetch(url);
       const result = await response.json();
@@ -157,6 +150,12 @@ function Coquankiemdinh() {
       fetchInspectionRequests();
     }
   }, [currentTab, selectedStandard]);
+
+  //lấy dữ liệu chấp nhận yêu cầu kiểm định
+  const [code, setcode] = useState("");
+  const [day, setday] = useState("");
+  const [time, settime] = useState("");
+  const [indspector, setindspector] = useState("");
 
   return (
     <div className="kiemdinh">
@@ -415,12 +414,13 @@ function Coquankiemdinh() {
                         <div className="card-actions-col">
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
                               handleOpenAcceptModal(
                                 item.ma_ho_so,
                                 `${item.ten_nong_trai} (#${item.ma_nong_trai})`,
-                              )
-                            }
+                              );
+                              setcode(item.ma_kiem_dinh);
+                            }}
                             className="btn-primary"
                           >
                             <CalendarPlus size={16} />
@@ -428,7 +428,10 @@ function Coquankiemdinh() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleRejectRequest(item.ma_ho_so)}
+                            onClick={() => {
+                              setcode(item.ma_kiem_dinh);
+                              accepauthority(false, code);
+                            }}
                             className="btn-reject"
                           >
                             <XCircle size={16} />
@@ -811,8 +814,10 @@ function Coquankiemdinh() {
                   <label>Ngày Đến Vườn Lấy Mẫu (*)</label>
                   <input
                     type="date"
-                    defaultValue="2026-10-02"
                     className="form-control-input"
+                    onChange={(e) => {
+                      setday(e.target.value);
+                    }}
                   />
                 </div>
 
@@ -820,14 +825,19 @@ function Coquankiemdinh() {
                   <label>Giờ Khảo Sát Dự Kiến</label>
                   <input
                     type="time"
-                    defaultValue="08:30"
                     className="form-control-input"
+                    onChange={(e) => settime(e.target.value)}
                   />
                 </div>
 
                 <div className="form-group">
                   <label>Phân Công Kiểm Định Viên Phụ Trách</label>
-                  <select className="form-control-select">
+                  <select
+                    className="form-control-select"
+                    onChange={(e) => {
+                      setindspector(e.target.value);
+                    }}
+                  >
                     <option>
                       KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)
                     </option>
@@ -855,7 +865,10 @@ function Coquankiemdinh() {
                 </button>
                 <button
                   type="button"
-                  onClick={handleConfirmScheduleSampling}
+                  onClick={() => {
+                    handleConfirmScheduleSampling;
+                    accepauthority(true, code, day, time, indspector);
+                  }}
                   className="btn-primary"
                 >
                   Chấp Thuận &amp; Phát Lịch Hẹn

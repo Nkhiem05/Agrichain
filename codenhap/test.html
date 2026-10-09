@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body></body>
+  <script>
+    const params = new URLSearchParams();
+
+    params.append("trang_thai", "CHO_TIEP_NHAN");
+    params.append("ma_co_quan", "CQKD001");
+
+    // In ra dạng chuỗi query: trang_thai=CHO_TIEP_NHAN&ma_co_quan=...
+    console.log("Params query string:", params.toString());
+  </script>
+</html>

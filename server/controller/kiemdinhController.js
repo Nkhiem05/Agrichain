@@ -1,3 +1,4 @@
+const { Code } = require("lucide-react");
 const db = require("../config/db");
 
 // Hàm duy nhất: Tải danh sách yêu cầu kiểm định
@@ -74,6 +75,44 @@ const taidlyeucaukiemdinh = async (req, res) => {
   }
 };
 
+const accepauthority = async (req, res) => {
+  const { code } = req.query;
+  const { status, day, time, inspector } = req.body;
+
+  if (status) {
+    const sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so=?, ngay_hen_lay_mau=?, gio_hen_lay_mau=?, kiem_dinh_vien=? WHERE ma_kiem_dinh =?`;
+    const [result] = await db.query(sql, [
+      "DA_HEN_LICH",
+      day,
+      time,
+      inspector,
+      code,
+    ]);
+
+    if (result.affectedRows > 0) {
+      return res.status(200).json({
+        message: "đã chấp nhận yêu cầu kiểm định",
+        status: true,
+      });
+    } else {
+      return res.status(404).json({ message: "đã có lỗi xảy ra" });
+    }
+  } else if (!status) {
+    const sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so=? WHERE ma_kiem_dinh =?`;
+    const [result] = await db.query(sql, ["TU_CHOI", code]);
+
+    if (result.affectedRows > 0) {
+      return res.status(200).json({
+        message: "đã từ chối yêu cầu kiểm định",
+        status: true,
+      });
+    } else {
+      return res.status(404).json({ message: "đã có lỗi xảy ra" });
+    }
+  }
+};
+
 module.exports = {
   taidlyeucaukiemdinh,
+  accepauthority,
 };

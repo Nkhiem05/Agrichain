@@ -49,7 +49,7 @@ const AppRoutes = () => {
       <Route path="/chi-tiet-mua-vu/:maMuaVu" element={<Chitietmuavu />} />
 
       {/*kiểm định */}
-      <Route path="/co-quan-kiem-dinh" element={<Coquankiemdinh />} />
+      <Route path="/kiem-dinh" element={<Coquankiemdinh />} />
       <Route path="/chi-tiet-kiem-dinh" element={<ChiTietKiemDinh />} />
 
       {/*Vận chuyển */}
