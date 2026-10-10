@@ -71,7 +71,7 @@ const LoginPage = () => {
           break;
 
         case "CERT_AUTHORITY":
-          navigate("/co-quan-kiem-dinh");
+          navigate("/kiem-dinh");
           break;
 
         case "ADMIN":

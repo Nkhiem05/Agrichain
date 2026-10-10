@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th10 08, 2026 lúc 02:38 PM
+-- Thời gian đã tạo: Th10 10, 2026 lúc 09:05 PM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
@@ -42,6 +42,35 @@ CREATE TABLE `blockchain_outbox` (
   `submitted_at` datetime DEFAULT NULL,
   `confirmed_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `chi_so_kiem_dinh`
+--
+
+CREATE TABLE `chi_so_kiem_dinh` (
+  `ma_chi_so_kd` bigint(20) UNSIGNED NOT NULL,
+  `ma_kiem_dinh` varchar(64) NOT NULL,
+  `loai_chi_so` enum('CO_DINH','TUY_CHINH') NOT NULL DEFAULT 'TUY_CHINH',
+  `ma_chi_so` varchar(50) DEFAULT NULL,
+  `ten_chi_so` varchar(150) NOT NULL,
+  `gia_tri` varchar(255) NOT NULL,
+  `thu_tu` smallint(5) UNSIGNED NOT NULL DEFAULT 0,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `chi_so_kiem_dinh`
+--
+
+INSERT INTO `chi_so_kiem_dinh` (`ma_chi_so_kd`, `ma_kiem_dinh`, `loai_chi_so`, `ma_chi_so`, `ten_chi_so`, `gia_tri`, `thu_tu`, `created_at`, `updated_at`) VALUES
+(1, 'KD-2026-001', 'CO_DINH', 'DU_LUONG_BVTV', 'Dư lượng BVTV (Hóa chất cấm)', 'Âm tính', 1, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
+(2, 'KD-2026-001', 'CO_DINH', 'KIM_LOAI_NANG', 'Kim loại nặng (Chì, Cadimi)', '< 0.05 mg/kg (Đạt)', 2, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
+(3, 'KD-2026-001', 'CO_DINH', 'VI_SINH', 'Vi sinh (E.coli, Salmonella)', 'Không phát hiện', 3, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
+(4, 'KD-2026-001', 'CO_DINH', 'NITRATE', 'Dư lượng Nitrate (NO3-)', '0.02 mg/kg', 4, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
+(5, 'KD-2026-001', 'TUY_CHINH', NULL, 'Độ ngọt Brix', '12.5', 5, '2026-10-11 02:05:37', '2026-10-11 02:05:37');
 
 -- --------------------------------------------------------
 
@@ -114,9 +143,9 @@ CREATE TABLE `kiem_dinh_lo_hang` (
 --
 
 INSERT INTO `kiem_dinh_lo_hang` (`ma_kiem_dinh`, `ma_ho_so`, `ma_lo_nong_san`, `ma_co_quan`, `tieu_chuan_dang_ky`, `noi_dung_de_nghi`, `ngay_hen_lay_mau`, `gio_hen_lay_mau`, `kiem_dinh_vien`, `ghi_chu_chuan_bi`, `ma_niem_phong`, `khoi_luong_mau`, `phuong_phap_lay_mau`, `tinh_trang_cam_quan`, `thoi_gian_lay_mau`, `chi_so_xet_nghiem`, `so_chung_nhan`, `ket_luan`, `hieu_luc_tu`, `hieu_luc_den`, `ly_do_thu_hoi`, `ngay_thu_hoi`, `trang_thai_ho_so`, `created_at`, `updated_at`) VALUES
-('KD-2026-001', 'HS-KD-9041', 'LH-8824', 'CQKD001', 'VIETGAP', 'Đề nghị kiểm tra dư lượng thuốc BVTV và kim loại nặng để phục vụ đóng gói phân phối siêu thị.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'CHO_TIEP_NHAN', '2026-10-05 08:30:00', '2026-10-07 23:28:35'),
-('KD-2026-002', 'HS-KD-9042', 'LH-8825', 'CQKD001', 'GLOBALGAP', 'Lô xoài xuất khẩu đợt 1, đề nghị kiểm tra dư lượng hóa chất cấm theo tiêu chuẩn GlobalGAP.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'CHO_TIEP_NHAN', '2026-10-06 09:15:00', '2026-10-07 23:28:35'),
-('KD-2026-003', 'HS-KD-9043', 'LH-8821', 'CQKD001', 'ORGANIC', 'Đề nghị giám định vi sinh và cấp tem chứng nhận Organic cho nông trại hữu cơ.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'CHO_TIEP_NHAN', '2026-10-07 14:00:00', '2026-10-07 23:28:35');
+('KD-2026-001', 'HS-KD-9041', 'LH-8824', 'CQKD001', 'VIETGAP', 'Đề nghị kiểm tra dư lượng thuốc BVTV và kim loại nặng để phục vụ đóng gói phân phối siêu thị.', '2026-10-08', '16:31:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_HEN_LICH', '2026-10-05 08:30:00', '2026-10-10 16:28:56'),
+('KD-2026-002', 'HS-KD-9042', 'LH-8825', 'CQKD001', 'GLOBALGAP', 'Lô xoài xuất khẩu đợt 1, đề nghị kiểm tra dư lượng hóa chất cấm theo tiêu chuẩn GlobalGAP.', '2026-10-06', '17:34:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'TU_CHOI', '2026-10-06 09:15:00', '2026-10-10 01:48:22'),
+('KD-2026-003', 'HS-KD-9043', 'LH-8821', 'CQKD001', 'ORGANIC', 'Đề nghị giám định vi sinh và cấp tem chứng nhận Organic cho nông trại hữu cơ.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_HEN_LICH', '2026-10-07 14:00:00', '2026-10-10 01:24:27');
 
 -- --------------------------------------------------------
 
@@ -297,6 +326,7 @@ CREATE TABLE `nong_trai` (
 --
 
 INSERT INTO `nong_trai` (`ma_nong_trai`, `ma_nguoi_dung`, `ten_nong_trai`, `dia_diem_nong_trai`, `dien_tich_nong_trai`, `anh_nong_trai`, `trang_thai`, `created_at`, `updated_at`) VALUES
+('123', 'ND001', '123', '123', 123.00, '/uploads/farms/1791483268394-340621062.png', 1, '2026-10-09 01:14:28', '2026-10-09 01:14:28'),
 ('NT001', 'ND001', 'Nông Trại Hoàng Ngọc', 'Hậu Giang', 100.00, NULL, 1, '2026-09-27 05:35:19', '2026-10-07 10:02:24'),
 ('NT002', 'ND001', 'Nông Trại Hoàng Nguyễn', 'Cần Thơ', 200.00, '/uploads/farms/1791004710307-248307264.jpg', 1, '2026-10-03 12:18:30', '2026-10-03 12:18:30');
 
@@ -391,6 +421,14 @@ ALTER TABLE `blockchain_outbox`
   ADD UNIQUE KEY `uq_blockchain_outbox_event` (`event_id`),
   ADD KEY `idx_blockchain_outbox_worker` (`status`,`next_retry_at`),
   ADD KEY `idx_blockchain_outbox_aggregate` (`aggregate_type`,`aggregate_id`);
+
+--
+-- Chỉ mục cho bảng `chi_so_kiem_dinh`
+--
+ALTER TABLE `chi_so_kiem_dinh`
+  ADD PRIMARY KEY (`ma_chi_so_kd`),
+  ADD UNIQUE KEY `uq_chi_so_kd_ten` (`ma_kiem_dinh`,`ten_chi_so`),
+  ADD KEY `idx_chi_so_kd_kiem_dinh` (`ma_kiem_dinh`,`thu_tu`);
 
 --
 -- Chỉ mục cho bảng `danh_muc_vat_tu`
@@ -511,6 +549,12 @@ ALTER TABLE `blockchain_outbox`
   MODIFY `outbox_id` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT cho bảng `chi_so_kiem_dinh`
+--
+ALTER TABLE `chi_so_kiem_dinh`
+  MODIFY `ma_chi_so_kd` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
 -- AUTO_INCREMENT cho bảng `mua_vu_vat_tu`
 --
 ALTER TABLE `mua_vu_vat_tu`
@@ -531,6 +575,12 @@ ALTER TABLE `quyen_thao_tac_lo`
 --
 ALTER TABLE `blockchain_outbox`
   ADD CONSTRAINT `fk_blockchain_outbox_event` FOREIGN KEY (`event_id`) REFERENCES `lich_su_truy_xuat_lo` (`ma_lich_su`) ON UPDATE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `chi_so_kiem_dinh`
+--
+ALTER TABLE `chi_so_kiem_dinh`
+  ADD CONSTRAINT `fk_chi_so_kd_kiem_dinh` FOREIGN KEY (`ma_kiem_dinh`) REFERENCES `kiem_dinh_lo_hang` (`ma_kiem_dinh`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Các ràng buộc cho bảng `kiem_dinh_lo_hang`
