@@ -16,6 +16,10 @@ const adminTongQuanRoutes = require("./routes/routes_admin/tongquanRoutes");
 const adminNongTraiRoutes = require("./routes/routes_admin/nongtraiRoutes");
 const adminTaiKhoanRoutes = require("./routes/routes_admin/taikhoanRoutes");
 const adminDanhMucRoutes = require("./routes/routes_admin/danhmucRoutes");
+const adminLoHangRoutes = require("./routes/routes_admin/lohangRoutes");
+const adminKiemDinhThuHoiRoutes = require("./routes/routes_admin/kiemdinhthuhoiRoutes");
+const adminVanChuyenRoutes = require("./routes/routes_admin/vanchuyenAdminRoutes");
+const trangcanhanRoutes = require("./routes/trangcanhanRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -57,6 +61,12 @@ app.use("/api/admin/tong-quan", adminTongQuanRoutes);
 app.use("/api/admin/nong-trai", adminNongTraiRoutes);
 app.use("/api/admin", adminTaiKhoanRoutes); // /tai-khoan... và /yeu-cau-tai-khoan...
 app.use("/api/admin/danh-muc", adminDanhMucRoutes);
+app.use("/api/admin/lo-hang", adminLoHangRoutes);
+app.use("/api/admin/kiem-dinh", adminKiemDinhThuHoiRoutes);
+app.use("/api/admin/van-chuyen", adminVanChuyenRoutes);
+
+// Trang cá nhân (hồ sơ của tài khoản đang đăng nhập)
+app.use("/api/trang-ca-nhan", trangcanhanRoutes);
 
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Truck,
   PackageCheck,
@@ -27,6 +28,7 @@ const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
 export default function AgriChainLogistics() {
+  const navigate = useNavigate();
   const [currentTab, setCurrentTab] = useState("shipping");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -356,7 +358,12 @@ export default function AgriChainLogistics() {
             />
           </div>
 
-          <div className="header-profile">
+          <div
+            className="header-profile"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/trang-ca-nhan")}
+            title="Xem hồ sơ cá nhân"
+          >
             <div className="avatar-circle"></div>
             <div className="profile-meta">
               <span className="profile-name">{user?.ho_ten || "Nông dân"}</span>
