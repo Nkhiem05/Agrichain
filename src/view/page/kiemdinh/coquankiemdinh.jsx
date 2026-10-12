@@ -503,7 +503,12 @@ function Coquankiemdinh() {
             />
           </div>
 
-          <div className="header-profile">
+          <div
+            className="header-profile"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/trang-ca-nhan")}
+            title="Xem hồ sơ cá nhân"
+          >
             <div className="avatar-circle"></div>
             <div className="profile-meta">
               <span className="profile-name">
