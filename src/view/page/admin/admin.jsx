@@ -15,8 +15,6 @@ import {
   Eye,
   RefreshCw,
   UserPlus,
-  Navigation,
-  FileCheck2,
   X,
   Tractor,
   Factory,
@@ -62,6 +60,51 @@ const STAGE_LABELS = {
   COMPLETED: "Hoàn tất",
 };
 
+const SHIPMENT_STATUS_LABELS = {
+  CHO_CHAP_NHAN: "Chờ chấp nhận",
+  CHO_LAY_HANG: "Chờ lấy hàng",
+  DANG_VAN_CHUYEN: "Đang vận chuyển",
+  CHO_TIEP_NHAN: "Chờ tiếp nhận",
+  HOAN_THANH: "Đã hoàn thành",
+  TU_CHOI: "Bị từ chối",
+  DA_HUY: "Đã hủy",
+};
+
+const INSPECTION_STATUS_LABELS = {
+  CHO_TIEP_NHAN: "Chờ phê duyệt",
+  DA_HEN_LICH: "Đã hẹn lịch",
+  DA_LAY_MAU: "Đã lấy mẫu",
+  DA_CONG_BO: "Đã công bố",
+  TU_CHOI: "Bị từ chối",
+  THU_HOI: "Đã thu hồi",
+};
+
+// "2026-10-01" -> "01/10/2026"
+const formatDate = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${String(d.getDate()).padStart(2, "0")}/${String(
+    d.getMonth() + 1,
+  ).padStart(2, "0")}/${d.getFullYear()}`;
+};
+
+// "2026-10-15T08:00:00.000Z" -> "15/10/2026 - 08:00"
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${formatDate(value)} - ${String(d.getHours()).padStart(2, "0")}:${String(
+    d.getMinutes(),
+  ).padStart(2, "0")}`;
+};
+
+const formatQuantity = (value, unit) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toLocaleString("vi-VN")} ${unit || ""}`.trim();
+};
+
 export default function AdminDashboard() {
   // ================= TABS =================
   const [activeTab, setActiveTab] = useState("overview");
@@ -71,9 +114,6 @@ export default function AdminDashboard() {
   const [showActorModal, setShowActorModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
   const [showCatModal, setShowCatModal] = useState(false);
-  const [showRecallModal, setShowRecallModal] = useState(false);
-  const [selectedRecallBatch, setSelectedRecallBatch] = useState("#LH-8790");
-  const [showGpsModal, setShowGpsModal] = useState(null);
 
   // Modal Chi tiết & Phân quyền người dùng
   const [selectedUserDetail, setSelectedUserDetail] = useState(null);
@@ -117,6 +157,22 @@ export default function AdminDashboard() {
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [catalogMaterials, setCatalogMaterials] = useState([]);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
+
+  // ================= LÔ HÀNG TOÀN CHUỖI (từ API) =================
+  const [batches, setBatches] = useState([]);
+  const [batchStageCounts, setBatchStageCounts] = useState({});
+  const [loadingBatches, setLoadingBatches] = useState(true);
+
+  // ================= KIỂM ĐỊNH & THU HỒI (từ API) =================
+  const [inspections, setInspections] = useState([]);
+  const [inspectionStatusCounts, setInspectionStatusCounts] = useState({});
+  const [loadingInspections, setLoadingInspections] = useState(true);
+  const [recallTarget, setRecallTarget] = useState(null);
+
+  // ================= VẬN CHUYỂN (từ API) =================
+  const [shipments, setShipments] = useState([]);
+  const [shipmentStatusCounts, setShipmentStatusCounts] = useState({});
+  const [loadingShipments, setLoadingShipments] = useState(true);
 
   // ================= TOÀN VẸN CHUỖI ON-CHAIN (chưa triển khai, dữ liệu minh họa) =================
   const [blocksVerified, setBlocksVerified] = useState(42918);
@@ -232,6 +288,83 @@ export default function AdminDashboard() {
     }
   };
 
+  const fetchBatches = async () => {
+    setLoadingBatches(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/lo-hang`, {
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setBatches(data.data.danh_sach || []);
+        setBatchStageCounts(data.data.theo_chang || {});
+      }
+    } catch (err) {
+      console.error("Lỗi lấy danh sách lô hàng:", err);
+    } finally {
+      setLoadingBatches(false);
+    }
+  };
+
+  const fetchInspections = async () => {
+    setLoadingInspections(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/kiem-dinh`, {
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setInspections(data.data.danh_sach || []);
+        setInspectionStatusCounts(data.data.theo_trang_thai || {});
+      }
+    } catch (err) {
+      console.error("Lỗi lấy danh sách kiểm định:", err);
+    } finally {
+      setLoadingInspections(false);
+    }
+  };
+
+  const fetchShipments = async () => {
+    setLoadingShipments(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/van-chuyen`, {
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShipments(data.data.danh_sach || []);
+        setShipmentStatusCounts(data.data.theo_trang_thai || {});
+      }
+    } catch (err) {
+      console.error("Lỗi lấy danh sách vận chuyển:", err);
+    } finally {
+      setLoadingShipments(false);
+    }
+  };
+
+  const submitRecall = async (e) => {
+    e.preventDefault();
+    if (!recallReason.trim()) return alert("Vui lòng nhập lý do thu hồi");
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/admin/kiem-dinh/${recallTarget.ma_kiem_dinh}/thu-hoi`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ ly_do_thu_hoi: recallReason }),
+        },
+      );
+      const data = await res.json();
+      if (!data.success) return alert(data.message || "Không thể thu hồi");
+      setRecallTarget(null);
+      setRecallReason("");
+      fetchInspections();
+    } catch (err) {
+      alert("Không thể kết nối tới máy chủ");
+    }
+  };
+
   // Gọi lại toàn bộ dữ liệu sau mỗi thao tác ghi, vì các trang phụ thuộc lẫn nhau
   // (ví dụ: duyệt yêu cầu đăng ký làm thay đổi cả Tổng quan, Nông trại, Tài khoản)
   const refreshAll = () => {
@@ -240,6 +373,9 @@ export default function AdminDashboard() {
     fetchAccountRequests();
     fetchUsers();
     fetchCatalog();
+    fetchBatches();
+    fetchInspections();
+    fetchShipments();
   };
 
   useEffect(() => {
@@ -710,7 +846,10 @@ export default function AdminDashboard() {
                                 ? "users"
                                 : item.loai === "DANG_KY_CHO_DUYET"
                                   ? "farms"
-                                  : "farms",
+                                  : item.loai === "LO_THU_HOI" ||
+                                      item.loai === "KIEM_DINH_TU_CHOI"
+                                    ? "inspection"
+                                    : "farms",
                             )
                           }
                         >
@@ -1400,191 +1539,85 @@ export default function AdminDashboard() {
               <div className="sticky-top-section">
                 <div className="metrics-row">
                   <div className="metric-card">
-                    <span className="metric-title">Canh tác (Nông dân)</span>
+                    <span className="metric-title">
+                      Tổng số lô đang theo dõi
+                    </span>
                     <div className="metric-number">
-                      42 <span className="metric-unit">LÔ THU HOẠCH</span>
+                      {batches.length} <span className="metric-unit">LÔ</span>
                     </div>
                   </div>
-                  <div className="metric-card">
-                    <span className="metric-title">Sơ chế (Cơ sở)</span>
-                    <div className="metric-number">
-                      18 <span className="metric-unit">TÁCH/GỘP</span>
-                    </div>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-title">Kiểm định</span>
-                    <div className="metric-number">
-                      11 <span className="metric-unit">CHỜ MẪU/KẾT QUẢ</span>
-                    </div>
-                  </div>
-                  <div className="metric-card">
-                    <span className="metric-title">Vận chuyển</span>
-                    <div className="metric-number">
-                      15 <span className="metric-unit">ĐANG TRÊN ĐƯỜNG</span>
-                    </div>
-                  </div>
+                  {Object.entries(batchStageCounts)
+                    .slice(0, 3)
+                    .map(([stage, count]) => (
+                      <div className="metric-card" key={stage}>
+                        <span className="metric-title">
+                          {STAGE_LABELS[stage] || stage}
+                        </span>
+                        <div className="metric-number">{count}</div>
+                      </div>
+                    ))}
                 </div>
 
                 <div className="content-head">
                   <div>
                     <h2>Theo dõi trạng thái lô toàn chuỗi</h2>
                     <p>
-                      Mỗi lô hiển thị chặng hiện tại và mã Hash gần nhất ghi lên
-                      sổ cái Smart Contract.
+                      Danh sách tất cả lô nông sản đang lưu thông, từ lúc thu
+                      hoạch đến khi hoàn tất.
                     </p>
                   </div>
-                  <span className="status-pill success">100% Khối hợp lệ</span>
                 </div>
               </div>
 
-              <div className="table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Mã lô</th>
-                      <th>Nguồn gốc</th>
-                      <th>Chặng hiện tại</th>
-                      <th>Khối lượng</th>
-                      <th>Tx Hash</th>
-                      <th style={{ textAlign: "center" }}>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <b>#LH-8824</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô thu hoạch
-                        </small>
-                      </td>
-                      <td>Vườn Cam A1, mùa vụ Quýt Đường</td>
-                      <td>
-                        <span className="status-pill gray">Chờ sơ chế</span>
-                      </td>
-                      <td>1.500 kg</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0x3d12...88fe
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">
-                          <Eye size={12} /> Hành trình
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <b>#LH-8801</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô thu hoạch
-                        </small>
-                      </td>
-                      <td>Vườn Cam A1 → HTX Mekong</td>
-                      <td>
-                        <span className="status-pill info">
-                          Đang tiếp nhận, cân thực tế
-                        </span>
-                      </td>
-                      <td>2.000 kg</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0x61aa...b210
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">
-                          <Eye size={12} /> Hành trình
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <b>#SC-2026-004</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô sơ chế (gộp)
-                        </small>
-                      </td>
-                      <td>HTX Sơ Chế Mekong</td>
-                      <td>
-                        <span className="status-pill warning">
-                          Chờ lấy mẫu kiểm định
-                        </span>
-                      </td>
-                      <td>1.850 kg</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0xb7e3...12c9
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">
-                          <Eye size={12} /> Hành trình
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <b>#SC-2026-001</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô thành phẩm
-                        </small>
-                      </td>
-                      <td>Trà Vinh → Tổng kho Bách Hóa Xanh</td>
-                      <td>
-                        <span className="status-pill info">
-                          Đang vận chuyển chuỗi lạnh
-                        </span>
-                      </td>
-                      <td>1.200 kg</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0x7c49...a74c
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">
-                          <Eye size={12} /> Hành trình
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <b>#LH-8790</b>
-                        <small style={{ display: "block", color: "#dc2626" }}>
-                          Lô thu hoạch
-                        </small>
-                      </td>
-                      <td>Vườn Bưởi B3</td>
-                      <td>
-                        <span className="status-pill danger">Bị đình chỉ</span>
-                      </td>
-                      <td>800 kg</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#dc2626", fontWeight: 700 }}
-                      >
-                        0xe419...77aa
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          className="btn-action-retry"
-                          onClick={() => {
-                            setSelectedRecallBatch("#LH-8790");
-                            setShowRecallModal(true);
-                          }}
-                        >
-                          Xem lý do
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {loadingBatches && <p style={{ color: "#6b7280" }}>Đang tải...</p>}
+
+              {!loadingBatches && (
+                <div className="table-container">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Mã lô</th>
+                        <th>Sản phẩm</th>
+                        <th>Nguồn gốc</th>
+                        <th>Chặng hiện tại</th>
+                        <th>Khối lượng</th>
+                        <th>Ngày thu hoạch</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {batches.length === 0 && (
+                        <tr>
+                          <td colSpan={6}>Chưa có lô nào.</td>
+                        </tr>
+                      )}
+                      {batches.map((b) => (
+                        <tr key={b.ma_lo_nong_san}>
+                          <td>
+                            <b>{b.ma_lo_nong_san}</b>
+                          </td>
+                          <td>{b.ten_san_pham}</td>
+                          <td>
+                            {b.ten_nong_trai || "—"}
+                            <small style={{ display: "block", color: "#6b7280" }}>
+                              {b.nguoi_quan_ly}
+                            </small>
+                          </td>
+                          <td>
+                            <span className="status-pill gray">
+                              {STAGE_LABELS[b.giai_doan_hien_tai] ||
+                                b.giai_doan_hien_tai}
+                            </span>
+                          </td>
+                          <td>
+                            {formatQuantity(b.so_luong_hien_tai, b.don_vi_tinh)}
+                          </td>
+                          <td>{formatDate(b.ngay_thu_hoach)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -1594,145 +1627,135 @@ export default function AdminDashboard() {
               <div className="sticky-top-section">
                 <div className="metrics-row">
                   <div className="metric-card">
-                    <span className="metric-title">Yêu cầu kiểm định mới</span>
+                    <span className="metric-title">Chờ phê duyệt</span>
                     <div className="metric-number">
-                      9 <span className="metric-unit">HỒ SƠ</span>
+                      {inspectionStatusCounts.CHO_TIEP_NHAN || 0}{" "}
+                      <span className="metric-unit">HỒ SƠ</span>
                     </div>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-title">Đã hẹn lấy mẫu</span>
-                    <div className="metric-number">6</div>
+                    <span className="metric-title">Đã hẹn lịch / lấy mẫu</span>
+                    <div className="metric-number">
+                      {(inspectionStatusCounts.DA_HEN_LICH || 0) +
+                        (inspectionStatusCounts.DA_LAY_MAU || 0)}
+                    </div>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Chứng nhận đã công bố</span>
-                    <div className="metric-number">73</div>
-                  </div>
-                  <div className="metric-card warn">
-                    <span className="metric-title">Lô bị đình chỉ</span>
                     <div className="metric-number">
-                      2 <span className="metric-unit">LÔ</span>
+                      {inspectionStatusCounts.DA_CONG_BO || 0}
                     </div>
                   </div>
-                </div>
-
-                <div className="alert-box">
-                  <div>
-                    <b>Lô #LH-8790 không đạt chuẩn VietGAP</b>
-                    <p>
-                      Dư lượng Decis vượt ngưỡng. Tem chứng nhận đã bị đình chỉ,
-                      lô chưa được thu hồi khỏi các điểm bán.
-                    </p>
+                  <div className="metric-card warn">
+                    <span className="metric-title">Đã thu hồi / từ chối</span>
+                    <div className="metric-number">
+                      {(inspectionStatusCounts.THU_HOI || 0) +
+                        (inspectionStatusCounts.TU_CHOI || 0)}{" "}
+                      <span className="metric-unit">HỒ SƠ</span>
+                    </div>
                   </div>
-                  <button
-                    className="btn-action-retry"
-                    onClick={() => {
-                      setSelectedRecallBatch("#LH-8790");
-                      setShowRecallModal(true);
-                    }}
-                  >
-                    Thu hồi lô
-                  </button>
                 </div>
 
                 <div className="content-head">
                   <div>
                     <h2>Hồ sơ kiểm định</h2>
                     <p>
-                      Từ yêu cầu của nông dân đến chứng nhận ký số do cơ quan
-                      kiểm định công bố.
+                      Từ yêu cầu của nông dân đến chứng nhận do cơ quan kiểm
+                      định công bố. Admin có thể thu hồi chứng nhận đã công bố.
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Hồ sơ</th>
-                      <th>Nông trại</th>
-                      <th>Tiêu chuẩn</th>
-                      <th>Lịch lấy mẫu</th>
-                      <th>Trạng thái</th>
-                      <th style={{ textAlign: "center" }}>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td className="mono">
-                        <b>#KD-2201</b>
-                      </td>
-                      <td>Vườn Cam A1</td>
-                      <td>VietGAP trồng trọt</td>
-                      <td>12/10/2026</td>
-                      <td>
-                        <span className="status-pill warning">Chờ lấy mẫu</span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">Chi tiết</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="mono">
-                        <b>#KD-2198</b>
-                      </td>
-                      <td>Vườn Quýt C2</td>
-                      <td>GlobalGAP xuất khẩu</td>
-                      <td>08/10/2026</td>
-                      <td>
-                        <span className="status-pill info">
-                          Đã niêm phong, chờ kết quả
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">Chi tiết</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="mono">
-                        <b>#KD-2187</b>
-                      </td>
-                      <td>Vườn Cam A1</td>
-                      <td>VietGAP trồng trọt</td>
-                      <td>02/10/2026</td>
-                      <td>
-                        <span className="status-pill success">
-                          Đã công bố chứng nhận
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">
-                          Tải chứng thư
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="mono">
-                        <b>#KD-2180</b>
-                      </td>
-                      <td>Vườn Bưởi B3</td>
-                      <td>VietGAP trồng trọt</td>
-                      <td>29/09/2026</td>
-                      <td>
-                        <span className="status-pill danger">
-                          Không đạt, đình chỉ tem
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          className="btn-action-retry"
-                          onClick={() => {
-                            setSelectedRecallBatch("#LH-8790");
-                            setShowRecallModal(true);
-                          }}
-                        >
-                          Xử lý
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {loadingInspections && (
+                <p style={{ color: "#6b7280" }}>Đang tải...</p>
+              )}
+
+              {!loadingInspections && (
+                <div className="table-container">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Hồ sơ</th>
+                        <th>Sản phẩm / Lô</th>
+                        <th>Cơ quan kiểm định</th>
+                        <th>Tiêu chuẩn</th>
+                        <th>Trạng thái</th>
+                        <th style={{ textAlign: "center" }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {inspections.length === 0 && (
+                        <tr>
+                          <td colSpan={6}>Chưa có hồ sơ kiểm định nào.</td>
+                        </tr>
+                      )}
+                      {inspections.map((kd) => (
+                        <tr key={kd.ma_kiem_dinh}>
+                          <td className="mono">
+                            <b>{kd.ma_kiem_dinh}</b>
+                            {kd.so_chung_nhan && (
+                              <small
+                                style={{ display: "block", color: "#6b7280" }}
+                              >
+                                CN: {kd.so_chung_nhan}
+                              </small>
+                            )}
+                          </td>
+                          <td>
+                            {kd.ten_san_pham}
+                            <small style={{ display: "block", color: "#6b7280" }}>
+                              {kd.ma_lo_nong_san}
+                            </small>
+                          </td>
+                          <td>{kd.ten_co_quan}</td>
+                          <td>{kd.tieu_chuan_dang_ky}</td>
+                          <td>
+                            <span
+                              className={`status-pill ${
+                                kd.trang_thai_ho_so === "DA_CONG_BO"
+                                  ? "success"
+                                  : kd.trang_thai_ho_so === "TU_CHOI" ||
+                                      kd.trang_thai_ho_so === "THU_HOI"
+                                    ? "danger"
+                                    : "warning"
+                              }`}
+                            >
+                              {INSPECTION_STATUS_LABELS[kd.trang_thai_ho_so] ||
+                                kd.trang_thai_ho_so}
+                            </span>
+                            {kd.trang_thai_ho_so === "THU_HOI" &&
+                              kd.ly_do_thu_hoi && (
+                                <small
+                                  style={{ display: "block", color: "#dc2626" }}
+                                >
+                                  {kd.ly_do_thu_hoi}
+                                </small>
+                              )}
+                          </td>
+                          <td style={{ textAlign: "center" }}>
+                            {kd.trang_thai_ho_so === "DA_CONG_BO" ? (
+                              <button
+                                className="btn-action-retry"
+                                onClick={() => {
+                                  setRecallTarget(kd);
+                                  setRecallReason("");
+                                }}
+                              >
+                                Thu hồi
+                              </button>
+                            ) : (
+                              <span style={{ color: "#9ca3af", fontSize: 12 }}>
+                                —
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -1742,168 +1765,120 @@ export default function AdminDashboard() {
               <div className="sticky-top-section">
                 <div className="metrics-row">
                   <div className="metric-card">
-                    <span className="metric-title">Chuyến chờ nhận</span>
-                    <div className="metric-number">4</div>
+                    <span className="metric-title">Chờ chấp nhận / lấy hàng</span>
+                    <div className="metric-number">
+                      {(shipmentStatusCounts.CHO_CHAP_NHAN || 0) +
+                        (shipmentStatusCounts.CHO_LAY_HANG || 0)}
+                    </div>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Đang vận chuyển</span>
                     <div className="metric-number">
-                      19 <span className="metric-unit">CHUYẾN</span>
+                      {shipmentStatusCounts.DANG_VAN_CHUYEN || 0}{" "}
+                      <span className="metric-unit">CHUYẾN</span>
                     </div>
                   </div>
                   <div className="metric-card">
-                    <span className="metric-title">Đã giao hôm nay</span>
-                    <div className="metric-number">11</div>
+                    <span className="metric-title">Đã hoàn thành</span>
+                    <div className="metric-number">
+                      {shipmentStatusCounts.HOAN_THANH || 0}
+                    </div>
                   </div>
                   <div className="metric-card warn">
-                    <span className="metric-title">Cảnh báo hành trình</span>
+                    <span className="metric-title">Từ chối / đã hủy</span>
                     <div className="metric-number">
-                      1 <span className="metric-unit">CHUYẾN</span>
+                      {(shipmentStatusCounts.TU_CHOI || 0) +
+                        (shipmentStatusCounts.DA_HUY || 0)}{" "}
+                      <span className="metric-unit">CHUYẾN</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="content-head">
                   <div>
-                    <h2>Giám sát chuyến vận chuyển</h2>
+                    <h2>Giám sát lệnh vận chuyển</h2>
                     <p>
-                      Theo dõi nhận chuyến, lấy hàng, nhật ký GPS và biên bản
-                      giao nhận điện tử.
+                      Toàn bộ lệnh vận chuyển & bàn giao giữa nông dân và đơn vị
+                      vận chuyển trong hệ thống.
                     </p>
                   </div>
-                  <button
-                    className="btn-action-edit"
-                    onClick={() => alert("Đang xuất báo cáo...")}
-                  >
-                    Xuất Excel / CSV
-                  </button>
                 </div>
               </div>
 
-              <div className="table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Mã chuyến</th>
-                      <th>Lộ trình</th>
-                      <th>Xe / Tài xế</th>
-                      <th>Nhiệt độ</th>
-                      <th>Trạng thái</th>
-                      <th style={{ textAlign: "center" }}>Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>
-                        <b>#VC-3021</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô #SC-2026-001
-                        </small>
-                      </td>
-                      <td>Trà Vinh → TP.HCM</td>
-                      <td>
-                        65C-128.45
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Nguyễn Văn Hùng
-                        </small>
-                      </td>
-                      <td style={{ color: "#dc2626", fontWeight: 700 }}>
-                        12°C
-                      </td>
-                      <td>
-                        <span className="status-pill danger">Vượt ngưỡng</span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          className="btn-action-edit"
-                          onClick={() => setShowGpsModal("#VC-3021")}
-                        >
-                          <Navigation size={12} /> Xem GPS
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <b>#VC-3019</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô #SC-2026-003
-                        </small>
-                      </td>
-                      <td>Cần Thơ → Đà Nẵng</td>
-                      <td>
-                        65H-044.12
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lê Văn Tâm
-                        </small>
-                      </td>
-                      <td>6°C</td>
-                      <td>
-                        <span className="status-pill info">
-                          Đang vận chuyển
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button
-                          className="btn-action-edit"
-                          onClick={() => setShowGpsModal("#VC-3019")}
-                        >
-                          <Navigation size={12} /> Xem GPS
-                        </button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <b>#VC-3017</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô #SC-2026-002
-                        </small>
-                      </td>
-                      <td>Tiền Giang → Cần Thơ</td>
-                      <td>
-                        63C-210.77
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Phạm Hữu Phúc
-                        </small>
-                      </td>
-                      <td>5°C</td>
-                      <td>
-                        <span className="status-pill warning">
-                          Chờ lấy hàng
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">Chi tiết</button>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>
-                        <b>#VC-3012</b>
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Lô #SC-2026-000
-                        </small>
-                      </td>
-                      <td>Vĩnh Long → TP.HCM</td>
-                      <td>
-                        64C-099.31
-                        <small style={{ display: "block", color: "#6b7280" }}>
-                          Trần Quốc Việt
-                        </small>
-                      </td>
-                      <td>7°C</td>
-                      <td>
-                        <span className="status-pill success">
-                          Đã giao, đã ký
-                        </span>
-                      </td>
-                      <td style={{ textAlign: "center" }}>
-                        <button className="btn-action-view">
-                          <FileCheck2 size={12} /> Biên bản
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              {loadingShipments && (
+                <p style={{ color: "#6b7280" }}>Đang tải...</p>
+              )}
+
+              {!loadingShipments && (
+                <div className="table-container">
+                  <table className="admin-table">
+                    <thead>
+                      <tr>
+                        <th>Mã vận đơn</th>
+                        <th>Lô hàng</th>
+                        <th>Người gửi → Bên nhận</th>
+                        <th>Đơn vị vận chuyển</th>
+                        <th>Khối lượng</th>
+                        <th>Thời gian xuất</th>
+                        <th>Trạng thái</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shipments.length === 0 && (
+                        <tr>
+                          <td colSpan={7}>Chưa có lệnh vận chuyển nào.</td>
+                        </tr>
+                      )}
+                      {shipments.map((vc) => (
+                        <tr key={vc.ma_van_don}>
+                          <td className="mono">
+                            <b>{vc.ma_van_don}</b>
+                          </td>
+                          <td>
+                            {vc.ten_san_pham}
+                            <small style={{ display: "block", color: "#6b7280" }}>
+                              {vc.ma_lo_nong_san}
+                            </small>
+                          </td>
+                          <td>
+                            {vc.ten_nguoi_gui} → {vc.ten_ben_nhan}
+                          </td>
+                          <td>
+                            {vc.ten_don_vi_van_chuyen}
+                            {vc.ten_tai_xe && (
+                              <small
+                                style={{ display: "block", color: "#6b7280" }}
+                              >
+                                {vc.ten_tai_xe}
+                                {vc.bien_so_xe ? ` (${vc.bien_so_xe})` : ""}
+                              </small>
+                            )}
+                          </td>
+                          <td>{formatQuantity(vc.khoi_luong, vc.don_vi_tinh)}</td>
+                          <td>{formatDateTime(vc.thoi_gian_xuat)}</td>
+                          <td>
+                            <span
+                              className={`status-pill ${
+                                vc.trang_thai === "HOAN_THANH"
+                                  ? "success"
+                                  : vc.trang_thai === "TU_CHOI" ||
+                                      vc.trang_thai === "DA_HUY"
+                                    ? "danger"
+                                    : vc.trang_thai === "DANG_VAN_CHUYEN"
+                                      ? "info"
+                                      : "warning"
+                              }`}
+                            >
+                              {SHIPMENT_STATUS_LABELS[vc.trang_thai] ||
+                                vc.trang_thai}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 
@@ -2517,9 +2492,9 @@ export default function AdminDashboard() {
       )}
 
       {/* ================= MODAL THU HỒI LÔ ================= */}
-      {showRecallModal && (
+      {recallTarget && (
         <div className="modal-overlay">
-          <div className="modal-container">
+          <form className="modal-container" onSubmit={submitRecall}>
             <div className="modal-header">
               <h3
                 style={{
@@ -2529,21 +2504,21 @@ export default function AdminDashboard() {
                   gap: 8,
                 }}
               >
-                <AlertTriangle size={18} /> Thu hồi lô {selectedRecallBatch}
+                <AlertTriangle size={18} /> Thu hồi hồ sơ {recallTarget.ma_kiem_dinh}
               </h3>
               <button
                 type="button"
                 className="btn-close-modal"
-                onClick={() => setShowRecallModal(false)}
+                onClick={() => setRecallTarget(null)}
               >
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
               <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 14 }}>
-                Lô sẽ bị chặn mọi giao dịch tiếp theo trên chuỗi Smart Contract,
-                và người tiêu dùng khi quét mã QR sẽ thấy cảnh báo thu hồi tức
-                thì.
+                Chứng nhận của lô <b>{recallTarget.ma_lo_nong_san}</b> (
+                {recallTarget.ten_san_pham}) sẽ chuyển sang trạng thái "Đã thu
+                hồi" và không còn hiệu lực.
               </p>
               <div className="form-group">
                 <label>Lý do thu hồi (*)</label>
@@ -2558,99 +2533,19 @@ export default function AdminDashboard() {
               <button
                 type="button"
                 className="btn-cancel"
-                onClick={() => setShowRecallModal(false)}
+                onClick={() => setRecallTarget(null)}
               >
                 Hủy
               </button>
               <button
-                type="button"
+                type="submit"
                 className="btn-save"
                 style={{ background: "#dc2626" }}
-                onClick={() => {
-                  if (!recallReason)
-                    return alert("Vui lòng nhập lý do thu hồi!");
-                  alert(
-                    `Đã kích hoạt lệnh thu hồi lô ${selectedRecallBatch} trên Smart Contract!`,
-                  );
-                  setShowRecallModal(false);
-                  setRecallReason("");
-                }}
               >
                 Xác nhận thu hồi
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ================= MODAL GPS VẬN CHUYỂN ================= */}
-      {showGpsModal && (
-        <div className="modal-overlay">
-          <div className="modal-container modal-lg">
-            <div className="modal-header">
-              <h3>Nhật ký hành trình GPS & Cảm biến: {showGpsModal}</h3>
-              <button
-                type="button"
-                className="btn-close-modal"
-                onClick={() => setShowGpsModal(null)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div
-                style={{
-                  height: 180,
-                  background: "#e2e8f0",
-                  borderRadius: 8,
-                  display: "grid",
-                  placeItems: "center",
-                  color: "#475569",
-                  marginBottom: 16,
-                }}
-              >
-                <div style={{ textAlign: "center" }}>
-                  <Navigation
-                    size={32}
-                    color="#2563eb"
-                    style={{ margin: "0 auto 6px" }}
-                  />
-                  <b>Mô phỏng bản đồ vệ tinh tuyến đường (Trà Vinh → TP.HCM)</b>
-                  <p style={{ fontSize: 12, color: "#64748b" }}>
-                    Cập nhật tự động qua định vị IoT
-                  </p>
-                </div>
-              </div>
-              <div className="form-grid-2">
-                <div className="form-group">
-                  <label>Tọa độ hiện tại</label>
-                  <input
-                    type="text"
-                    readOnly
-                    value="10.2431° N, 106.3753° E (Bến Lức, Long An)"
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Nhiệt độ thùng lạnh</label>
-                  <input
-                    type="text"
-                    readOnly
-                    value="12°C (Vượt ngưỡng tiêu chuẩn 4–8°C)"
-                    style={{ color: "#dc2626", fontWeight: 700 }}
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                className="btn-cancel"
-                onClick={() => setShowGpsModal(null)}
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
+          </form>
         </div>
       )}
     </div>
