@@ -8,6 +8,7 @@ const authRoutes = require("./routes/authRoutes");
 const farmerRoutes = require("./routes/farmerRoutes");
 const registerRoutes = require("./routes/registerRoutes");
 const kiemdinhRoutes = require("./routes/kiemdinhRoutes");
+const chitietkiemdinhroutes = require("./routes/chitietkiemdinhroute");
 const muavuRoutes = require("./routes/muavuRoutes");
 const lothuhoachRoutes = require("./routes/lothuhoachRoutes");
 const nongtraiRoutes = require("./routes/nongtraiRoutes");
@@ -43,6 +44,7 @@ app.use("/api/farmer", farmerRoutes);
 
 //kiểm định
 app.use("/api/kiem-dinh", kiemdinhRoutes);
+app.use("/api/chi-tiet-kiem-dinh", chitietkiemdinhroutes);
 
 // Mùa vụ
 app.use("/api/mua-vu", muavuRoutes);

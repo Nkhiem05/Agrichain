@@ -1,4 +1,3 @@
-import { Await } from "react-router-dom";
 import {
   Document,
   Packer,
@@ -38,15 +37,13 @@ const accepauthority = async (status, code, day, time, inspector) => {
         }),
       },
     );
-
-    const res = await fetchaccept.json();
-    if (res) {
-      console.log(res);
-    }
-  } catch {}
+    return await fetchaccept.json();
+  } catch (err) {
+    console.error(err);
+  }
 };
 
-//tài dữ liệu cho lịch hẹn
+// Tải dữ liệu cho lịch hẹn
 const fetchSamplingListApi = async (maCoQuan) => {
   const params = new URLSearchParams();
   if (maCoQuan) params.append("ma_co_quan", maCoQuan);
@@ -55,12 +52,10 @@ const fetchSamplingListApi = async (maCoQuan) => {
     `${API_URL}getSamplingScheduleList?${params.toString()}`,
   );
   const data = await res.json();
-  console.log("dữ liệu kiểm định:", data);
-
   return data;
 };
 
-// đặt thời gian lấy mẫu
+// Đặt thời gian lấy mẫu
 const updateSampleDetail = async (
   code,
   sealcode,
@@ -95,18 +90,29 @@ const updateSampleDetail = async (
         }),
       },
     );
-
-    const res = await fetchupdatesampledetail.json();
-    if (res.status) {
-      console.log(res.message);
-    } else {
-      console.log("có lỗi xảy ra vui lòng thử lại!!!");
-    }
+    return await fetchupdatesampledetail.json();
   } catch (err) {
-    console.log(err);
+    console.error(err);
   }
 };
 
+// Tải danh sách các ngưỡng kiểm định chuẩn từ server
+const fetchNguongKiemDinhApi = async (code, tieuChuan, maSanPham) => {
+  const params = new URLSearchParams();
+  if (code) params.append("code", code);
+  if (tieuChuan) params.append("tieu_chuan", tieuChuan);
+  if (maSanPham) params.append("ma_san_pham", maSanPham);
+
+  try {
+    const res = await fetch(`${API_URL}nguong-kiem-dinh?${params.toString()}`);
+    return await res.json();
+  } catch (err) {
+    console.error("Lỗi nạp ngưỡng kiểm định:", err);
+    return { ok: false, data: { standards: [], savedIndicators: [] } };
+  }
+};
+
+// Lưu chỉ số kiểm định
 const saveTestIndicators = async (code, indicators) => {
   const param = new URLSearchParams();
   param.append("code", code);
@@ -119,7 +125,7 @@ const saveTestIndicators = async (code, indicators) => {
     });
     return await res.json();
   } catch (err) {
-    console.log(err);
+    console.error(err);
   }
 };
 
@@ -134,21 +140,16 @@ const updateInspectionStatus = async (code, status, message) => {
         method: "POST",
         body: JSON.stringify({
           status: status,
-          message,
-          message,
+          message: message,
         }),
       },
     );
-
-    const res = await fetchupdateInspectionStatus.json();
-    if (res.status) {
-      console.log(res.message);
-    }
-    console.log(res);
-  } catch {}
+    return await fetchupdateInspectionStatus.json();
+  } catch (err) {
+    console.error(err);
+  }
 };
 
-// 1. Tải danh sách lô hàng đã công bố chứng nhận (Tab 3)
 const fetchPublishedCertificatesApi = async (maCoQuan) => {
   const params = new URLSearchParams();
   if (maCoQuan) params.append("ma_co_quan", maCoQuan);
@@ -157,14 +158,16 @@ const fetchPublishedCertificatesApi = async (maCoQuan) => {
     const res = await fetch(
       `${API_URL}published-certificates?${params.toString()}`,
     );
-    return await res.json();
+    const data = await res.json();
+    console.log("dữ liêu", data);
+
+    return data;
   } catch (error) {
     console.error("Lỗi kết nối tải danh sách công bố:", error);
     return { ok: false, data: [] };
   }
 };
 
-// 2. Tải danh sách lô hàng bị đình chỉ / thu hồi (Tab 4)
 const fetchRevokedCertificatesApi = async (maCoQuan) => {
   const params = new URLSearchParams();
   if (maCoQuan) params.append("ma_co_quan", maCoQuan);
@@ -180,10 +183,6 @@ const fetchRevokedCertificatesApi = async (maCoQuan) => {
   }
 };
 
-/**
- * Hàm xuất Giấy chứng nhận / Báo cáo kiểm định ra file Word (.docx)
- * @param {Object} item - Thông tin lô hàng kiểm định
- */
 const exportInspectionCertificateWord = async (item) => {
   if (!item) {
     alert("Không tìm thấy thông tin lô hàng để xuất báo cáo!");
@@ -195,14 +194,13 @@ const exportInspectionCertificateWord = async (item) => {
       {
         properties: {},
         children: [
-          // 1. Quốc hiệu & Tiêu ngữ
           new Paragraph({
             alignment: AlignmentType.CENTER,
             children: [
               new TextRun({
                 text: "CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM",
                 bold: true,
-                size: 24, // 12pt
+                size: 24,
               }),
             ],
           }),
@@ -226,15 +224,13 @@ const exportInspectionCertificateWord = async (item) => {
             ],
           }),
           new Paragraph({ text: "" }),
-
-          // 2. Tiêu đề báo cáo
           new Paragraph({
             alignment: AlignmentType.CENTER,
             children: [
               new TextRun({
                 text: "BÁO CÁO KẾT QUẢ KIỂM ĐỊNH NÔNG SẢN",
                 bold: true,
-                size: 32, // 16pt
+                size: 32,
                 color: "047857",
               }),
             ],
@@ -250,8 +246,6 @@ const exportInspectionCertificateWord = async (item) => {
             ],
           }),
           new Paragraph({ text: "" }),
-
-          // 3. Thông tin cơ bản
           new Paragraph({
             children: [
               new TextRun({
@@ -309,8 +303,6 @@ const exportInspectionCertificateWord = async (item) => {
             ],
           }),
           new Paragraph({ text: "" }),
-
-          // 4. Bảng kết luận
           new Paragraph({
             children: [
               new TextRun({
@@ -398,8 +390,6 @@ const exportInspectionCertificateWord = async (item) => {
           }),
           new Paragraph({ text: "" }),
           new Paragraph({ text: "" }),
-
-          // 5. Chữ ký xác nhận
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
@@ -474,14 +464,15 @@ const exportInspectionCertificateWord = async (item) => {
     ],
   });
 
-  // Đóng gói và xuất file Word
   const blob = await Packer.toBlob(doc);
   saveAs(blob, `BaoCao_KiemDinh_${item.ma_lo_nong_san || Date.now()}.docx`);
 };
+
 export {
   accepauthority,
   updateSampleDetail,
   fetchSamplingListApi,
+  fetchNguongKiemDinhApi,
   saveTestIndicators,
   updateInspectionStatus,
   fetchPublishedCertificatesApi,
