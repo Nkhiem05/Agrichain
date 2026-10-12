@@ -1,18 +1,18 @@
-const db = require("../config/db"); // Kết nối MySQL pool/promise
+const db = require("../config/db"); // Kết nối MySQL pool/promise[cite: 6]
 
 /**
- * Hàm so sánh giá trị thực tế với ngưỡng chuẩn trong CSDL
+ * Hàm so sánh giá trị thực tế với ngưỡng chuẩn trong CSDL[cite: 6]
  */
 function evaluateResult(rawValue, rule) {
-  if (!rule) return true;
+  if (!rule) return true; //[cite: 6]
 
   const valStr = String(rawValue || "")
     .trim()
-    .toLowerCase();
-  const operator = rule.toan_tu_so_sanh;
-  const threshold = Number(rule.nguong_toi_da);
+    .toLowerCase(); //[cite: 6]
+  const operator = rule.toan_tu_so_sanh; //[cite: 6]
+  const threshold = Number(rule.nguong_toi_da); //[cite: 6]
 
-  // Kiểm tra trường hợp ÂM TÍNH (hoạt chất cấm, salmonella,...)
+  // Kiểm tra trường hợp ÂM TÍNH (hoạt chất cấm, salmonella,...)[cite: 6]
   if (operator === "AM_TINH") {
     return (
       valStr.includes("âm tính") ||
@@ -20,40 +20,40 @@ function evaluateResult(rawValue, rule) {
       valStr.includes("negative") ||
       valStr === "0" ||
       valStr.startsWith("<")
-    );
+    ); //[cite: 6]
   }
 
-  // Tách giá trị số từ chuỗi nhập vào (ví dụ "0.02 mg/kg", "11.8 Brix")
-  const numericMatch = valStr.match(/^-?\d+(\.\d+)?/);
+  // Tách giá trị số từ chuỗi nhập vào (ví dụ "0.02 mg/kg", "11.8 Brix")[cite: 6]
+  const numericMatch = valStr.match(/^-?\d+(\.\d+)?/); //[cite: 6]
   if (!numericMatch) {
-    return false;
+    return false; //[cite: 6]
   }
-  const measuredVal = parseFloat(numericMatch[0]);
+  const measuredVal = parseFloat(numericMatch[0]); //[cite: 6]
 
   switch (operator) {
     case "<=":
-      return measuredVal <= threshold;
+      return measuredVal <= threshold; //[cite: 6]
     case "<":
-      return measuredVal < threshold;
+      return measuredVal < threshold; //[cite: 6]
     case ">=":
-      return measuredVal >= threshold;
+      return measuredVal >= threshold; //[cite: 6]
     case ">":
-      return measuredVal > threshold;
+      return measuredVal > threshold; //[cite: 6]
     case "BANG":
-      return Math.abs(measuredVal - threshold) < 0.0001;
+      return Math.abs(measuredVal - threshold) < 0.0001; //[cite: 6]
     default:
-      return true;
+      return true; //[cite: 6]
   }
 }
 
 /**
- * Lấy chi tiết hồ sơ kiểm định và so sánh ngưỡng (không tải bảng vật tư)
+ * Lấy chi tiết hồ sơ kiểm định và so sánh ngưỡng (không tải bảng vật tư)[cite: 6]
  */
 const getChiTietKiemDinh = async (req, res) => {
   try {
-    const { maKiemDinh } = req.params;
+    const { maKiemDinh } = req.params; //[cite: 6]
 
-    // 1. Truy vấn thông tin kiểm định, lô hàng, mùa vụ, thửa đất / nông trại
+    // 1. Truy vấn thông tin kiểm định, lô hàng, mùa vụ, thửa đất / nông trại[cite: 6]
     const [kdRows] = await db.query(
       `SELECT 
           kd.*,
@@ -73,17 +73,17 @@ const getChiTietKiemDinh = async (req, res) => {
        LEFT JOIN nguoi_dung nd ON nt.ma_nguoi_dung = nd.ma_nguoi_dung
        WHERE kd.ma_kiem_dinh = ? OR kd.so_chung_nhan = ?`,
       [maKiemDinh, maKiemDinh],
-    );
+    ); //[cite: 6]
 
     if (kdRows.length === 0) {
       return res
         .status(404)
-        .json({ success: false, message: "Không tìm thấy hồ sơ kiểm định" });
+        .json({ success: false, message: "Không tìm thấy hồ sơ kiểm định" }); //[cite: 6]
     }
 
-    const data = kdRows[0];
+    const data = kdRows[0]; //[cite: 6]
 
-    // 2. Truy vấn chỉ số kiểm định và liên kết với bảng ngưỡng chuẩn
+    // 2. Truy vấn chỉ số kiểm định và liên kết với bảng ngưỡng chuẩn[cite: 6]
     const [chiSoRows] = await db.query(
       `SELECT 
           cs.ma_chi_so_kd,
@@ -107,40 +107,49 @@ const getChiTietKiemDinh = async (req, res) => {
        WHERE cs.ma_kiem_dinh = ?
        ORDER BY cs.thu_tu ASC, cs.ma_chi_so_kd ASC`,
       [data.tieu_chuan_dang_ky, data.ma_san_pham, data.ma_kiem_dinh],
-    );
+    ); //[cite: 6]
 
-    // 3. Tự động kiểm tra Đạt / Không đạt từng chỉ số
-    let coChiSoHong = false;
-    const danhSachChiSo = chiSoRows.map((item) => {
-      let isPass = true;
-      let nguongHienThi = item.mo_ta_nguong || "Theo đánh giá kiểm định viên";
-      let pphuongPhap = item.phuong_phap_thu || "TCVN";
+    // 3. Lọc trùng lặp (Unique) và kiểm tra Đạt / Không đạt
+    const uniqueChiSoMap = new Map();
+    for (const item of chiSoRows) {
+      const key = item.ma_chi_so_kd || item.ma_chi_so || item.ten_chi_so;
+      if (!uniqueChiSoMap.has(key)) {
+        uniqueChiSoMap.set(key, item);
+      }
+    }
+    const uniqueRows = Array.from(uniqueChiSoMap.values());
+
+    let coChiSoHong = false; //[cite: 6]
+    const danhSachChiSo = uniqueRows.map((item) => {
+      let isPass = true; //[cite: 6]
+      let nguongHienThi = item.mo_ta_nguong || "Theo đánh giá kiểm định viên"; //[cite: 6]
+      let pphuongPhap = item.phuong_phap_thu || "TCVN"; //[cite: 6]
 
       if (item.loai_chi_so === "CO_DINH" && item.toan_tu_so_sanh) {
         isPass = evaluateResult(item.gia_tri, {
           toan_tu_so_sanh: item.toan_tu_so_sanh,
           nguong_toi_da: item.nguong_toi_da,
-        });
-        if (!isPass) coChiSoHong = true;
+        }); //[cite: 6]
+        if (!isPass) coChiSoHong = true; //[cite: 6]
       } else {
-        nguongHienThi = "KĐV tự thẩm định";
-        pphuongPhap = "Phương pháp thực địa";
+        nguongHienThi = "KĐV tự thẩm định"; //[cite: 6]
+        pphuongPhap = "Phương pháp thực địa"; //[cite: 6]
       }
 
       return {
-        ma_chi_so_kd: item.ma_chi_so_kd,
-        loai_chi_so: item.loai_chi_so,
-        ma_chi_so: item.ma_chi_so,
-        ten_chi_so: item.ten_chi_so,
-        phuong_phap_thu: pphuongPhap,
-        gia_tri: item.gia_tri,
-        nguong_tieu_chuan: nguongHienThi,
-        is_pass: isPass,
-        danh_gia: isPass ? "Đạt" : "Không đạt",
+        ma_chi_so_kd: item.ma_chi_so_kd, //[cite: 6]
+        loai_chi_so: item.loai_chi_so, //[cite: 6]
+        ma_chi_so: item.ma_chi_so, //[cite: 6]
+        ten_chi_so: item.ten_chi_so, //[cite: 6]
+        phuong_phap_thu: pphuongPhap, //[cite: 6]
+        gia_tri: item.gia_tri, //[cite: 6]
+        nguong_tieu_chuan: nguongHienThi, //[cite: 6]
+        is_pass: isPass, //[cite: 6]
+        danh_gia: isPass ? "Đạt" : "Không đạt", //[cite: 6]
       };
     });
 
-    // 4. Lấy lịch sử truy xuất lô hàng từ nhật ký blockchain
+    // 4. Lấy lịch sử truy xuất lô hàng từ nhật ký blockchain[cite: 6]
     const [timelineRows] = await db.query(
       `SELECT ma_lich_su, loai_hoat_dong, thoi_diem_xay_ra, du_lieu_chi_tiet, 
               ma_bam_su_kien_hien_tai, ma_giao_dich_blockchain, blockchain_sync_status
@@ -148,7 +157,7 @@ const getChiTietKiemDinh = async (req, res) => {
        WHERE ma_lo_nong_san = ?
        ORDER BY so_thu_tu_su_kien DESC`,
       [data.ma_lo_nong_san],
-    );
+    ); //[cite: 6]
 
     return res.status(200).json({
       success: true,
@@ -160,16 +169,15 @@ const getChiTietKiemDinh = async (req, res) => {
         chi_so: danhSachChiSo,
         lich_su: timelineRows,
       },
-    });
+    }); //[cite: 6]
   } catch (error) {
-    console.error("Lỗi khi tải chi tiết kiểm định:", error);
+    console.error("Lỗi khi tải chi tiết kiểm định:", error); //[cite: 6]
     return res
       .status(500)
-      .json({ success: false, message: "Lỗi máy chủ nội bộ" });
+      .json({ success: false, message: "Lỗi máy chủ nội bộ" }); //[cite: 6]
   }
 };
 
-// ================= XUẤT HÀM Ở CUỐI FILE =================
 module.exports = {
   getChiTietKiemDinh,
 };

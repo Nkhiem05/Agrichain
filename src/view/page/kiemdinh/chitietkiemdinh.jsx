@@ -185,11 +185,14 @@ const ChiTietKiemDinh = () => {
   }
 
   // ================= DỮ LIỆU TỪ API =================
-  const {
-    kiem_dinh: kd,
-    chi_so: danhSachChiSo = [],
-    lich_su: timeline = [],
-  } = data;
+  const { kiem_dinh: kd, chi_so: rawChiSo = [], lich_su: timeline = [] } = data;
+
+  // Lọc unique chỉ số để tránh hiển thị lặp dòng
+  const danhSachChiSo = Array.from(
+    new Map(
+      rawChiSo.map((item) => [item.ten_chi_so || item.ma_chi_so_kd, item]),
+    ).values(),
+  );
 
   const isDatChuan = kd.tong_ket_lab === "DAT";
   const certCode = kd.ma_ho_so || kd.ma_kiem_dinh;
@@ -206,7 +209,7 @@ const ChiTietKiemDinh = () => {
     "Chưa lấy mẫu";
 
   const sampleAddress =
-    `${kd.ten_thua_dat ? `${kd.ten_thua_dat}, ` : ""}${
+    `${kd.ten_thua_dat ? `\${kd.ten_thua_dat}, ` : ""}${
       kd.dia_diem_nong_trai || ""
     }` || "Chưa có địa chỉ";
 
@@ -385,7 +388,7 @@ const ChiTietKiemDinh = () => {
                 <div className="qr-preview-box">
                   <img
                     src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                      `https://agrichain.vn/verify/${certCode}`,
+                      `https://agrichain.vn/verify/\${certCode}`,
                     )}`}
                     alt="QR Code"
                     className="qr-box-img"

@@ -525,9 +525,9 @@ function Coquankiemdinh() {
       alert("Hồ sơ này chưa có mã kiểm định!");
       return;
     }
-    // Chuyển URL sang dạng: /chi-tiet-kiem-dinh/KD-2026-001
     navigate(`/chi-tiet-kiem-dinh?makiemdinh=${maKiemDinh}`);
   };
+
   return (
     <div className="kiemdinh">
       <div className="cert-container">
@@ -875,7 +875,7 @@ function Coquankiemdinh() {
                   {!samplingLoading &&
                     filteredSamplingList.map((item) => {
                       const farmLabel = `${item.ten_nong_trai || "Chưa rõ trang trại"}${
-                        item.ma_nong_trai ? ` (#${item.ma_nong_trai})` : ""
+                        item.ma_nong_trai ? ` (#\${item.ma_nong_trai})` : ""
                       }`;
 
                       // 1. TRẠNG THÁI "CHỜ LẤY MẪU" -> HIỂN THỊ NÚT "NHẬP CHỈ SỐ MẪU"
@@ -1050,7 +1050,10 @@ function Coquankiemdinh() {
                               {/* Nút Sửa */}
                               <button
                                 type="button"
-                                onClick={() => handleOpenPublishModal(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenPublishModal(item);
+                                }}
                                 className="btn-action-edit"
                               >
                                 <Edit3 size={15} />
@@ -1061,9 +1064,10 @@ function Coquankiemdinh() {
                               {allPassed && (
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    handleOpenConfirmPublishModal(item)
-                                  }
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenConfirmPublishModal(item);
+                                  }}
                                   className="btn-action-publish"
                                 >
                                   <Award size={15} />
@@ -1074,7 +1078,10 @@ function Coquankiemdinh() {
                               {/* Nút Yêu Cầu Thu Hồi */}
                               <button
                                 type="button"
-                                onClick={() => handleOpenRevokeModal(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenRevokeModal(item);
+                                }}
                                 className="btn-action-revoke"
                               >
                                 <ShieldAlert size={15} />
@@ -1565,7 +1572,7 @@ function Coquankiemdinh() {
           </div>
         )}
 
-        {/* MODAL 3: NHẬP CHỈ SỐ MẪU TỰ ĐỘNG THEO TIÊU CHUẨN */}
+        {/* MODAL 3: NHẬP CHỈ SỐ MẪU TỰ ĐỘNG THEO TIÊU CHUẨN (GIỮ NGUYÊN CẤU TRÚC GỐC, KHÔNG LỖI DẤU HAI CHẤM) */}
         {modalPublishOpen && (
           <div className="modal-overlay">
             <div className="modal-dialog modal-max-xl">
@@ -1611,19 +1618,15 @@ function Coquankiemdinh() {
                       {standardIndicators.map((std) => (
                         <div className="form-group" key={std.ma_nguong}>
                           <span className="indicator-field-label">
-                            {std.ten_chi_tiet_chat}{" "}
-                            <span
-                              style={{ fontSize: "12px", color: "#6b7280" }}
-                            >
-                              ({std.mo_ta_nguong} -{" "}
-                              {std.phuong_phap_thu || "TCVN"})
-                            </span>
-                            :
+                            {std.ten_chi_tiet_chat}
                           </span>
                           <input
                             type="text"
-                            placeholder={`Nhập kết quả (${std.don_vi_tinh})`}
-                            value={indicatorValues[std.ma_nguong] || ""}
+                            placeholder={
+                              std.don_vi_tinh
+                                ? `Nhập (${std.don_vi_tinh})`
+                                : "Nhập kết quả..."
+                            }
                             onChange={(e) =>
                               setIndicatorValues({
                                 ...indicatorValues,
