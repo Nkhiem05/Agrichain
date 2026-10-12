@@ -156,7 +156,7 @@ const getSamplingScheduleList = async (req, res) => {
       LEFT JOIN mua_vu mv ON lo.ma_mua_vu = mv.ma_mua_vu
       LEFT JOIN nong_trai nt ON mv.ma_nong_trai = nt.ma_nong_trai
       LEFT JOIN nguoi_dung nd ON nt.ma_nguoi_dung = nd.ma_nguoi_dung
-      WHERE kd.trang_thai_ho_so IN ('DA_HEN_LICH', 'DA_LAY_MAU')
+      WHERE kd.trang_thai_ho_so IN ('DA_HEN_LICH', 'CHO_LAY_MAU','DA_LAY_MAU')
     `;
 
     const params = [];
@@ -186,7 +186,7 @@ const updateSampleDetail = async (req, res) => {
   const { code } = req.query;
   const { sealcode, sampleweight, samplemethod, visualconsition } = req.body;
 
-  const sql = `UPDATE kiem_dinh_lo_hang SET ma_niem_phong =?, khoi_luong_mau=?, phuong_phap_lay_mau =?, tinh_trang_cam_quan=?, trang_thai_ho_so='DA_LAY_MAU' WHERE ma_kiem_dinh =?`;
+  const sql = `UPDATE kiem_dinh_lo_hang SET ma_niem_phong =?, khoi_luong_mau=?, phuong_phap_lay_mau =?, tinh_trang_cam_quan=?, trang_thai_ho_so='CHO_LAY_MAU' WHERE ma_kiem_dinh =?`;
   const [result] = await db.query(sql, [
     sealcode,
     sampleweight,
@@ -209,33 +209,182 @@ const updateSampleDetail = async (req, res) => {
 };
 
 const saveTestIndicators = async (req, res) => {
-  const { code } = req.query;
-  const { indicators } = req.body; // [{loai, ma, ten, val}, ...]
+  try {
+    const { code } = req.query;
+    const { indicators } = req.body; // [{loai, ma, ten, val}, ...]
+    const now = new Date(); // Thời gian thực hiện
 
-  const rows = (indicators || [])
-    .filter((i) => i.ten?.trim() && i.val?.trim())
-    .map((i, idx) => [
+    const rows = (indicators || [])
+      .filter((i) => i.ten?.trim() && i.val?.trim())
+      .map((i, idx) => [
+        code,
+        i.loai,
+        i.ma || null,
+        i.ten.trim(),
+        i.val.trim(),
+        idx + 1,
+        now, // Giá trị updated_at cho từng dòng
+      ]);
+
+    if (!code || rows.length === 0) {
+      return res
+        .status(200)
+        .json({ status: false, message: "vui lòng nhập chỉ số" });
+    }
+
+    // 1. Xóa các chỉ số cũ (nếu có)
+    await db.query(`DELETE FROM chi_so_kiem_dinh WHERE ma_kiem_dinh = ?`, [
       code,
-      i.loai,
-      i.ma || null,
-      i.ten.trim(),
-      i.val.trim(),
-      idx + 1,
     ]);
 
-  if (!code || rows.length === 0) {
-    return res
-      .status(200)
-      .json({ status: false, message: "vui lòng nhập chỉ số" });
+    // 2. Thêm mới danh sách chỉ số kiểm định (kèm updated_at)
+    await db.query(
+      `INSERT INTO chi_so_kiem_dinh (ma_kiem_dinh, loai_chi_so, ma_chi_so, ten_chi_so, gia_tri, thu_tu, updated_at) VALUES ?`,
+      [rows],
+    );
+
+    // 3. Cập nhật trạng thái hồ sơ kiểm định và updated_at
+    await db.query(
+      `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so = 'DA_LAY_MAU', updated_at = NOW() WHERE ma_kiem_dinh = ?`,
+      [code],
+    );
+
+    return res.status(200).json({
+      status: true,
+      message: "Đã lưu chỉ số xét nghiệm và cập nhật trạng thái đã lấy mẫu",
+    });
+  } catch (error) {
+    console.error("Lỗi khi lưu chỉ số kiểm định:", error);
+    return res.status(500).json({
+      status: false,
+      message: "Có lỗi xảy ra khi lưu chỉ số xét nghiệm",
+    });
   }
+};
 
-  await db.query(`DELETE FROM chi_so_kiem_dinh WHERE ma_kiem_dinh = ?`, [code]);
-  await db.query(
-    `INSERT INTO chi_so_kiem_dinh (ma_kiem_dinh, loai_chi_so, ma_chi_so, ten_chi_so, gia_tri, thu_tu) VALUES ?`,
-    [rows],
-  );
+// hàm chấp nhận hoặc từ chối công bố
+const updateInspectionStatus = async (req, res) => {
+  const { code } = req.query;
+  const { status, message } = req.body;
 
-  res.status(200).json({ status: true, message: "đã lưu chỉ số xét nghiệm" });
+  if (status == "accept") {
+    try {
+      sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so = 'DA_CONG_BO', updated_at = CURRENT_TIMESTAMP WHERE ma_kiem_dinh = ?;`;
+      const [result] = await db.query(sql, [code]);
+      if (result.affectedRows > 0) {
+        res.status(200).json({
+          message: "công bố thành công",
+          status: true,
+        });
+      }
+    } catch (error) {}
+  } else {
+    try {
+      sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so = 'THU_HOI',ly_do_thu_hoi=?, updated_at = CURRENT_TIMESTAMP WHERE ma_kiem_dinh = ?;`;
+      const [result] = await db.query(sql, [message, code]);
+      if (result.affectedRows > 0) {
+        res.status(200).json({
+          message: "Đã yêu cầu thu hồi",
+          status: true,
+        });
+      }
+    } catch (error) {}
+  }
+  console.log(code, status, message);
+};
+
+// 1. Lấy danh sách lô hàng đã công bố chứng nhận
+const getPublishedCertificates = async (req, res) => {
+  try {
+    const { ma_co_quan } = req.query;
+    let sql = `
+      SELECT 
+        kd.ma_kiem_dinh,
+        kd.ma_ho_so,
+        kd.ma_lo_nong_san,
+        kd.tieu_chuan_dang_ky,
+        kd.so_chung_nhan,
+        kd.hieu_luc_tu,
+        kd.hieu_luc_den,
+        kd.updated_at AS ngay_cong_bo,
+        sp.ten_san_pham,
+        lo.so_luong_hien_tai,
+        lo.don_vi_tinh,
+        nt.ten_nong_trai,
+        nd.ho_ten AS ten_chu_vuon
+      FROM kiem_dinh_lo_hang kd
+      INNER JOIN lo_nong_san lo ON kd.ma_lo_nong_san = lo.ma_lo_nong_san
+      INNER JOIN san_pham_nong_san sp ON lo.ma_san_pham = sp.ma_san_pham
+      LEFT JOIN mua_vu mv ON lo.ma_mua_vu = mv.ma_mua_vu
+      LEFT JOIN nong_trai nt ON mv.ma_nong_trai = nt.ma_nong_trai
+      LEFT JOIN nguoi_dung nd ON lo.ma_nguoi_quan_ly = nd.ma_nguoi_dung
+      WHERE kd.trang_thai_ho_so = 'DA_CONG_BO'
+    `;
+
+    const values = [];
+    if (ma_co_quan) {
+      sql += ` AND kd.ma_co_quan = ?`;
+      values.push(ma_co_quan);
+    }
+
+    sql += ` ORDER BY kd.updated_at DESC`;
+    const [rows] = await db.query(sql, values);
+
+    return res.status(200).json({
+      ok: true,
+      message: "Lấy danh sách công bố thành công",
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy danh sách công bố:", error);
+    return res.status(500).json({ ok: false, message: "Lỗi máy chủ nội bộ" });
+  }
+};
+
+// 2. Lấy danh sách lô hàng bị đình chỉ / thu hồi
+const getRevokedCertificates = async (req, res) => {
+  try {
+    const { ma_co_quan } = req.query;
+    let sql = `
+      SELECT 
+        kd.ma_kiem_dinh,
+        kd.ma_ho_so,
+        kd.ma_lo_nong_san,
+        kd.tieu_chuan_dang_ky,
+        kd.ly_do_thu_hoi,
+        kd.updated_at AS ngay_thu_hoi,
+        sp.ten_san_pham,
+        lo.so_luong_hien_tai,
+        lo.don_vi_tinh,
+        nt.ten_nong_trai,
+        nd.ho_ten AS ten_chu_vuon
+      FROM kiem_dinh_lo_hang kd
+      INNER JOIN lo_nong_san lo ON kd.ma_lo_nong_san = lo.ma_lo_nong_san
+      INNER JOIN san_pham_nong_san sp ON lo.ma_san_pham = sp.ma_san_pham
+      LEFT JOIN mua_vu mv ON lo.ma_mua_vu = mv.ma_mua_vu
+      LEFT JOIN nong_trai nt ON mv.ma_nong_trai = nt.ma_nong_trai
+      LEFT JOIN nguoi_dung nd ON lo.ma_nguoi_quan_ly = nd.ma_nguoi_dung
+      WHERE kd.trang_thai_ho_so = 'THU_HOI'
+    `;
+
+    const values = [];
+    if (ma_co_quan) {
+      sql += ` AND kd.ma_co_quan = ?`;
+      values.push(ma_co_quan);
+    }
+
+    sql += ` ORDER BY kd.updated_at DESC`;
+    const [rows] = await db.query(sql, values);
+
+    return res.status(200).json({
+      ok: true,
+      message: "Lấy danh sách thu hồi thành công",
+      data: rows,
+    });
+  } catch (error) {
+    console.error("Lỗi lấy danh sách thu hồi:", error);
+    return res.status(500).json({ ok: false, message: "Lỗi máy chủ nội bộ" });
+  }
 };
 
 module.exports = {
@@ -244,4 +393,7 @@ module.exports = {
   getSamplingScheduleList,
   updateSampleDetail,
   saveTestIndicators,
+  updateInspectionStatus,
+  getPublishedCertificates,
+  getRevokedCertificates,
 };

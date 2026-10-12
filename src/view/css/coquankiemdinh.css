@@ -230,6 +230,11 @@
     gap: 20px;
   }
 
+  /* Thêm khoảng cách phía trên cho tab 3 và tab 4 để không bị chạm vào Header */
+  .view-panel-clean {
+    padding-top: 24px;
+  }
+
   /* ================= CỐ ĐỊNH KHUNG THỐNG KÊ (STICKY) ================= */
   .metrics-sticky-wrapper {
     position: sticky;
@@ -271,7 +276,7 @@
     }
   }
 
-  /* Thẻ chỉ số card chuẩn style hình đính kèm */
+  /* Thẻ chỉ số card */
   .metric-card {
     background-color: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -326,6 +331,10 @@
   .custom-select-box {
     position: relative;
     width: 100%;
+  }
+
+  .select-box-sampling {
+    min-width: 220px;
   }
 
   .select-control {
@@ -384,6 +393,17 @@
     align-items: center;
     gap: 6px;
     margin-top: 2px;
+  }
+
+  /* State Messages */
+  .state-msg {
+    text-align: center;
+    color: #6b7280;
+  }
+
+  .state-msg-error {
+    text-align: center;
+    color: #dc2626;
   }
 
   /* Card Lists */
@@ -536,6 +556,17 @@
     color: #7e22ce;
   }
 
+  .text-meta-code {
+    font-family: monospace;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .text-meta-warning-state {
+    font-weight: 600;
+    color: #d97706;
+  }
+
   .card-desc-box {
     font-size: 12px;
     color: #4b5563;
@@ -544,14 +575,33 @@
     gap: 2px;
   }
 
+  .card-desc-title {
+    font-weight: 600;
+    color: #374151;
+  }
+
   .card-desc-box p:last-child {
     color: #6b7280;
+  }
+
+  .status-badge-wrapper {
+    padding-top: 4px;
   }
 
   .status-badge-amber {
     display: inline-block;
     background-color: #fef3c7;
     color: #92400e;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 2px;
+  }
+
+  .status-badge-emerald {
+    display: inline-block;
+    background-color: #ecfdf5;
+    color: #047857;
     font-size: 11px;
     font-weight: 600;
     padding: 2px 10px;
@@ -603,7 +653,7 @@
   }
 
   .btn-primary {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
@@ -660,6 +710,87 @@
 
   .btn-light:hover {
     background-color: #e5e7eb;
+  }
+
+  /* Nút hành động chuẩn hóa cho thẻ Lấy mẫu */
+  .btn-action-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .btn-action-edit:hover {
+    background-color: #f9fafb;
+    border-color: #d1d5db;
+  }
+
+  .btn-action-publish {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: #047857;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+    box-shadow: 0 1px 2px rgba(4, 120, 87, 0.2);
+  }
+
+  .btn-action-publish:hover {
+    background-color: #065f46;
+  }
+
+  .btn-action-revoke {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #be123c;
+    background-color: #fff1f2;
+    border: 1px solid #fecdd3;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+  }
+
+  .btn-action-revoke:hover {
+    background-color: #ffe4e6;
+    border-color: #fda4af;
+  }
+
+  .btn-confirm-revoke {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffffff;
+    background-color: #dc2626;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+
+  .btn-confirm-revoke:hover {
+    background-color: #b91c1c;
   }
 
   /* Tab Banner Box */
@@ -719,6 +850,11 @@
     gap: 12px;
   }
 
+  .alert-icon-warning {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
   .alert-box-text {
     font-size: 12px;
     color: #b91c1c;
@@ -747,6 +883,13 @@
     color: #374151;
     display: flex;
     justify-content: space-between;
+    align-items: center;
+  }
+
+  .violations-subtitle {
+    font-size: 12px;
+    font-weight: 400;
+    color: #dc2626;
   }
 
   .violations-row {
@@ -763,6 +906,12 @@
     background-color: #f9fafb;
   }
 
+  .violations-left-group {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
   .violation-avatar {
     width: 40px;
     height: 40px;
@@ -773,6 +922,47 @@
     align-items: center;
     justify-content: center;
     font-weight: 700;
+  }
+
+  .violation-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .violation-item-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: #1f2937;
+  }
+
+  .badge-revoked {
+    background-color: #fee2e2;
+    color: #991b1b;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+  }
+
+  .violation-reason-text {
+    color: #6b7280;
+    margin-top: 2px;
+  }
+
+  .violations-right-group {
+    text-align: right;
+  }
+
+  .violation-date {
+    color: #9ca3af;
+    display: block;
+    font-size: 11px;
+  }
+
+  .violation-lock-status {
+    color: #dc2626;
+    font-weight: 600;
   }
 
   /* Modals */
@@ -827,6 +1017,10 @@
     gap: 8px;
   }
 
+  .modal-title.color-danger {
+    color: #dc2626;
+  }
+
   .btn-close-modal {
     background: transparent;
     border: none;
@@ -845,6 +1039,22 @@
     font-size: 12px;
   }
 
+  .modal-info-text {
+    color: #4b5563;
+  }
+
+  .modal-highlight-green {
+    color: #047857;
+  }
+
+  .modal-highlight-dark {
+    color: #111827;
+  }
+
+  .modal-highlight-danger {
+    color: #dc2626;
+  }
+
   .modal-scrollable-body {
     overflow-y: auto;
     padding-right: 4px;
@@ -859,6 +1069,19 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     color: #4b5563;
+  }
+
+  .grid-col-full {
+    grid-column: span 2;
+  }
+
+  .font-code {
+    font-family: monospace;
+  }
+
+  .font-code-bold {
+    font-family: monospace;
+    font-weight: 700;
   }
 
   .form-group label {
@@ -908,6 +1131,13 @@
     justify-content: space-between;
   }
 
+  .indicators-header-title {
+    font-weight: 700;
+    color: #374151;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
   .btn-add-indicator {
     display: flex;
     align-items: center;
@@ -925,6 +1155,85 @@
   .btn-add-indicator:hover {
     border-color: #2d8647;
     color: #1b6b3b;
+  }
+
+  .indicator-field-label {
+    color: #6b7280;
+    font-weight: 500;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .custom-indicators-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(229, 231, 235, 0.8);
+  }
+
+  .custom-indicator-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-remove-indicator {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #9ca3af;
+    padding: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-remove-indicator:hover {
+    color: #dc2626;
+  }
+
+  .select-evaluation {
+    font-weight: 700;
+    color: #047857;
+  }
+
+  .readonly-code-input {
+    background-color: #f3f4f6;
+    font-family: monospace;
+    font-weight: 700;
+  }
+
+  /* Warning & Notice Boxes trong Modals */
+  .revoke-warning-card {
+    background-color: #fef2f2;
+    border: 1px solid #fee2e2;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 12px;
+    color: #991b1b;
+  }
+
+  .revoke-warning-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: #dc2626;
+  }
+
+  .publish-confirm-info-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: #374151;
+  }
+
+  .publish-guide-note {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.5;
   }
 
   .modal-footer {
