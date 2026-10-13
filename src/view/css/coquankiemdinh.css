@@ -230,7 +230,6 @@
     gap: 20px;
   }
 
-  /* Thêm khoảng cách phía trên cho tab 3 và tab 4 để không bị chạm vào Header */
   .view-panel-clean {
     padding-top: 24px;
   }
@@ -712,7 +711,6 @@
     background-color: #e5e7eb;
   }
 
-  /* Nút hành động chuẩn hóa cho thẻ Lấy mẫu */
   .btn-action-edit {
     display: inline-flex;
     align-items: center;
@@ -813,7 +811,6 @@
     margin-top: 2px;
   }
 
-  /* Bố cục chia hai bên cho Banner có bộ lọc */
   .tab-banner-with-filter {
     display: flex;
     align-items: center;
@@ -1084,6 +1081,13 @@
     font-weight: 700;
   }
 
+  /* ================= FORM VÀ CÂN BẰNG ĐÁY (KEEP BOTTOM) ================= */
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
   .form-group label {
     display: block;
     font-weight: 600;
@@ -1101,6 +1105,7 @@
     outline: none;
     font-size: 12px;
     color: #1f2937;
+    margin-top: auto; /* Tự động đẩy input rớt sát đáy, giúp các input bằng nhau */
   }
 
   .form-control-input:focus,
@@ -1113,6 +1118,7 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+    align-items: stretch; /* Đảm bảo 2 cột bằng chiều cao nhau */
   }
 
   .indicators-block {
@@ -1138,64 +1144,12 @@
     letter-spacing: 0.025em;
   }
 
-  .btn-add-indicator {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    font-weight: 600;
-    color: #2d8647;
-    background-color: #ffffff;
-    border: 1px solid rgba(45, 134, 71, 0.3);
-    padding: 4px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-  }
-
-  .btn-add-indicator:hover {
-    border-color: #2d8647;
-    color: #1b6b3b;
-  }
-
   .indicator-field-label {
-    color: #6b7280;
-    font-weight: 500;
+    color: #374151;
+    font-weight: 600;
     display: block;
-    margin-bottom: 4px;
-  }
-
-  .custom-indicators-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-top: 6px;
-    border-top: 1px solid rgba(229, 231, 235, 0.8);
-  }
-
-  .custom-indicator-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .btn-remove-indicator {
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    color: #9ca3af;
-    padding: 6px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .btn-remove-indicator:hover {
-    color: #dc2626;
-  }
-
-  .select-evaluation {
-    font-weight: 700;
-    color: #047857;
+    margin-bottom: 6px;
+    line-height: 1.4;
   }
 
   .readonly-code-input {

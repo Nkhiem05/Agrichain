@@ -6,6 +6,7 @@ import {
   saveTestIndicators,
   updateInspectionStatus,
   exportInspectionCertificateWord,
+  fetchNguongKiemDinhApi,
 } from "../../../api/coquankiemdinhApi";
 import {
   ClipboardList,
@@ -26,9 +27,7 @@ import {
   X,
   CalendarCheck,
   ClipboardCheck,
-  PlusCircle,
   Check,
-  Trash2,
   Edit3,
 } from "lucide-react";
 import "../../css/coquankiemdinh.css";
@@ -37,24 +36,18 @@ import { useNavigate } from "react-router-dom";
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
-// Chuẩn hoá trạng thái để so sánh an toàn
 const normalizeStatus = (s) =>
   String(s ?? "")
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
 
-// 1. Nhóm đã hẹn lịch
 const SCHEDULED_STATUSES = ["DA_HEN_LICH", "DA_HEN"];
-
-// 2. Nhóm chờ lấy mẫu / đang xét nghiệm -> Hiển thị khung "Nhập chỉ số mẫu"
 const PENDING_SAMPLE_STATUSES = [
   "CHO_LAY_MAU",
   "DANG_XET_NGHIEM",
   "CHO_XET_NGHIEM",
 ];
-
-// 3. Nhóm đã lấy mẫu -> Hiển thị khung "Công bố & Yêu cầu thu hồi"
 const SAMPLED_STATUSES = [
   "DA_LAY_MAU",
   "DA_NIEM_PHONG",
@@ -64,7 +57,6 @@ const SAMPLED_STATUSES = [
   "DA_KIEM_DINH",
 ];
 
-// Kiểm tra thẻ hẹn lịch
 const isScheduledItem = (item) => {
   const status = normalizeStatus(
     item.trang_thai_ho_so ?? item.trang_thai ?? item.trang_thai_kiem_dinh,
@@ -78,7 +70,6 @@ const isScheduledItem = (item) => {
   );
 };
 
-// Kiểm tra trạng thái "Chờ lấy mẫu / Xét nghiệm" (Hiện khung Nhập chỉ số)
 const isPendingSampleItem = (item) => {
   const status = normalizeStatus(
     item.trang_thai_ho_so ?? item.trang_thai ?? item.trang_thai_kiem_dinh,
@@ -86,18 +77,23 @@ const isPendingSampleItem = (item) => {
   return PENDING_SAMPLE_STATUSES.includes(status);
 };
 
-// Kiểm tra trạng thái "Đã lấy mẫu" (Hiện khung Sửa, Công bố, Thu hồi)
 const isSampledItem = (item) => {
   const status = normalizeStatus(
     item.trang_thai_ho_so ?? item.trang_thai ?? item.trang_thai_kiem_dinh,
   );
+  // Ưu tiên trạng thái DB: DA_HEN_LICH và CHO_LAY_MAU không phải đã lấy mẫu
+  if (
+    SCHEDULED_STATUSES.includes(status) ||
+    PENDING_SAMPLE_STATUSES.includes(status)
+  ) {
+    return false;
+  }
   return (
     SAMPLED_STATUSES.includes(status) ||
     Boolean(item.thoi_gian_lay_mau && item.khoi_luong_mau)
   );
 };
 
-// Định dạng giờ hẹn: 08:30 Sáng
 const formatGioHen = (g) => {
   if (!g) return "Chưa hẹn giờ";
   const [h, m] = String(g).split(":");
@@ -107,51 +103,117 @@ const formatGioHen = (g) => {
   return `${h.padStart(2, "0")}:${(m ?? "00").slice(0, 2)} ${buoi}`;
 };
 
+// Hàm kiểm tra 1 chỉ số có đạt chuẩn hay không
+const isIndicatorValid = (val, toanTu, nguongToiDa) => {
+  if (val === undefined || val === null || val === "") return false;
+  const strVal = String(val).trim().toUpperCase();
+  const numVal = parseFloat(strVal);
+  const max =
+    nguongToiDa !== null && nguongToiDa !== undefined && nguongToiDa !== ""
+      ? parseFloat(nguongToiDa)
+      : null;
+
+  // So sánh âm tính
+  if (toanTu === "AM_TINH") {
+    if (
+      strVal.includes("ÂM") ||
+      strVal.includes("AM") ||
+      strVal.includes("KHÔNG PHÁT HIỆN") ||
+      strVal.includes("KHONG PHAT HIEN") ||
+      strVal.includes("NEGATIVE") ||
+      strVal.startsWith("<")
+    ) {
+      return true;
+    }
+
+    if (!Number.isNaN(numVal)) {
+      if (numVal === 0) return true;
+      // Khi nguong_toi_da = 0 hoặc null với AM_TINH: giá trị số là LOD thiết bị, coi là đạt
+      if (max === null || Number.isNaN(max) || max === 0) return true;
+      return numVal <= max;
+    }
+    return false;
+  }
+
+  if (Number.isNaN(numVal)) {
+    return (
+      strVal.includes("ĐẠT") ||
+      strVal.includes("DAT") ||
+      strVal.includes("ÂM") ||
+      strVal.includes("AM")
+    );
+  }
+
+  if (max === null || Number.isNaN(max)) return true;
+
+  switch (toanTu) {
+    case "<=":
+      return numVal <= max;
+    case "<":
+      return numVal < max;
+    case ">=":
+      return numVal >= max;
+    case ">":
+      return numVal > max;
+    case "BANG":
+      return Math.abs(numVal - max) < 0.0001;
+    default:
+      return numVal <= max;
+  }
+};
+// Kiểm tra toàn bộ các chất của lô hàng có đạt chuẩn hay không
+const checkAllIndicatorsPass = (item) => {
+  if (!item.danh_sach_chi_so || item.danh_sach_chi_so.length === 0) {
+    return false;
+  }
+
+  for (const cs of item.danh_sach_chi_so) {
+    if (!isIndicatorValid(cs.gia_tri, cs.toan_tu_so_sanh, cs.nguong_toi_da)) {
+      return false; // Chỉ cần 1 chất không đạt thì không cho công bố
+    }
+  }
+  return true;
+};
+
 function Coquankiemdinh() {
   const savedUser = localStorage.getItem("user");
   const user = savedUser ? JSON.parse(savedUser) : null;
   const navigate = useNavigate();
   const [currentTab, setCurrentTab] = useState("requests");
 
-  // State bộ lọc trạng thái riêng cho tab lấy mẫu
   const [samplingFilterStatus, setSamplingFilterStatus] = useState("ALL");
 
-  // Hàm chuyển trang xem chi tiết kết quả kiểm định
   const handlechitietkiemdinh = (e) => {
     e.preventDefault();
     navigate("/chi-tiet-kiem-dinh");
   };
 
-  // Modals state
   const [modalAcceptOpen, setModalAcceptOpen] = useState(false);
   const [modalSamplingOpen, setModalSamplingOpen] = useState(false);
   const [modalPublishOpen, setModalPublishOpen] = useState(false);
   const [modalRevokeOpen, setModalRevokeOpen] = useState(false);
   const [modalConfirmPublishOpen, setModalConfirmPublishOpen] = useState(false);
 
-  // Modal Accept Data
   const [acceptData, setAcceptData] = useState({ code: "", farm: "" });
 
-  // Modal Sampling Data
   const [samplingData, setSamplingData] = useState({
     requestCode: "",
     batchCode: "",
     farmName: "",
   });
 
-  // Modal Publish Dynamic Indicators
-  const [customIndicators, setCustomIndicators] = useState([]);
+  // State danh sách các chỉ số tải từ bảng nguong_kiem_dinh_chuan
+  const [standardIndicators, setStandardIndicators] = useState([]);
+  const [indicatorValues, setIndicatorValues] = useState({});
+  const [loadingStandards, setLoadingStandards] = useState(false);
 
-  // Modal Revoke Data
   const [revokeItem, setRevokeItem] = useState(null);
   const [revokeReason, setRevokeReason] = useState(
     "Phát hiện tồn dư chất cấm vượt ngưỡng kiểm định an toàn",
   );
 
-  // Modal Confirm Publish Data
   const [selectedPublishItem, setSelectedPublishItem] = useState(null);
 
-  // Form states cho tiếp nhận và lấy mẫu
   const [code, setCode] = useState("");
   const [day, setDay] = useState("");
   const [time, setTime] = useState("");
@@ -165,7 +227,6 @@ function Coquankiemdinh() {
   );
   const [visualCondition, setVisualCondition] = useState("");
 
-  // Actions Modal
   const handleOpenAcceptModal = (codeVal, farmVal, maKiemDinh) => {
     setAcceptData({ code: codeVal, farm: farmVal });
     setCode(maKiemDinh);
@@ -197,22 +258,50 @@ function Coquankiemdinh() {
     setModalSamplingOpen(true);
   };
 
-  const handleOpenPublishModal = (item) => {
+  // Mở popup và gửi yêu cầu đến server tải các tiêu chuẩn của bảng ngưỡng kiểm định chuẩn
+  const handleOpenPublishModal = async (item) => {
     setCode(item.ma_kiem_dinh);
+    setLoadingStandards(true);
     setModalPublishOpen(true);
+
+    try {
+      const res = await fetchNguongKiemDinhApi(
+        item.ma_kiem_dinh,
+        item.tieu_chuan_dang_ky,
+        item.ma_san_pham,
+      );
+
+      if (res?.ok && res.data) {
+        const standards = res.data.standards || [];
+        const saved = res.data.savedIndicators || [];
+
+        setStandardIndicators(standards);
+
+        // Khởi tạo các giá trị, nếu có giá trị đã lưu trước thì điền vào
+        const valMap = {};
+        standards.forEach((std) => {
+          const found = saved.find(
+            (s) =>
+              s.ma_chi_so === std.ma_chi_so ||
+              s.ten_chi_so === std.ten_chi_tiet_chat,
+          );
+          valMap[std.ma_nguong] = found ? found.gia_tri : "";
+        });
+
+        setIndicatorValues(valMap);
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải ngưỡng kiểm định chuẩn:", error);
+      alert("Không thể tải danh sách tiêu chuẩn kiểm định!");
+    } finally {
+      setLoadingStandards(false);
+    }
   };
 
   const handleOpenConfirmPublishModal = (item) => {
     setSelectedPublishItem(item);
     setCode(item.ma_kiem_dinh);
     setModalConfirmPublishOpen(true);
-  };
-
-  const handleProceedToPublish = () => {
-    if (selectedPublishItem) {
-      handleOpenPublishModal(selectedPublishItem);
-    }
-    setModalConfirmPublishOpen(false);
   };
 
   const handleOpenRevokeModal = (item) => {
@@ -222,7 +311,6 @@ function Coquankiemdinh() {
     setModalRevokeOpen(true);
   };
 
-  // Xác nhận thu hồi và làm biến mất thẻ ở tab lấy mẫu ngay lập tức
   const handleConfirmRevoke = async () => {
     if (!revokeItem) return;
     if (!revokeReason.trim()) {
@@ -248,7 +336,6 @@ function Coquankiemdinh() {
     }
   };
 
-  // Xác nhận công bố và làm biến mất thẻ ở tab lấy mẫu ngay lập tức
   const handleConfirmPublish = async () => {
     if (!selectedPublishItem) return;
     try {
@@ -269,23 +356,6 @@ function Coquankiemdinh() {
     }
   };
 
-  const handleAddCustomIndicator = () => {
-    setCustomIndicators((prev) => [...prev, { name: "", val: "" }]);
-  };
-
-  const handleCustomIndicatorChange = (index, field, value) => {
-    setCustomIndicators((prev) => {
-      const next = [...prev];
-      next[index][field] = value;
-      return next;
-    });
-  };
-
-  const handleRemoveCustomIndicator = (index) => {
-    setCustomIndicators((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  // 1. Tải danh sách yêu cầu chờ duyệt (Tab 1)
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -326,7 +396,6 @@ function Coquankiemdinh() {
     }
   }, [currentTab, selectedStandard]);
 
-  // 2. Tải danh sách khảo sát & lấy mẫu (Tab 2)
   const [samplingList, setSamplingList] = useState([]);
   const [samplingLoading, setSamplingLoading] = useState(false);
   const [samplingError, setSamplingError] = useState(null);
@@ -357,7 +426,6 @@ function Coquankiemdinh() {
     }
   }, [currentTab]);
 
-  // 3. Tải danh sách công bố chứng nhận (Tab 3)
   const [publishedList, setPublishedList] = useState([]);
   const [publishedLoading, setPublishedLoading] = useState(false);
 
@@ -389,7 +457,6 @@ function Coquankiemdinh() {
     }
   }, [currentTab]);
 
-  // 4. Tải danh sách cảnh báo & thu hồi (Tab 4)
   const [revokedList, setRevokedList] = useState([]);
   const [revokedLoading, setRevokedLoading] = useState(false);
 
@@ -421,7 +488,6 @@ function Coquankiemdinh() {
     }
   }, [currentTab]);
 
-  // Lọc dữ liệu danh sách lấy mẫu ở phía client
   const filteredSamplingList = samplingList.filter((item) => {
     if (samplingFilterStatus === "ALL") return true;
 
@@ -437,35 +503,14 @@ function Coquankiemdinh() {
     return true;
   });
 
-  const [fixedValues, setFixedValues] = useState({
-    DU_LUONG_BVTV: "",
-    KIM_LOAI_NANG: "",
-    VI_SINH: "",
-    NITRATE: "",
-  });
-
-  const FIXED_NAMES = {
-    DU_LUONG_BVTV: "Dư lượng BVTV (Hóa chất cấm)",
-    KIM_LOAI_NANG: "Kim loại nặng (Chì, Cadimi)",
-    VI_SINH: "Vi sinh (E.coli, Salmonella)",
-    NITRATE: "Dư lượng Nitrate (NO3-)",
-  };
-
+  // Lưu chỉ số xét nghiệm và xóa cũ, insert lại toàn bộ
   const handleSaveIndicators = async () => {
-    const indicators = [
-      ...Object.keys(FIXED_NAMES).map((ma) => ({
-        loai: "CO_DINH",
-        ma,
-        ten: FIXED_NAMES[ma],
-        val: fixedValues[ma],
-      })),
-      ...customIndicators.map((c) => ({
-        loai: "TUY_CHINH",
-        ma: null,
-        ten: c.name,
-        val: c.val,
-      })),
-    ];
+    const indicators = standardIndicators.map((std) => ({
+      loai: "CO_DINH",
+      ma: std.ma_chi_so,
+      ten: std.ten_chi_tiet_chat,
+      val: indicatorValues[std.ma_nguong] ?? "",
+    }));
 
     try {
       const res = await saveTestIndicators(code, indicators);
@@ -480,6 +525,15 @@ function Coquankiemdinh() {
       console.error("Lỗi khi lưu chỉ số kiểm định:", err);
       alert("Lưu chỉ số kiểm định thất bại!");
     }
+  };
+
+  // chuyển sang trang chi tiết kiểm định
+  const handleXemChiTietKiemDinh = (maKiemDinh) => {
+    if (!maKiemDinh) {
+      alert("Hồ sơ này chưa có mã kiểm định!");
+      return;
+    }
+    navigate(`/chi-tiet-kiem-dinh?makiemdinh=${maKiemDinh}`);
   };
 
   return (
@@ -828,13 +882,9 @@ function Coquankiemdinh() {
 
                   {!samplingLoading &&
                     filteredSamplingList.map((item) => {
-                      const farmLabel = `${item.ten_nong_trai || "Chưa rõ trang trại"}${
-                        item.ma_nong_trai ? ` (#\${item.ma_nong_trai})` : ""
-                      }`;
+                      const farmLabel = `${item.ten_nong_trai || "Chưa rõ trang trại"}${item.ma_nong_trai ? ` (#${item.ma_nong_trai})` : ""}`;
 
-                      // =========================================================================
-                      // 1. KHUNG: TRẠNG THÁI "CHỜ LẤY MẪU" -> HIỂN THỊ NÚT "NHẬP CHỈ SỐ MẪU"
-                      // =========================================================================
+                      // 1. TRẠNG THÁI "CHỜ LẤY MẪU" -> HIỂN THỊ NÚT "NHẬP CHỈ SỐ MẪU"
                       if (isPendingSampleItem(item)) {
                         return (
                           <div className="item-card" key={item.ma_kiem_dinh}>
@@ -912,15 +962,30 @@ function Coquankiemdinh() {
                         );
                       }
 
-                      // =========================================================================
-                      // 2. KHUNG: TRẠNG THÁI "ĐÃ LẤY MẪU" -> HIỂN THỊ NÚT SỬA, CÔNG BỐ & THU HỒI
-                      // =========================================================================
+                      // 2. TRẠNG THÁI "ĐÃ LẤY MẪU" -> KIỂM TRA ĐẠT CHUẨN ĐỂ ẨN NÚT CÔNG BỐ
                       if (isSampledItem(item)) {
+                        const allPassed = checkAllIndicatorsPass(item);
+
                         return (
-                          <div className="item-card" key={item.ma_kiem_dinh}>
+                          <div
+                            className="item-card"
+                            key={item.ma_kiem_dinh}
+                            style={{ cursor: "pointer" }}
+                            onClick={() =>
+                              handleXemChiTietKiemDinh(item.ma_kiem_dinh)
+                            }
+                          >
                             <div className="card-left-group">
-                              <div className="card-icon-bubble icon-emerald">
-                                <Check size={32} />
+                              <div
+                                className={`card-icon-bubble ${
+                                  allPassed ? "icon-emerald" : "icon-rose"
+                                }`}
+                              >
+                                {allPassed ? (
+                                  <Check size={32} />
+                                ) : (
+                                  <AlertTriangle size={32} color="#dc2626" />
+                                )}
                               </div>
 
                               <div className="card-content-stack">
@@ -939,12 +1004,6 @@ function Coquankiemdinh() {
 
                                 <div className="card-meta-wrap">
                                   <p>
-                                    Mã mẫu:{" "}
-                                    <span className="text-meta-regular">
-                                      {item.ma_mau || "N/A"}
-                                    </span>
-                                  </p>
-                                  <p>
                                     Mã niêm phong:{" "}
                                     <span className="text-meta-code">
                                       {item.ma_niem_phong || "N/A"}
@@ -960,23 +1019,46 @@ function Coquankiemdinh() {
                                         : "Đã lấy mẫu"}
                                     </span>
                                   </p>
+                                  <p>
+                                    Đánh giá kết quả:{" "}
+                                    <span
+                                      style={{
+                                        fontWeight: 600,
+                                        color: allPassed
+                                          ? "#059669"
+                                          : "#dc2626",
+                                      }}
+                                    >
+                                      {allPassed
+                                        ? "Đạt chuẩn an toàn (Đủ điều kiện công bố)"
+                                        : "Có chỉ số vượt ngưỡng (Không đạt chuẩn)"}
+                                    </span>
+                                  </p>
                                 </div>
 
                                 <div className="status-badge-wrapper">
-                                  <span className="status-badge-emerald">
-                                    Trạng thái: Đã lấy mẫu &amp; niêm phong
+                                  <span
+                                    className={
+                                      allPassed
+                                        ? "status-badge-emerald"
+                                        : "status-badge-rose"
+                                    }
+                                  >
+                                    {allPassed
+                                      ? "Trạng thái: Đã xét nghiệm & Đạt chuẩn"
+                                      : "Trạng thái: Không đạt chuẩn kiểm định"}
                                   </span>
                                 </div>
                               </div>
                             </div>
 
                             <div className="card-actions-row">
-                              {/* 1. Nút Sửa */}
+                              {/* Nút Sửa */}
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleOpenPublishModal(item);
-                                  setCode(item.ma_kiem_dinh);
                                 }}
                                 className="btn-action-edit"
                               >
@@ -984,22 +1066,28 @@ function Coquankiemdinh() {
                                 <span>Sửa</span>
                               </button>
 
-                              {/* 2. Nút Công Bố */}
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleOpenConfirmPublishModal(item)
-                                }
-                                className="btn-action-publish"
-                              >
-                                <Award size={15} />
-                                <span>Công bố</span>
-                              </button>
+                              {/* NÚT CÔNG BỐ: ẨN KHI CÓ BẤT KỲ CHẤT NÀO KHÔNG ĐẠT */}
+                              {allPassed && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenConfirmPublishModal(item);
+                                  }}
+                                  className="btn-action-publish"
+                                >
+                                  <Award size={15} />
+                                  <span>Công bố</span>
+                                </button>
+                              )}
 
-                              {/* 3. Nút Yêu Cầu Thu Hồi */}
+                              {/* Nút Yêu Cầu Thu Hồi */}
                               <button
                                 type="button"
-                                onClick={() => handleOpenRevokeModal(item)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenRevokeModal(item);
+                                }}
                                 className="btn-action-revoke"
                               >
                                 <ShieldAlert size={15} />
@@ -1010,9 +1098,7 @@ function Coquankiemdinh() {
                         );
                       }
 
-                      // =========================================================================
-                      // 3. KHUNG: TRẠNG THÁI "ĐÃ HẸN LỊCH" -> HIỂN THỊ NÚT CẬP NHẬT LẤY MẪU & NIÊM PHONG
-                      // =========================================================================
+                      // 3. TRẠNG THÁI "ĐÃ HẸN LỊCH"
                       return (
                         <div className="item-card" key={item.ma_kiem_dinh}>
                           <div className="card-left-group">
@@ -1115,7 +1201,10 @@ function Coquankiemdinh() {
                       <div
                         className="item-card"
                         key={item.ma_kiem_dinh}
-                        onClick={handlechitietkiemdinh}
+                        style={{ cursor: "pointer" }}
+                        onClick={() => {
+                          handleXemChiTietKiemDinh(item.ma_kiem_dinh);
+                        }}
                       >
                         <div className="card-left-group">
                           <div className="card-icon-bubble icon-emerald">
@@ -1489,14 +1578,14 @@ function Coquankiemdinh() {
           </div>
         )}
 
-        {/* MODAL 3: NHẬP CHỈ SỐ & CÔNG BỐ KẾT QUẢ */}
+        {/* MODAL 3: NHẬP CHỈ SỐ MẪU TỰ ĐỘNG THEO TIÊU CHUẨN (GIỮ NGUYÊN CẤU TRÚC GỐC, KHÔNG LỖI DẤU HAI CHẤM) */}
         {modalPublishOpen && (
           <div className="modal-overlay">
             <div className="modal-dialog modal-max-xl">
               <div className="modal-header">
                 <h3 className="modal-title">
                   <Award size={20} color="#059669" />
-                  Lưu Kết Quả Kiểm Nghiệm Lên Chuỗi
+                  Nhập Chỉ Số Xét Nghiệm Chuẩn
                 </h3>
                 <button
                   type="button"
@@ -1511,94 +1600,51 @@ function Coquankiemdinh() {
                 <div className="indicators-block">
                   <div className="indicators-block-header">
                     <span className="indicators-header-title">
-                      Chỉ số xét nghiệm từ Phòng Thí Nghiệm
+                      Chỉ số xét nghiệm từ Phòng Thí Nghiệm (Quy chuẩn bắt buộc)
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleAddCustomIndicator}
-                      className="btn-add-indicator"
+                  </div>
+
+                  {loadingStandards ? (
+                    <p style={{ textAlign: "center", padding: "20px" }}>
+                      Đang tải danh sách tiêu chuẩn kiểm định...
+                    </p>
+                  ) : standardIndicators.length === 0 ? (
+                    <p
+                      style={{
+                        textAlign: "center",
+                        padding: "20px",
+                        color: "#6b7280",
+                      }}
                     >
-                      <PlusCircle size={14} />
-                      <span>Thêm chỉ số khác</span>
-                    </button>
-                  </div>
-
-                  <div className="grid-two-cols">
-                    {Object.keys(FIXED_NAMES).map((ma) => (
-                      <div className="form-group" key={ma}>
-                        <span className="indicator-field-label">
-                          {FIXED_NAMES[ma]}:
-                        </span>
-                        <input
-                          type="text"
-                          value={fixedValues[ma]}
-                          onChange={(e) =>
-                            setFixedValues({
-                              ...fixedValues,
-                              [ma]: e.target.value,
-                            })
-                          }
-                          className="form-control-input"
-                        />
-                      </div>
-                    ))}
-                  </div>
-
-                  {customIndicators.length > 0 && (
-                    <div className="custom-indicators-list">
-                      {customIndicators.map((item, index) => (
-                        <div key={index} className="custom-indicator-row">
+                      Không có tiêu chuẩn nào được cấu hình cho sản phẩm hoặc
+                      tiêu chuẩn này.
+                    </p>
+                  ) : (
+                    <div className="grid-two-cols">
+                      {standardIndicators.map((std) => (
+                        <div className="form-group" key={std.ma_nguong}>
+                          <span className="indicator-field-label">
+                            {std.ten_chi_tiet_chat}
+                          </span>
                           <input
                             type="text"
-                            placeholder="Tên chỉ số (vd: Độ ngọt Brix, pH...)"
-                            value={item.name}
+                            placeholder={
+                              std.don_vi_tinh
+                                ? `Nhập (${std.don_vi_tinh})`
+                                : "Nhập kết quả..."
+                            }
                             onChange={(e) =>
-                              handleCustomIndicatorChange(
-                                index,
-                                "name",
-                                e.target.value,
-                              )
+                              setIndicatorValues({
+                                ...indicatorValues,
+                                [std.ma_nguong]: e.target.value,
+                              })
                             }
                             className="form-control-input"
                           />
-                          <input
-                            type="text"
-                            placeholder="Giá trị đo (vd: 12.5 Brix, 6.2...)"
-                            value={item.val}
-                            onChange={(e) =>
-                              handleCustomIndicatorChange(
-                                index,
-                                "val",
-                                e.target.value,
-                              )
-                            }
-                            className="form-control-input"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveCustomIndicator(index)}
-                            className="btn-remove-indicator"
-                          >
-                            <Trash2 size={16} />
-                          </button>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
-
-                <div className="form-group">
-                  <label>Kết Luận Đánh Giá (*)</label>
-                  <select className="form-control-select select-evaluation">
-                    <option>
-                      ĐẠT CHUẨN VIETGAP TRỒNG TRỌT (Cấp tem chứng nhận)
-                    </option>
-                    <option>ĐẠT CHUẨN XUẤT KHẨU GLOBALGAP</option>
-                    <option>ĐẠT CHUẨN NÔNG NGHIỆP HỮU CƠ (ORGANIC)</option>
-                    <option>
-                      KHÔNG ĐẠT (Phát hiện tồn dư vượt ngưỡng quy định)
-                    </option>
-                  </select>
                 </div>
 
                 <div className="form-group">
@@ -1626,7 +1672,7 @@ function Coquankiemdinh() {
                   className="btn-primary"
                 >
                   <Check size={16} />
-                  <span>Ký Số &amp; Lưu</span>
+                  <span>Ký Số &amp; Lưu Chỉ Số</span>
                 </button>
               </div>
             </div>
