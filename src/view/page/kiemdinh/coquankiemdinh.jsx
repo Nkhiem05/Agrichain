@@ -81,6 +81,13 @@ const isSampledItem = (item) => {
   const status = normalizeStatus(
     item.trang_thai_ho_so ?? item.trang_thai ?? item.trang_thai_kiem_dinh,
   );
+  // Ưu tiên trạng thái DB: DA_HEN_LICH và CHO_LAY_MAU không phải đã lấy mẫu
+  if (
+    SCHEDULED_STATUSES.includes(status) ||
+    PENDING_SAMPLE_STATUSES.includes(status)
+  ) {
+    return false;
+  }
   return (
     SAMPLED_STATUSES.includes(status) ||
     Boolean(item.thoi_gian_lay_mau && item.khoi_luong_mau)
@@ -100,6 +107,11 @@ const formatGioHen = (g) => {
 const isIndicatorValid = (val, toanTu, nguongToiDa) => {
   if (val === undefined || val === null || val === "") return false;
   const strVal = String(val).trim().toUpperCase();
+  const numVal = parseFloat(strVal);
+  const max =
+    nguongToiDa !== null && nguongToiDa !== undefined && nguongToiDa !== ""
+      ? parseFloat(nguongToiDa)
+      : null;
 
   // So sánh âm tính
   if (toanTu === "AM_TINH") {
@@ -108,23 +120,21 @@ const isIndicatorValid = (val, toanTu, nguongToiDa) => {
       strVal.includes("AM") ||
       strVal.includes("KHÔNG PHÁT HIỆN") ||
       strVal.includes("KHONG PHAT HIEN") ||
-      strVal === "0" ||
-      strVal === "NEGATIVE"
+      strVal.includes("NEGATIVE") ||
+      strVal.startsWith("<")
     ) {
       return true;
     }
-    const num = parseFloat(strVal);
-    if (
-      !Number.isNaN(num) &&
-      nguongToiDa !== null &&
-      nguongToiDa !== undefined
-    ) {
-      return num <= parseFloat(nguongToiDa);
+
+    if (!Number.isNaN(numVal)) {
+      if (numVal === 0) return true;
+      // Khi nguong_toi_da = 0 hoặc null với AM_TINH: giá trị số là LOD thiết bị, coi là đạt
+      if (max === null || Number.isNaN(max) || max === 0) return true;
+      return numVal <= max;
     }
     return false;
   }
 
-  const numVal = parseFloat(strVal);
   if (Number.isNaN(numVal)) {
     return (
       strVal.includes("ĐẠT") ||
@@ -134,8 +144,7 @@ const isIndicatorValid = (val, toanTu, nguongToiDa) => {
     );
   }
 
-  const max = parseFloat(nguongToiDa);
-  if (Number.isNaN(max)) return true;
+  if (max === null || Number.isNaN(max)) return true;
 
   switch (toanTu) {
     case "<=":
@@ -147,12 +156,11 @@ const isIndicatorValid = (val, toanTu, nguongToiDa) => {
     case ">":
       return numVal > max;
     case "BANG":
-      return numVal === max;
+      return Math.abs(numVal - max) < 0.0001;
     default:
       return numVal <= max;
   }
 };
-
 // Kiểm tra toàn bộ các chất của lô hàng có đạt chuẩn hay không
 const checkAllIndicatorsPass = (item) => {
   if (!item.danh_sach_chi_so || item.danh_sach_chi_so.length === 0) {
@@ -874,9 +882,7 @@ function Coquankiemdinh() {
 
                   {!samplingLoading &&
                     filteredSamplingList.map((item) => {
-                      const farmLabel = `${item.ten_nong_trai || "Chưa rõ trang trại"}${
-                        item.ma_nong_trai ? ` (#\${item.ma_nong_trai})` : ""
-                      }`;
+                      const farmLabel = `${item.ten_nong_trai || "Chưa rõ trang trại"}${item.ma_nong_trai ? ` (#${item.ma_nong_trai})` : ""}`;
 
                       // 1. TRẠNG THÁI "CHỜ LẤY MẪU" -> HIỂN THỊ NÚT "NHẬP CHỈ SỐ MẪU"
                       if (isPendingSampleItem(item)) {

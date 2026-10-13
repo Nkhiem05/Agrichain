@@ -3,46 +3,75 @@ const db = require("../config/db"); // Kết nối MySQL pool/promise[cite: 6]
 /**
  * Hàm so sánh giá trị thực tế với ngưỡng chuẩn trong CSDL[cite: 6]
  */
+/**
+ * Hàm so sánh giá trị thực tế với ngưỡng chuẩn trong CSDL
+ */
 function evaluateResult(rawValue, rule) {
-  if (!rule) return true; //[cite: 6]
+  if (!rule) return true;
 
-  const valStr = String(rawValue || "")
+  const valStr = String(rawValue ?? "")
     .trim()
-    .toLowerCase(); //[cite: 6]
-  const operator = rule.toan_tu_so_sanh; //[cite: 6]
-  const threshold = Number(rule.nguong_toi_da); //[cite: 6]
+    .toLowerCase();
+  if (valStr === "") return false;
 
-  // Kiểm tra trường hợp ÂM TÍNH (hoạt chất cấm, salmonella,...)[cite: 6]
+  const operator = rule.toan_tu_so_sanh;
+  const threshold =
+    rule.nguong_toi_da !== null && rule.nguong_toi_da !== undefined
+      ? Number(rule.nguong_toi_da)
+      : null;
+
+  // Tách giá trị số từ chuỗi nhập vào
+  const numericMatch = valStr.match(/^-?\d+(\.\d+)?/);
+  const measuredVal = numericMatch ? parseFloat(numericMatch[0]) : null;
+
+  // Kiểm tra trường hợp ÂM TÍNH (hoạt chất cấm, salmonella,...)
   if (operator === "AM_TINH") {
-    return (
+    if (
       valStr.includes("âm tính") ||
       valStr.includes("không phát hiện") ||
+      valStr.includes("khong phat hien") ||
       valStr.includes("negative") ||
-      valStr === "0" ||
       valStr.startsWith("<")
-    ); //[cite: 6]
+    ) {
+      return true;
+    }
+
+    if (measuredVal !== null) {
+      // Nếu nhập bằng 0 hoặc 0.00... thì luôn đạt
+      if (measuredVal === 0) return true;
+      // Nếu có ngưỡng tối đa (ví dụ 0.01 mg/kg) thì giá trị đo <= ngưỡng vẫn đạt
+      if (threshold !== null && !isNaN(threshold)) {
+        return measuredVal <= threshold;
+      }
+    }
+    return false;
   }
 
-  // Tách giá trị số từ chuỗi nhập vào (ví dụ "0.02 mg/kg", "11.8 Brix")[cite: 6]
-  const numericMatch = valStr.match(/^-?\d+(\.\d+)?/); //[cite: 6]
-  if (!numericMatch) {
-    return false; //[cite: 6]
+  // Trường hợp so sánh định lượng thông thường
+  if (measuredVal === null) {
+    return (
+      valStr.includes("đạt") ||
+      valStr.includes("dat") ||
+      valStr.includes("âm") ||
+      valStr.includes("am")
+    );
   }
-  const measuredVal = parseFloat(numericMatch[0]); //[cite: 6]
+
+  if (threshold === null || isNaN(threshold)) return true;
 
   switch (operator) {
     case "<=":
-      return measuredVal <= threshold; //[cite: 6]
+      return measuredVal <= threshold;
     case "<":
-      return measuredVal < threshold; //[cite: 6]
+      return measuredVal < threshold;
     case ">=":
-      return measuredVal >= threshold; //[cite: 6]
+      return measuredVal >= threshold;
     case ">":
-      return measuredVal > threshold; //[cite: 6]
+      return measuredVal > threshold;
     case "BANG":
-      return Math.abs(measuredVal - threshold) < 0.0001; //[cite: 6]
+      return Math.abs(measuredVal - threshold) < 0.0001;
     default:
-      return true; //[cite: 6]
+      return measuredVal <= threshold;
   }
 }
 

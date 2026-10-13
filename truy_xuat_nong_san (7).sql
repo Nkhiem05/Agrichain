@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th10 10, 2026 lúc 09:05 PM
+-- Thời gian đã tạo: Th10 13, 2026 lúc 07:03 AM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
@@ -66,11 +66,12 @@ CREATE TABLE `chi_so_kiem_dinh` (
 --
 
 INSERT INTO `chi_so_kiem_dinh` (`ma_chi_so_kd`, `ma_kiem_dinh`, `loai_chi_so`, `ma_chi_so`, `ten_chi_so`, `gia_tri`, `thu_tu`, `created_at`, `updated_at`) VALUES
-(1, 'KD-2026-001', 'CO_DINH', 'DU_LUONG_BVTV', 'Dư lượng BVTV (Hóa chất cấm)', 'Âm tính', 1, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
-(2, 'KD-2026-001', 'CO_DINH', 'KIM_LOAI_NANG', 'Kim loại nặng (Chì, Cadimi)', '< 0.05 mg/kg (Đạt)', 2, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
-(3, 'KD-2026-001', 'CO_DINH', 'VI_SINH', 'Vi sinh (E.coli, Salmonella)', 'Không phát hiện', 3, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
-(4, 'KD-2026-001', 'CO_DINH', 'NITRATE', 'Dư lượng Nitrate (NO3-)', '0.02 mg/kg', 4, '2026-10-11 02:05:37', '2026-10-11 02:05:37'),
-(5, 'KD-2026-001', 'TUY_CHINH', NULL, 'Độ ngọt Brix', '12.5', 5, '2026-10-11 02:05:37', '2026-10-11 02:05:37');
+(116, 'KD-2026-003', 'CO_DINH', 'DU_LUONG_BVTV', 'Dư lượng hoạt chất BVTV cấm', '0.001', 1, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
+(117, 'KD-2026-003', 'CO_DINH', 'KIM_LOAI_NANG', 'Chì (Pb)', '0.0001', 2, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
+(118, 'KD-2026-003', 'CO_DINH', 'KIM_LOAI_NANG', 'Cadimi (Cd)', '0.0001', 3, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
+(119, 'KD-2026-003', 'CO_DINH', 'VI_SINH', 'Vi khuẩn E.coli', '0.005', 4, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
+(120, 'KD-2026-003', 'CO_DINH', 'VI_SINH', 'Salmonella', '0.005', 5, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
+(121, 'KD-2026-003', 'CO_DINH', 'NITRATE', 'Hàm lượng Nitrate (NO3-)', '0.005', 6, '2026-10-13 07:50:39', '2026-10-13 07:50:39');
 
 -- --------------------------------------------------------
 
@@ -133,7 +134,7 @@ CREATE TABLE `kiem_dinh_lo_hang` (
   `hieu_luc_den` date DEFAULT NULL,
   `ly_do_thu_hoi` text DEFAULT NULL,
   `ngay_thu_hoi` datetime DEFAULT NULL,
-  `trang_thai_ho_so` enum('CHO_TIEP_NHAN','DA_HEN_LICH','DA_LAY_MAU','DA_CONG_BO','TU_CHOI','THU_HOI') NOT NULL DEFAULT 'CHO_TIEP_NHAN',
+  `trang_thai_ho_so` enum('CHO_TIEP_NHAN','DA_HEN_LICH','DA_LAY_MAU','DA_CONG_BO','TU_CHOI','THU_HOI','CHO_LAY_MAU') NOT NULL DEFAULT 'CHO_TIEP_NHAN',
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -143,9 +144,33 @@ CREATE TABLE `kiem_dinh_lo_hang` (
 --
 
 INSERT INTO `kiem_dinh_lo_hang` (`ma_kiem_dinh`, `ma_ho_so`, `ma_lo_nong_san`, `ma_co_quan`, `tieu_chuan_dang_ky`, `noi_dung_de_nghi`, `ngay_hen_lay_mau`, `gio_hen_lay_mau`, `kiem_dinh_vien`, `ghi_chu_chuan_bi`, `ma_niem_phong`, `khoi_luong_mau`, `phuong_phap_lay_mau`, `tinh_trang_cam_quan`, `thoi_gian_lay_mau`, `chi_so_xet_nghiem`, `so_chung_nhan`, `ket_luan`, `hieu_luc_tu`, `hieu_luc_den`, `ly_do_thu_hoi`, `ngay_thu_hoi`, `trang_thai_ho_so`, `created_at`, `updated_at`) VALUES
-('KD-2026-001', 'HS-KD-9041', 'LH-8824', 'CQKD001', 'VIETGAP', 'Đề nghị kiểm tra dư lượng thuốc BVTV và kim loại nặng để phục vụ đóng gói phân phối siêu thị.', '2026-10-08', '16:31:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_HEN_LICH', '2026-10-05 08:30:00', '2026-10-10 16:28:56'),
-('KD-2026-002', 'HS-KD-9042', 'LH-8825', 'CQKD001', 'GLOBALGAP', 'Lô xoài xuất khẩu đợt 1, đề nghị kiểm tra dư lượng hóa chất cấm theo tiêu chuẩn GlobalGAP.', '2026-10-06', '17:34:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'TU_CHOI', '2026-10-06 09:15:00', '2026-10-10 01:48:22'),
-('KD-2026-003', 'HS-KD-9043', 'LH-8821', 'CQKD001', 'ORGANIC', 'Đề nghị giám định vi sinh và cấp tem chứng nhận Organic cho nông trại hữu cơ.', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_HEN_LICH', '2026-10-07 14:00:00', '2026-10-10 01:24:27');
+('KD-2026-001', 'HS-KD-9041', 'LH-8824', 'CQKD001', 'VIETGAP', 'Đề nghị kiểm tra dư lượng thuốc BVTV và kim loại nặng để phục vụ đóng gói phân phối siêu thị.', '2026-10-13', '07:35:00', 'KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)', NULL, 'QR-Seal-0000000012', '12', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', '12', '2026-10-12 17:45:15', NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_HEN_LICH', '2026-10-05 08:30:00', '2026-10-13 07:35:34'),
+('KD-2026-002', 'HS-KD-9042', 'LH-8825', 'CQKD001', 'GLOBALGAP', 'Lô xoài xuất khẩu đợt 1, đề nghị kiểm tra dư lượng hóa chất cấm theo tiêu chuẩn GlobalGAP.', '2026-10-06', '17:34:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_CONG_BO', '2026-10-06 09:15:00', '2026-10-11 22:41:26'),
+('KD-2026-003', 'HS-KD-9043', 'LH-8821', 'CQKD001', 'ORGANIC', 'Đề nghị giám định vi sinh và cấp tem chứng nhận Organic cho nông trại hữu cơ.', '2026-10-13', '07:33:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, 'QR-Seal-0000000011', '1kg', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', 'tốt', '2026-10-13 07:36:30', NULL, NULL, 'PENDING', NULL, NULL, '', NULL, 'DA_LAY_MAU', '2026-10-07 14:00:00', '2026-10-13 07:50:39'),
+('KD001', 'HS-KD-9044', 'LO001', 'CQKD001', 'VIETGAP', 'yêu cầu kiểm định các  chất trong sản phẩm lúa', '2026-10-14', '05:20:00', 'KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)', NULL, 'QR-Seal-0000000001', 'test', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', '123', NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_CONG_BO', '2026-10-11 19:31:41', '2026-10-11 23:33:53');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `lenh_van_chuyen`
+--
+
+CREATE TABLE `lenh_van_chuyen` (
+  `ma_van_don` varchar(64) NOT NULL,
+  `ma_lo_nong_san` varchar(64) NOT NULL,
+  `ma_nguoi_gui` varchar(50) NOT NULL COMMENT 'Nông dân tạo lệnh',
+  `ma_don_vi_van_chuyen` varchar(50) NOT NULL COMMENT 'Người dùng vai trò TRANSPORTER',
+  `ma_ben_nhan` varchar(50) NOT NULL COMMENT 'Người dùng vai trò PROCESSOR',
+  `khoi_luong` decimal(18,3) NOT NULL COMMENT 'Khối lượng lô tại thời điểm tạo lệnh',
+  `don_vi_tinh` varchar(30) NOT NULL,
+  `thoi_gian_xuat` datetime NOT NULL COMMENT 'Thời gian xuất hàng (dự kiến, đơn vị vận chuyển có thể cập nhật khi lấy hàng)',
+  `ten_tai_xe` varchar(150) DEFAULT NULL COMMENT 'Đơn vị vận chuyển điền khi phân công',
+  `bien_so_xe` varchar(30) DEFAULT NULL,
+  `ghi_chu` varchar(500) DEFAULT NULL,
+  `trang_thai` enum('CHO_CHAP_NHAN','CHO_LAY_HANG','DANG_VAN_CHUYEN','CHO_TIEP_NHAN','HOAN_THANH','TU_CHOI','DA_HUY') NOT NULL DEFAULT 'CHO_CHAP_NHAN',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -219,6 +244,7 @@ INSERT INTO `lo_nong_san` (`ma_lo_nong_san`, `ma_mua_vu`, `ma_san_pham`, `ma_ngu
 ('LH-8821', 'MV002', 'SP002', 'ND001', '2026-09-28', 3500.000, 'kg', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
 ('LH-8824', 'MV002', 'SP002', 'ND001', '2026-10-01', 5000.000, 'kg', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
 ('LH-8825', 'MV001', 'SP001', 'ND001', '2026-10-05', 8.500, 'Tấn', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
+('LO001', 'MV004', 'SP003', 'ND001', '2027-02-11', 1000.000, 'kg', 'CREATED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-11 19:12:20', '2026-10-11 19:12:20'),
 ('LOXOAI001', 'MV001', 'SP001', 'ADMIN001', '2026-09-26', 10.000, 'Tấn', 'CREATED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-09-27 05:57:38', '2026-09-27 05:57:38');
 
 -- --------------------------------------------------------
@@ -249,7 +275,8 @@ CREATE TABLE `mua_vu` (
 INSERT INTO `mua_vu` (`ma_mua_vu`, `ma_nong_trai`, `ma_thua_dat`, `loai_cay_trong`, `giong_cay`, `thua_dat`, `ngay_gieo_trong`, `ngay_thu_hoach_du_kien`, `anh_mua_vu`, `trang_thai`, `created_at`, `updated_at`) VALUES
 ('MV001', 'NT001', NULL, 'Xoài Cát Chu', NULL, NULL, '2026-08-27', NULL, NULL, 1, '2026-09-27 05:40:08', '2026-09-27 05:40:08'),
 ('MV002', 'NT001', 'TD002', 'Quýt Đường', 'Quýt Đường', NULL, '2025-06-18', '2026-11-30', NULL, 1, '2026-10-07 09:55:12', '2026-10-07 09:55:12'),
-('MV003', 'NT002', 'TD003', 'Quýt Đường', NULL, NULL, '2026-10-07', NULL, NULL, 1, '2026-10-07 11:35:01', '2026-10-07 11:35:01');
+('MV003', 'NT002', 'TD003', 'Quýt Đường', NULL, NULL, '2026-10-07', NULL, NULL, 1, '2026-10-07 11:35:01', '2026-10-07 11:35:01'),
+('MV004', 'NT002', NULL, 'Lúa vụ đông xuân 2026', 'Lúa ST25', NULL, '2026-10-11', '2027-02-11', '/uploads/seasons/1791720596116-937843900.png', 1, '2026-10-11 19:09:56', '2026-10-11 19:09:56');
 
 -- --------------------------------------------------------
 
@@ -272,7 +299,8 @@ CREATE TABLE `mua_vu_vat_tu` (
 
 INSERT INTO `mua_vu_vat_tu` (`ma_su_dung`, `ma_mua_vu`, `ma_vat_tu`, `lieu_luong`, `ngay_su_dung`, `created_at`) VALUES
 (1, 'MV002', 'PB001', 50.000, '2025-07-01', '2026-10-07 09:55:12'),
-(2, 'MV002', 'TB001', 1.500, '2025-08-01', '2026-10-07 09:55:12');
+(2, 'MV002', 'TB001', 1.500, '2025-08-01', '2026-10-07 09:55:12'),
+(3, 'MV004', 'PB005', 5.000, '2026-10-13', '2026-10-11 19:11:11');
 
 -- --------------------------------------------------------
 
@@ -287,6 +315,9 @@ CREATE TABLE `nguoi_dung` (
   `mat_khau` varchar(255) DEFAULT NULL,
   `vai_tro` enum('ADMIN','FARMER_COOP','PROCESSOR','TRANSPORTER','DISTRIBUTOR','CONSUMER','CERT_AUTHORITY') NOT NULL,
   `so_dien_thoai` varchar(20) DEFAULT NULL,
+  `email` varchar(150) DEFAULT NULL,
+  `dia_chi` varchar(255) DEFAULT NULL,
+  `anh_dai_dien` varchar(500) DEFAULT NULL,
   `trang_thai` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -296,12 +327,52 @@ CREATE TABLE `nguoi_dung` (
 -- Đang đổ dữ liệu cho bảng `nguoi_dung`
 --
 
-INSERT INTO `nguoi_dung` (`ma_nguoi_dung`, `ho_ten`, `ten_dang_nhap`, `mat_khau`, `vai_tro`, `so_dien_thoai`, `trang_thai`, `created_at`, `updated_at`) VALUES
-('ADMIN001', 'Quản trị viên', 'admin', '$2b$12$JiobVJRGTmb.9Dhw1yYd0.RyTU3vtSHkml1A/NzmJRX/qCt0zXwIG', 'ADMIN', '0900000000', 1, '2026-09-27 05:29:46', '2026-10-03 11:44:35'),
-('CQKD001', 'Trung Tâm Giám Định Nông Nghiệp Vùng 2', 'kiemdinhvung2', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'CERT_AUTHORITY', '02923888999', 1, '2026-10-07 23:28:13', '2026-10-07 23:53:35'),
-('ND001', 'Nguyễn Hoàng', 'nongdan01', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'FARMER_COOP', '0901234567', 1, '2026-09-27 05:29:24', '2026-10-03 12:35:19'),
-('SC001', 'Khu Sơ Chế Chế Biến Mekong', 'sochemekong', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'PROCESSOR', '0977777777', 1, '2026-10-08 19:38:08', '2026-10-08 19:38:08'),
-('VC001', 'Mekong Cold Logistics', 'vanchuyen01', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'TRANSPORTER', '0944444444', 1, '2026-10-08 19:38:08', '2026-10-08 19:38:08');
+INSERT INTO `nguoi_dung` (`ma_nguoi_dung`, `ho_ten`, `ten_dang_nhap`, `mat_khau`, `vai_tro`, `so_dien_thoai`, `email`, `dia_chi`, `anh_dai_dien`, `trang_thai`, `created_at`, `updated_at`) VALUES
+('ADMIN001', 'Quản trị viên', 'admin', '$2b$12$JiobVJRGTmb.9Dhw1yYd0.RyTU3vtSHkml1A/NzmJRX/qCt0zXwIG', 'ADMIN', '0900000000', NULL, NULL, NULL, 1, '2026-09-27 05:29:46', '2026-10-03 11:44:35'),
+('CQKD001', 'Trung Tâm Giám Định Nông Nghiệp Vùng 2', 'kiemdinhvung2', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'CERT_AUTHORITY', '02923888999', NULL, NULL, NULL, 1, '2026-10-07 23:28:13', '2026-10-07 23:53:35'),
+('ND001', 'Nguyễn Hoàng', 'nongdan01', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'FARMER_COOP', '0901234567', NULL, 'cần thơ', NULL, 1, '2026-09-27 05:29:24', '2026-10-11 13:23:52'),
+('SC001', 'Khu Sơ Chế Chế Biến Mekong', 'sochemekong', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'PROCESSOR', '0977777777', NULL, NULL, NULL, 1, '2026-10-08 19:38:08', '2026-10-08 19:38:08'),
+('VC001', 'Mekong Cold Logistics', 'vanchuyen01', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'TRANSPORTER', '0944444444', NULL, NULL, NULL, 1, '2026-10-08 19:38:08', '2026-10-08 19:38:08');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `nguong_kiem_dinh_chuan`
+--
+
+CREATE TABLE `nguong_kiem_dinh_chuan` (
+  `ma_nguong` bigint(20) UNSIGNED NOT NULL,
+  `ma_chi_so` varchar(50) NOT NULL COMMENT 'Mã định danh khớp với ma_chi_so cố định (DU_LUONG_BVTV, KIM_LOAI_NANG,...)',
+  `ten_chi_tiet_chat` varchar(150) NOT NULL COMMENT 'Tên hoạt chất cụ thể (vd: Chì (Pb), Cadimi (Cd), E.coli)',
+  `phuong_phap_thu` varchar(100) DEFAULT NULL COMMENT 'Tiêu chuẩn test (vd: TCVN 10780:2015, AOAC 2015.01)',
+  `tieu_chuan_ap_dung` enum('TAT_CA','VIETGAP','GLOBALGAP','ORGANIC') NOT NULL DEFAULT 'TAT_CA',
+  `ma_san_pham` varchar(50) DEFAULT NULL COMMENT 'NULL nếu áp dụng chung cho mọi nông sản, hoặc gắn mã SP cụ thể',
+  `toan_tu_so_sanh` enum('<=','<','>=','>','AM_TINH','BANG') NOT NULL DEFAULT '<=',
+  `nguong_toi_da` decimal(12,4) DEFAULT NULL COMMENT 'Giá trị số để so sánh tự động (NULL nếu là kiểm tra âm tính/cảm quan)',
+  `don_vi_tinh` varchar(30) NOT NULL COMMENT 'Đơn vị đo (mg/kg, CFU/g, Brix,...)',
+  `mo_ta_nguong` varchar(100) NOT NULL COMMENT 'Chuỗi hiển thị (vd: <= 0.01 mg/kg, Âm tính, >= 10 Brix)',
+  `trang_thai` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `nguong_kiem_dinh_chuan`
+--
+
+INSERT INTO `nguong_kiem_dinh_chuan` (`ma_nguong`, `ma_chi_so`, `ten_chi_tiet_chat`, `phuong_phap_thu`, `tieu_chuan_ap_dung`, `ma_san_pham`, `toan_tu_so_sanh`, `nguong_toi_da`, `don_vi_tinh`, `mo_ta_nguong`, `trang_thai`, `created_at`, `updated_at`) VALUES
+(1, 'DU_LUONG_BVTV', 'Dư lượng hoạt chất BVTV cấm', 'TCVN 10780:2015', 'VIETGAP', NULL, 'AM_TINH', 0.0100, 'mg/kg', 'Không phát hiện (< 0.01 mg/kg)', 1, '2026-10-12 16:45:10', '2026-10-12 16:45:10'),
+(2, 'KIM_LOAI_NANG', 'Chì (Pb)', 'AOAC 2015.01', 'VIETGAP', NULL, '<=', 0.1000, 'mg/kg', '<= 0.1 mg/kg', 1, '2026-10-12 16:45:10', '2026-10-12 16:45:10'),
+(3, 'KIM_LOAI_NANG', 'Cadimi (Cd)', 'AOAC 2015.01', 'VIETGAP', NULL, '<=', 0.0500, 'mg/kg', '<= 0.05 mg/kg', 1, '2026-10-12 16:45:10', '2026-10-12 16:45:10'),
+(4, 'VI_SINH', 'Vi khuẩn E.coli', 'ISO 16649-2', 'VIETGAP', NULL, '<=', 10.0000, 'CFU/g', '<= 10 CFU/g', 1, '2026-10-12 16:45:10', '2026-10-12 16:45:10'),
+(5, 'VI_SINH', 'Salmonella', 'ISO 6579-1', 'VIETGAP', NULL, 'AM_TINH', 0.0000, 'CFU/25g', 'Âm tính / 25g', 1, '2026-10-12 16:45:10', '2026-10-12 16:45:10'),
+(6, 'NITRATE', 'Hàm lượng Nitrate (NO3-)', 'TCVN 5247:1990', 'VIETGAP', NULL, '<=', 150.0000, 'mg/kg', '<= 150 mg/kg', 1, '2026-10-12 16:45:10', '2026-10-12 16:45:10'),
+(7, 'DU_LUONG_BVTV', 'Dư lượng hoạt chất BVTV cấm', 'TCVN 10780:2015', 'TAT_CA', NULL, 'AM_TINH', 0.0100, 'mg/kg', 'Không phát hiện (< 0.01 mg/kg)', 1, '2026-10-13 00:35:07', '2026-10-13 00:35:07'),
+(8, 'KIM_LOAI_NANG', 'Chì (Pb)', 'AOAC 2015.01', 'TAT_CA', NULL, '<=', 0.1000, 'mg/kg', '<= 0.1 mg/kg', 1, '2026-10-13 00:35:07', '2026-10-13 00:35:07'),
+(9, 'KIM_LOAI_NANG', 'Cadimi (Cd)', 'AOAC 2015.01', 'TAT_CA', NULL, '<=', 0.0500, 'mg/kg', '<= 0.05 mg/kg', 1, '2026-10-13 00:35:07', '2026-10-13 00:35:07'),
+(10, 'VI_SINH', 'Vi khuẩn E.coli', 'ISO 16649-2', 'TAT_CA', NULL, '<=', 10.0000, 'CFU/g', '<= 10 CFU/g', 1, '2026-10-13 00:35:07', '2026-10-13 00:35:07'),
+(11, 'VI_SINH', 'Salmonella', 'ISO 6579-1', 'TAT_CA', NULL, 'AM_TINH', 0.0000, 'CFU/25g', 'Âm tính / 25g', 1, '2026-10-13 00:35:07', '2026-10-13 00:35:07'),
+(12, 'NITRATE', 'Hàm lượng Nitrate (NO3-)', 'TCVN 5247:1990', 'TAT_CA', NULL, '<=', 150.0000, 'mg/kg', '<= 150 mg/kg', 1, '2026-10-13 00:35:07', '2026-10-13 00:35:07');
 
 -- --------------------------------------------------------
 
@@ -368,7 +439,8 @@ CREATE TABLE `san_pham_nong_san` (
 
 INSERT INTO `san_pham_nong_san` (`ma_san_pham`, `ten_san_pham`, `loai_san_pham`, `mo_ta_san_pham`, `don_vi_tinh_mac_dinh`, `trang_thai`, `created_at`, `updated_at`) VALUES
 ('SP001', 'Xoải Cát Chu', 'Trái Cây', NULL, 'tan', 1, '2026-09-27 05:56:50', '2026-09-27 05:56:50'),
-('SP002', 'Quýt Đường', 'Trái Cây', 'Quýt đường ngọt mọng nước miền Tây', 'kg', 1, '2026-10-07 23:28:35', '2026-10-07 23:28:35');
+('SP002', 'Quýt Đường', 'Trái Cây', 'Quýt đường ngọt mọng nước miền Tây', 'kg', 1, '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
+('SP003', 'Lúa vụ đông xuân 2026', 'Nông sản', NULL, 'kg', 1, '2026-10-11 19:12:20', '2026-10-11 19:12:20');
 
 -- --------------------------------------------------------
 
@@ -409,6 +481,30 @@ CREATE TABLE `vi_blockchain` (
   `trang_thai` tinyint(1) NOT NULL DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `yeu_cau_cap_tai_khoan`
+--
+
+CREATE TABLE `yeu_cau_cap_tai_khoan` (
+  `ma_yeu_cau` bigint(20) UNSIGNED NOT NULL,
+  `vai_tro_yeu_cau` enum('FARMER_COOP','PROCESSOR','TRANSPORTER','DISTRIBUTOR','CERT_AUTHORITY') NOT NULL,
+  `ho_ten` varchar(150) NOT NULL,
+  `so_dien_thoai` varchar(20) NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `ten_co_so` varchar(150) NOT NULL,
+  `dia_chi` varchar(255) NOT NULL,
+  `thong_tin_bo_sung` text NOT NULL,
+  `trang_thai_duyet` enum('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
+  `ma_nguoi_dung_tao` varchar(50) DEFAULT NULL,
+  `ly_do_tu_choi` text DEFAULT NULL,
+  `ma_nguoi_duyet` varchar(50) DEFAULT NULL,
+  `ngay_duyet` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 --
 -- Chỉ mục cho các bảng đã đổ
 --
@@ -446,6 +542,16 @@ ALTER TABLE `kiem_dinh_lo_hang`
   ADD KEY `idx_kd_lo` (`ma_lo_nong_san`),
   ADD KEY `idx_kd_co_quan` (`ma_co_quan`),
   ADD KEY `idx_kd_trang_thai` (`trang_thai_ho_so`);
+
+--
+-- Chỉ mục cho bảng `lenh_van_chuyen`
+--
+ALTER TABLE `lenh_van_chuyen`
+  ADD PRIMARY KEY (`ma_van_don`),
+  ADD KEY `idx_lvc_lo` (`ma_lo_nong_san`,`trang_thai`),
+  ADD KEY `idx_lvc_nguoi_gui` (`ma_nguoi_gui`,`trang_thai`),
+  ADD KEY `idx_lvc_don_vi` (`ma_don_vi_van_chuyen`,`trang_thai`),
+  ADD KEY `idx_lvc_ben_nhan` (`ma_ben_nhan`,`trang_thai`);
 
 --
 -- Chỉ mục cho bảng `lich_su_truy_xuat_lo`
@@ -503,6 +609,15 @@ ALTER TABLE `nguoi_dung`
   ADD UNIQUE KEY `uq_ten_dang_nhap` (`ten_dang_nhap`);
 
 --
+-- Chỉ mục cho bảng `nguong_kiem_dinh_chuan`
+--
+ALTER TABLE `nguong_kiem_dinh_chuan`
+  ADD PRIMARY KEY (`ma_nguong`),
+  ADD KEY `idx_nguong_ma_chi_so` (`ma_chi_so`),
+  ADD KEY `idx_nguong_tieu_chuan` (`tieu_chuan_ap_dung`),
+  ADD KEY `fk_nguong_san_pham` (`ma_san_pham`);
+
+--
 -- Chỉ mục cho bảng `nong_trai`
 --
 ALTER TABLE `nong_trai`
@@ -539,6 +654,15 @@ ALTER TABLE `vi_blockchain`
   ADD UNIQUE KEY `uq_vi_blockchain_nguoi_dung` (`ma_nguoi_dung`);
 
 --
+-- Chỉ mục cho bảng `yeu_cau_cap_tai_khoan`
+--
+ALTER TABLE `yeu_cau_cap_tai_khoan`
+  ADD PRIMARY KEY (`ma_yeu_cau`),
+  ADD KEY `idx_yeu_cau_trang_thai` (`trang_thai_duyet`),
+  ADD KEY `fk_yeu_cau_nguoi_duyet` (`ma_nguoi_duyet`),
+  ADD KEY `fk_yeu_cau_nguoi_dung_tao` (`ma_nguoi_dung_tao`);
+
+--
 -- AUTO_INCREMENT cho các bảng đã đổ
 --
 
@@ -552,19 +676,31 @@ ALTER TABLE `blockchain_outbox`
 -- AUTO_INCREMENT cho bảng `chi_so_kiem_dinh`
 --
 ALTER TABLE `chi_so_kiem_dinh`
-  MODIFY `ma_chi_so_kd` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `ma_chi_so_kd` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=122;
 
 --
 -- AUTO_INCREMENT cho bảng `mua_vu_vat_tu`
 --
 ALTER TABLE `mua_vu_vat_tu`
-  MODIFY `ma_su_dung` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `ma_su_dung` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT cho bảng `nguong_kiem_dinh_chuan`
+--
+ALTER TABLE `nguong_kiem_dinh_chuan`
+  MODIFY `ma_nguong` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT cho bảng `quyen_thao_tac_lo`
 --
 ALTER TABLE `quyen_thao_tac_lo`
   MODIFY `ma_quyen` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT cho bảng `yeu_cau_cap_tai_khoan`
+--
+ALTER TABLE `yeu_cau_cap_tai_khoan`
+  MODIFY `ma_yeu_cau` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT;
 
 --
 -- Các ràng buộc cho các bảng đã đổ
@@ -588,6 +724,15 @@ ALTER TABLE `chi_so_kiem_dinh`
 ALTER TABLE `kiem_dinh_lo_hang`
   ADD CONSTRAINT `fk_kd_co_quan` FOREIGN KEY (`ma_co_quan`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_kd_lo_nong_san` FOREIGN KEY (`ma_lo_nong_san`) REFERENCES `lo_nong_san` (`ma_lo_nong_san`) ON UPDATE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `lenh_van_chuyen`
+--
+ALTER TABLE `lenh_van_chuyen`
+  ADD CONSTRAINT `fk_lvc_ben_nhan` FOREIGN KEY (`ma_ben_nhan`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_lvc_don_vi` FOREIGN KEY (`ma_don_vi_van_chuyen`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_lvc_lo` FOREIGN KEY (`ma_lo_nong_san`) REFERENCES `lo_nong_san` (`ma_lo_nong_san`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_lvc_nguoi_gui` FOREIGN KEY (`ma_nguoi_gui`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON UPDATE CASCADE;
 
 --
 -- Các ràng buộc cho bảng `lich_su_truy_xuat_lo`
@@ -626,6 +771,12 @@ ALTER TABLE `mua_vu_vat_tu`
   ADD CONSTRAINT `fk_mua_vu_vat_tu_vat_tu` FOREIGN KEY (`ma_vat_tu`) REFERENCES `danh_muc_vat_tu` (`ma_vat_tu`) ON UPDATE CASCADE;
 
 --
+-- Các ràng buộc cho bảng `nguong_kiem_dinh_chuan`
+--
+ALTER TABLE `nguong_kiem_dinh_chuan`
+  ADD CONSTRAINT `fk_nguong_san_pham` FOREIGN KEY (`ma_san_pham`) REFERENCES `san_pham_nong_san` (`ma_san_pham`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+--
 -- Các ràng buộc cho bảng `nong_trai`
 --
 ALTER TABLE `nong_trai`
@@ -649,6 +800,13 @@ ALTER TABLE `thua_dat`
 --
 ALTER TABLE `vi_blockchain`
   ADD CONSTRAINT `fk_vi_blockchain_nguoi_dung` FOREIGN KEY (`ma_nguoi_dung`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON UPDATE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `yeu_cau_cap_tai_khoan`
+--
+ALTER TABLE `yeu_cau_cap_tai_khoan`
+  ADD CONSTRAINT `fk_yeu_cau_nguoi_dung_tao` FOREIGN KEY (`ma_nguoi_dung_tao`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON DELETE SET NULL ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_yeu_cau_nguoi_duyet` FOREIGN KEY (`ma_nguoi_duyet`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON DELETE SET NULL ON UPDATE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -160,17 +160,21 @@ const getSamplingScheduleList = async (req, res) => {
       params.push(ma_co_quan);
     }
 
-    sql += ` ORDER BY kd.ngay_hen_lay_mau ASC, kd.gio_hen_lay_mau ASC`;
+    sql += ` ORDER BY kd.ngay_hen_lay_mau DESC, kd.gio_hen_lay_mau DESC`;
     const [rows] = await db.query(sql, params);
 
     // Lấy thêm danh sách chỉ số kiểm định của các hồ sơ này
     if (rows.length > 0) {
       const maKiemDinhList = rows.map((r) => r.ma_kiem_dinh);
       const [chiSoRows] = await db.query(
-        `SELECT cs.*, nq.toan_tu_so_sanh, nq.nguong_toi_da, nq.mo_ta_nguong
+        `SELECT cs.ma_chi_so_kd, cs.ma_kiem_dinh, cs.loai_chi_so, cs.ma_chi_so,
+                cs.ten_chi_so, cs.gia_tri, cs.thu_tu, cs.updated_at,
+                nq.toan_tu_so_sanh, nq.nguong_toi_da, nq.mo_ta_nguong
          FROM chi_so_kiem_dinh cs
-         LEFT JOIN nguong_kiem_dinh_chuan nq ON (cs.ma_chi_so = nq.ma_chi_so OR cs.ten_chi_so = nq.ten_chi_tiet_chat)
-         WHERE cs.ma_kiem_dinh IN (?)`,
+         LEFT JOIN nguong_kiem_dinh_chuan nq
+           ON cs.ma_chi_so = nq.ma_chi_so AND cs.ten_chi_so = nq.ten_chi_tiet_chat
+         WHERE cs.ma_kiem_dinh IN (?)
+         GROUP BY cs.ma_chi_so_kd`,
         [maKiemDinhList],
       );
 
@@ -233,7 +237,7 @@ const getNguongKiemDinh = async (req, res) => {
     const { code, tieu_chuan, ma_san_pham } = req.query;
 
     let sql = `
-      SELECT ma_nguong, ma_chi_so, ten_chi_tiet_chat, phuong_phap_thu, 
+      SELECT ma_nguong, ma_chi_so, ten_chi_tiet_chat, phuong_phap_thu,
              tieu_chuan_ap_dung, toan_tu_so_sanh, nguong_toi_da, don_vi_tinh, mo_ta_nguong
       FROM nguong_kiem_dinh_chuan
       WHERE trang_thai = 1
@@ -250,8 +254,19 @@ const getNguongKiemDinh = async (req, res) => {
       params.push(ma_san_pham);
     }
 
-    sql += ` ORDER BY ma_nguong ASC`;
-    const [nguongList] = await db.query(sql, params);
+    // Ưu tiên hàng có tieu_chuan cụ thể hơn TAT_CA, sau đó GROUP BY ten_chi_tiet_chat
+    // để mỗi chất chỉ xuất hiện đúng 1 lần trong popup nhập chỉ số
+    sql += ` ORDER BY CASE WHEN tieu_chuan_ap_dung = 'TAT_CA' THEN 1 ELSE 0 END ASC, ma_nguong ASC`;
+    const [rawList] = await db.query(sql, params);
+
+    // Deduplicate: mỗi ten_chi_tiet_chat chỉ giữ lại 1 hàng (ưu tiên tieu_chuan cụ thể)
+    const seen = new Set();
+    const nguongList = rawList.filter((row) => {
+      const key = row.ten_chi_tiet_chat;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     // Nếu có mã kiểm định, lấy kèm các chỉ số đã lưu trước đó
     let savedIndicators = [];
