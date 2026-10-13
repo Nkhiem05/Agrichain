@@ -20,6 +20,8 @@ const adminLoHangRoutes = require("./routes/routes_admin/lohangRoutes");
 const adminKiemDinhThuHoiRoutes = require("./routes/routes_admin/kiemdinhthuhoiRoutes");
 const adminVanChuyenRoutes = require("./routes/routes_admin/vanchuyenAdminRoutes");
 const trangcanhanRoutes = require("./routes/trangcanhanRoutes");
+const sochedonggoiRoutes = require("./routes/sochedonggoiRoutes");
+const donvivanchuyenRoutes = require("./routes/donvivanchuyenRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -51,7 +53,7 @@ app.use("/api/mua-vu", muavuRoutes);
 app.use("/api/lo-thu-hoach", lothuhoachRoutes);
 
 // Chi tiết nông trại
-app.use("/api/nong-trai", nongtraiRoutes);
+app.use("api/nong-trai", nongtraiRoutes);
 
 // Vận chuyển & bàn giao
 app.use("/api/van-chuyen", vanchuyenRoutes);
@@ -67,6 +69,12 @@ app.use("/api/admin/van-chuyen", adminVanChuyenRoutes);
 
 // Trang cá nhân (hồ sơ của tài khoản đang đăng nhập)
 app.use("/api/trang-ca-nhan", trangcanhanRoutes);
+
+// Cơ sở sơ chế / đóng gói
+app.use("/api/so-che", sochedonggoiRoutes);
+
+// Đơn vị vận chuyển (thao tác trên lệnh vận chuyển được chỉ định)
+app.use("/api/don-vi-van-chuyen", donvivanchuyenRoutes);
 
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);

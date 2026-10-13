@@ -7,7 +7,7 @@ import DangNhap from "./view/page/dangnhap";
 import Dangky from "./view/page/dangky";
 
 //nông dân
-import Nongdan from "./view/page/nongdan/nongdan";
+import Nongdan from "../view/page/nongdan/nongdan";
 import Chitietnongtrai from "./view/page/nongdan/chitietnongtrai";
 import Chitietmuavu from "./view/page/nongdan/chitietmuavu";
 
@@ -57,7 +57,7 @@ const AppRoutes = () => {
 
       {/*Sơ chế*/}
       <Route path="/so-che" element={<Soche />} />
-      <Route path="/chi-tiet-so-che" element={<Chitietsoche />} />
+      <Route path="/chi-tiet-so-che/:maSoChe" element={<Chitietsoche />} />
 
       {/*User */}
       <Route path="/user" element={<User />} />

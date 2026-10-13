@@ -79,7 +79,7 @@ const LoginPage = () => {
           break;
 
         case "PROCESSOR":
-          alert("Đăng nhập cơ sở sơ chế thành công");
+          navigate("/so-che");
           break;
 
         case "DISTRIBUTOR":

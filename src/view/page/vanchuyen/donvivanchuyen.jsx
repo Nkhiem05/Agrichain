@@ -1,271 +1,188 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Truck,
   PackageCheck,
   MapPin,
   ClipboardCheck,
-  Search,
   Plus,
   Navigation,
   CheckCircle,
   PackageSearch,
   ArrowUpRight,
-  QrCode,
-  PlusCircle,
   Check,
   X,
   FileSpreadsheet,
   Download,
   Clock,
-  ArrowLeft,
   CheckCircle2,
   Eye,
+  XCircle,
+  AlertCircle,
 } from "lucide-react";
 import "../../css/donvivanchuyen.css";
+import {
+  fetchMyTrips,
+  acceptTrip,
+  rejectTrip,
+  confirmPickup,
+  confirmArrival,
+} from "../../../api/donvivanchuyenApi";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
+const STATUS_LABEL = {
+  CHO_CHAP_NHAN: { text: "Chờ chấp nhận", tone: "purple", icon: Clock },
+  CHO_LAY_HANG: { text: "Chờ lấy hàng", tone: "amber", icon: PackageSearch },
+  DANG_VAN_CHUYEN: { text: "Đang vận chuyển", tone: "blue", icon: Navigation },
+  CHO_TIEP_NHAN: { text: "Đã đến nơi - Chờ bên nhận xác nhận", tone: "emerald", icon: ClipboardCheck },
+  HOAN_THANH: { text: "Đã hoàn thành", tone: "success", icon: CheckCircle2 },
+  TU_CHOI: { text: "Đã từ chối", tone: "danger", icon: XCircle },
+  DA_HUY: { text: "Đã hủy", tone: "danger", icon: XCircle },
+};
+
+const formatWeight = (value, unit) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return `- ${unit || ""}`;
+  return `${num.toLocaleString("vi-VN")} ${unit || ""}`;
+};
+
+const tripRoute = (t) =>
+  `${t.ten_nguoi_gui || "—"} ➔ ${t.ten_ben_nhan || t.dia_chi_giao_hang || "—"}`;
+
 export default function AgriChainLogistics() {
   const navigate = useNavigate();
+  const [user, setUser] = useState(null);
   const [currentTab, setCurrentTab] = useState("shipping");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [user, setUser] = useState(null);
+
+  const [trips, setTrips] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [acceptModalTrip, setAcceptModalTrip] = useState(null);
+  const [acceptForm, setAcceptForm] = useState({ ten_tai_xe: "", bien_so_xe: "" });
+
+  const [rejectModalTrip, setRejectModalTrip] = useState(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const [pickupModalTrip, setPickupModalTrip] = useState(null);
+  const [pickupWeight, setPickupWeight] = useState("");
+
+  const [detailTrip, setDetailTrip] = useState(null);
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (err) {
-        console.error("Không đọc được user:", err);
-      }
+    if (!savedUser) {
+      navigate("/");
+      return;
+    }
+    try {
+      setUser(JSON.parse(savedUser));
+    } catch {
+      localStorage.removeItem("user");
+      navigate("/");
+    }
+  }, [navigate]);
+
+  const loadTrips = useCallback(async () => {
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const res = await fetchMyTrips();
+      setTrips(res?.data || []);
+    } catch (err) {
+      setErrorMsg(err.message || "Không thể tải danh sách chuyến vận chuyển");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
-  // Quản lý chuyến xe đang chọn để xem/ghi nhật ký hành trình inline
-  const [selectedJourneyTrip, setSelectedJourneyTrip] = useState(null);
+  useEffect(() => {
+    if (user) loadTrips();
+  }, [user, loadTrips]);
 
-  // Dữ liệu danh sách chuyến xe
-  const [trips, setTrips] = useState([
-    {
-      id: "VC-2026-8800",
-      title: "Chuyển Giao Nông Sản: Xoài Cát Hòa Lộc",
-      batchName: "Xoài Cát Hòa Lộc Tiêu Chuẩn GlobalGAP",
-      batchCode: "XCHL-2026-09",
-      driver: "Chưa phân công",
-      plate: "Chưa điều xe",
-      route: "Hợp Tác Xã Xoài Mỹ Xương (Đồng Tháp) ➔ Cảng Cát Lái (TP.HCM)",
-      weight: "2,000 kg (200 thùng)",
-      temp: "Chuẩn lạnh 8-10°C",
-      location: "Chờ đơn vị vận tải xác nhận tiếp nhận đơn",
-      status: "pending_accept",
-      statusText: "Trạng thái: Chờ xác nhận tiếp nhận đơn vận chuyển",
-      recipient: "Cảng Cát Lái - Kho CFS",
-      sealCode: "SEAL-WAIT-00",
-      notes: "Hàng chờ xe tiếp nhận",
-    },
-    {
-      id: "VC-2026-8801",
-      title: "Chuyến Vận Chuyển: Quýt Đường Xuất Khẩu",
-      batchName: "Quýt Đường Đóng Thùng Xuất Khẩu",
-      batchCode: "SC-2026-001",
-      driver: "Nguyễn Văn Hùng",
-      plate: "65C-128.45",
-      route: "HTX Sơ Chế Trà Vinh ➔ Trung Tâm Phân Phối Bách Hóa Xanh (TP.HCM)",
-      weight: "1,200 kg (120 thùng)",
-      temp: "6.2°C",
-      location:
-        "Trạm dừng chân Cao tốc Trung Lương - Mỹ Tho (Cách điểm giao 45km - Dự kiến đến: 17:30)",
-      status: "in_transit",
-      statusText: "Trạng thái: Đang vận chuyển trên đường",
-      recipient: "Kho Phân Phối Bách Hóa Xanh Bình Tân",
-      sealCode: "SEAL-LOG-119",
-      notes: "Nhiệt độ ổn định, kiểm tra định kỳ mỗi 2 tiếng",
-    },
-    {
-      id: "VC-2026-8802",
-      title: "Chuyển Giao Nông Sản: Cam Sành VietGAP",
-      batchName: "Cam Sành VietGAP Trà Ôn",
-      batchCode: "LH-8824",
-      driver: "Chưa phân công",
-      plate: "Đang điều xe",
-      route: "Vườn Cam A1 (#FARM-01111) ➔ Khu Sơ Chế Chế Biến Mekong",
-      weight: "1,500 kg",
-      temp: "Môi trường",
-      location: "Tại điểm bốc hàng",
-      status: "pending_pickup",
-      statusText: "Trạng thái: Xe đã đến điểm lấy hàng - Chờ xác nhận bốc xếp",
-      recipient: "Khu Sơ Chế Chế Biến Mekong",
-      sealCode: "SEAL-TRUCK-9901",
-      notes: "Hàng vừa thu hoạch trong ngày",
-    },
-    {
-      id: "VC-2026-8803",
-      title: "Chuyển Giao: Bưởi Da Xanh Bến Tre",
-      batchName: "Bưởi Da Xanh Loại 1",
-      batchCode: "BDX-2026-44",
-      driver: "Lê Thành Đạt",
-      plate: "65C-234.12",
-      route: "Vựa Bưởi Mỏ Cày Bắc ➔ Tổng Kho Mega Market Bình Phú",
-      weight: "1,800 kg (150 thùng)",
-      temp: "12.0°C",
-      location: "Đã cập bến điểm đích - Chờ xác nhận ký nhận bàn giao",
-      status: "pending_delivery",
-      statusText: "Trạng thái: Đã đến điểm đích - Chờ xác nhận bàn giao",
-      recipient: "Tổng Kho Mega Market Bình Phú (Quản lý kho: Phan Thành)",
-      sealCode: "SEAL-TRUCK-8842",
-      notes: "Đã kiểm tra sơ bộ ngoại quan, nguyên đai nguyên kiện",
-    },
-  ]);
+  // ==================== CHẤP NHẬN / TỪ CHỐI ====================
 
-  // Quản lý trạng thái mở/đóng Modal
-  const [modalState, setModalState] = useState({
-    createTrip: false,
-    pickupAction: false,
-    journeyLog: false,
-    deliveryConfirm: false,
-    deliveryDetail: false,
-  });
-
-  // State chuyến xe đang xem chi tiết giao nhận
-  const [detailTrip, setDetailTrip] = useState(null);
-
-  // State Form Khởi tạo chuyến
-  const [newTripForm, setNewTripForm] = useState({
-    batch: "Lô #SC-2026-002 - Cam Sành Đóng Thùng (800 kg)",
-    plate: "65C-128.45 (Xe Lạnh 2.5T)",
-    driver: "Nguyễn Văn Hùng",
-    from: "HTX Sơ Chế Mekong",
-    to: "Kho Siêu Thị Co.opMart Cần Thơ",
-  });
-
-  // State Form Pickup
-  const [pickupForm, setPickupForm] = useState({
-    tripCode: "#VC-2026-8802",
-    batchName: "Cam Sành VietGAP Trà Ôn",
-    batchCode: "#LH-8824",
-    weight: "1500",
-    sealCode: "SEAL-TRUCK-9901",
-    temp: "5.8",
-  });
-
-  // State Form Journey
-  const [journeyForm, setJourneyForm] = useState({
-    location: "",
-    temp: "6.0",
-    humidity: "85%",
-    note: "Hàng hóa cố định tốt, không rung lắc mạnh, nhiệt độ bảo quản chuẩn.",
-  });
-
-  // State Form Delivery
-  const [deliveryForm, setDeliveryForm] = useState({
-    tripCode: "#VC-2026-8801",
-    recipient: "",
-    checkResult: "Đầy đủ số lượng - Không dập hỏng - Đạt chuẩn nghiệm thu",
-    signatureOtp: "OTP-CONFIRM-8219",
-  });
-
-  const openModal = (name) =>
-    setModalState((prev) => ({ ...prev, [name]: true }));
-  const closeModal = (name) =>
-    setModalState((prev) => ({ ...prev, [name]: false }));
-
-  // Mở modal xem chi tiết đơn giao hàng
-  const handleOpenDetail = (trip) => {
-    setDetailTrip(trip);
-    openModal("deliveryDetail");
+  const handleOpenAccept = (trip) => {
+    setAcceptModalTrip(trip);
+    setAcceptForm({ ten_tai_xe: trip.ten_tai_xe || "", bien_so_xe: trip.bien_so_xe || "" });
   };
 
-  // Chấp nhận đơn vận chuyển
-  const handleAcceptTrip = (tripId) => {
-    setTrips((prevTrips) =>
-      prevTrips.map((item) => {
-        if (item.id === tripId) {
-          return {
-            ...item,
-            status: "pending_pickup",
-            statusText:
-              "Trạng thái: Đã tiếp nhận - Sẵn sàng điều xe đến lấy hàng",
-            plate: "65C-128.45 (Chờ xuất bến)",
-            driver: "Nguyễn Văn Hùng (Chờ chỉ định)",
-          };
-        }
-        return item;
-      }),
-    );
-    alert(
-      `Đã chấp nhận đơn vận chuyển #${tripId}! Đơn đã được chuyển sang trạng thái chờ lấy hàng.`,
-    );
+  const handleSubmitAccept = async () => {
+    if (!acceptForm.ten_tai_xe.trim() || !acceptForm.bien_so_xe.trim()) {
+      alert("Vui lòng nhập tên tài xế và biển số xe phụ trách!");
+      return;
+    }
+    try {
+      await acceptTrip(acceptModalTrip.ma_van_don, acceptForm.ten_tai_xe.trim(), acceptForm.bien_so_xe.trim());
+      setAcceptModalTrip(null);
+      await loadTrips();
+      alert(`Đã chấp nhận chuyến ${acceptModalTrip.ma_van_don}!`);
+    } catch (err) {
+      alert(err.message || "Không thể chấp nhận chuyến");
+    }
   };
 
-  // Khởi tạo chuyến mới
-  const handleCreateTripSubmit = (e) => {
-    e.preventDefault();
-    const newId = `VC-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-    const parsedBatch = newTripForm.batch.split(" - ")[1] || "Nông sản sạch";
-    const parsedCode = (newTripForm.batch.match(/#[A-Za-z0-9-]+/) || [
-      "#SC-CUSTOM",
-    ])[0].replace("#", "");
-
-    const newTrip = {
-      id: newId,
-      title: `Chuyển Giao: ${parsedBatch}`,
-      batchName: parsedBatch,
-      batchCode: parsedCode,
-      driver: newTripForm.driver,
-      plate: newTripForm.plate,
-      route: `${newTripForm.from} ➔ ${newTripForm.to}`,
-      weight: "Theo kế hoạch",
-      temp: "Chuẩn lạnh 5-8°C",
-      location: newTripForm.from,
-      status: "pending_pickup",
-      statusText: "Trạng thái: Vừa tạo - Chờ xuất bến lấy hàng",
-      recipient: newTripForm.to,
-      sealCode: "SEAL-TRUCK-" + Math.floor(1000 + Math.random() * 9000),
-      notes: "Đơn vận chuyển mới khởi tạo",
-    };
-    setTrips([newTrip, ...trips]);
-    alert(`Đã khởi tạo chuyến vận chuyển ${newId} thành công!`);
-    closeModal("createTrip");
+  const handleOpenReject = (trip) => {
+    setRejectModalTrip(trip);
+    setRejectReason("");
   };
 
-  // Xác nhận lấy hàng
-  const handleConfirmPickup = (e) => {
-    e.preventDefault();
-    alert(
-      "Đã xác nhận lấy hàng thành công và kích hoạt thiết bị giám sát hành trình!",
-    );
-    closeModal("pickupAction");
+  const handleSubmitReject = async () => {
+    if (!rejectReason.trim()) {
+      alert("Vui lòng nhập lý do từ chối!");
+      return;
+    }
+    try {
+      await rejectTrip(rejectModalTrip.ma_van_don, rejectReason.trim());
+      setRejectModalTrip(null);
+      await loadTrips();
+    } catch (err) {
+      alert(err.message || "Không thể từ chối chuyến");
+    }
   };
 
-  // Cập nhật nhật ký hành trình
-  const handleAddJourneyPoint = (e) => {
-    e.preventDefault();
-    alert(
-      `Đã ghi nhận điểm kiểm tra GPS: ${journeyForm.location || "Trạm giám sát"} thành công!`,
-    );
-    closeModal("journeyLog");
-    setJourneyForm({
-      location: "",
-      temp: "6.0",
-      humidity: "85%",
-      note: "Hàng hóa cố định tốt, không rung lắc mạnh, nhiệt độ bảo quản chuẩn.",
-    });
+  // ==================== LẤY HÀNG ====================
+
+  const handleOpenPickup = (trip) => {
+    setPickupModalTrip(trip);
+    setPickupWeight(String(Math.round(Number(trip.khoi_luong))));
   };
 
-  // Hoàn tất bàn giao
-  const handleConfirmDelivery = (e) => {
-    e.preventDefault();
-    alert(
-      "Đã hoàn tất bàn giao hàng đến điểm đích và ký biên bản giao nhận điện tử!",
-    );
-    closeModal("deliveryConfirm");
+  const handleSubmitPickup = async () => {
+    const value = Number(pickupWeight);
+    if (!pickupWeight || !Number.isFinite(value) || value <= 0) {
+      alert("Vui lòng nhập khối lượng thực nhận hợp lệ!");
+      return;
+    }
+    try {
+      await confirmPickup(pickupModalTrip.ma_van_don, value);
+      setPickupModalTrip(null);
+      await loadTrips();
+      alert(`Đã xác nhận lấy hàng chuyến ${pickupModalTrip.ma_van_don}, xe bắt đầu vận chuyển!`);
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận lấy hàng");
+    }
   };
 
-  // Xuất dữ liệu JSON
+  // ==================== ĐẾN NƠI ====================
+
+  const handleConfirmArrival = async (trip) => {
+    if (!window.confirm(`Xác nhận xe đã đến điểm giao cho chuyến ${trip.ma_van_don}?`)) return;
+    try {
+      await confirmArrival(trip.ma_van_don);
+      await loadTrips();
+      alert("Đã xác nhận đến nơi. Chờ bên nhận xác nhận tiếp nhận.");
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận đến nơi");
+    }
+  };
+
+  // ==================== XUẤT FILE ====================
+
   const exportToJson = (data, filename = "agrichain_logistics_data.json") => {
     const jsonStr = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonStr], { type: "application/json" });
@@ -279,36 +196,18 @@ export default function AgriChainLogistics() {
     URL.revokeObjectURL(url);
   };
 
-  // Xuất dữ liệu CSV
   const exportToCsv = (dataList, filename = "chuyen_xe_logistics.csv") => {
     if (!dataList || !dataList.length) return;
     const headers = [
-      "Mã Chuyến",
-      "Tiêu Đề",
-      "Tên Lô Hàng",
-      "Mã Lô",
-      "Tài Xế",
-      "Biển Số",
-      "Lộ Trình",
-      "Khối Lượng",
-      "Nhiệt Độ",
-      "Trạng Thái",
+      "Mã Chuyến", "Mã Lô", "Sản Phẩm", "Người Gửi", "Bên Nhận", "Tài Xế", "Biển Số",
+      "Khối Lượng", "Trạng Thái",
     ];
     const rows = dataList.map((t) => [
-      t.id,
-      `"${t.title}"`,
-      `"${t.batchName}"`,
-      t.batchCode,
-      `"${t.driver}"`,
-      t.plate,
-      `"${t.route}"`,
-      `"${t.weight}"`,
-      `"${t.temp}"`,
-      `"${t.status}"`,
+      t.ma_van_don, t.ma_lo_nong_san, `"${t.ten_san_pham}"`, `"${t.ten_nguoi_gui || ""}"`,
+      `"${t.ten_ben_nhan || t.dia_chi_giao_hang || ""}"`, `"${t.ten_tai_xe || ""}"`,
+      t.bien_so_xe || "", `"${formatWeight(t.khoi_luong, t.don_vi_tinh)}"`, t.trang_thai,
     ]);
-    const csvContent =
-      "\uFEFF" +
-      [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const csvContent = "﻿" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -320,32 +219,37 @@ export default function AgriChainLogistics() {
     URL.revokeObjectURL(url);
   };
 
-  // Lọc chuyến theo từ khóa và Dropdown trạng thái
-  const filteredTrips = trips.filter((t) => {
-    const matchesSearch =
-      t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.plate.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.batchCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.batchName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.title.toLowerCase().includes(searchTerm.toLowerCase());
+  // ==================== LỌC ====================
 
-    const matchesStatus =
-      statusFilter === "all" ? true : t.status === statusFilter;
+  const filteredTrips = trips.filter((t) => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch =
+      !term ||
+      t.ma_van_don.toLowerCase().includes(term) ||
+      (t.bien_so_xe || "").toLowerCase().includes(term) ||
+      t.ma_lo_nong_san.toLowerCase().includes(term) ||
+      t.ten_san_pham.toLowerCase().includes(term);
+
+    const matchesStatus = statusFilter === "all" ? true : t.trang_thai === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
 
+  const pickupTrips = trips.filter((t) => t.trang_thai === "CHO_LAY_HANG");
+  const pickupHistory = trips.filter((t) =>
+    ["DANG_VAN_CHUYEN", "CHO_TIEP_NHAN", "HOAN_THANH"].includes(t.trang_thai),
+  );
+  const deliveryTrips = trips.filter((t) => t.trang_thai === "DANG_VAN_CHUYEN");
+  const deliveryHistory = trips.filter((t) => ["CHO_TIEP_NHAN", "HOAN_THANH"].includes(t.trang_thai));
+
+  if (!user) return null;
+
   return (
     <div className="vanchuyen">
       <div className="app-container">
-        {/* ================= HEADER ĐƯỢC THAY THẾ CHUẨN ================= */}
         <header className="dashboard-header">
           <div className="header-left">
-            <img
-              src={DEFAULT_LOGO_IMG}
-              alt="Logo"
-              className="header-logo-icon"
-            />
+            <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
             <span className="header-brand-title">AGRICHAIN</span>
           </div>
 
@@ -354,7 +258,7 @@ export default function AgriChainLogistics() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Tìm kiếm lô canh tác, mã chuyến, biển số..."
+              placeholder="Tìm kiếm mã chuyến, mã lô, biển số..."
             />
           </div>
 
@@ -364,38 +268,28 @@ export default function AgriChainLogistics() {
             onClick={() => navigate("/trang-ca-nhan")}
             title="Xem hồ sơ cá nhân"
           >
-            <div className="avatar-circle"></div>
+            <div className="avatar-circle">{(user.ho_ten || "VC").slice(0, 2).toUpperCase()}</div>
             <div className="profile-meta">
-              <span className="profile-name">{user?.ho_ten || "Nông dân"}</span>
-              <span className="profile-role">Nông dân</span>
+              <span className="profile-name">{user.ho_ten || "Đơn vị vận chuyển"}</span>
+              <span className="profile-role">Đơn vị vận chuyển</span>
             </div>
           </div>
         </header>
 
-        {/* 2. BODY LAYOUT */}
         <div className="body-layout">
-          {/* SIDEBAR ĐIỀU HƯỚNG */}
           <aside className="sidebar no-scrollbar">
             <div className="sidebar-title">Nghiệp vụ logistics</div>
             <nav className="sidebar-nav">
               <button
-                onClick={() => {
-                  setCurrentTab("shipping");
-                  setSelectedJourneyTrip(null);
-                }}
-                className={`nav-item ${
-                  currentTab === "shipping" ? "active" : ""
-                }`}
+                onClick={() => setCurrentTab("shipping")}
+                className={`nav-item ${currentTab === "shipping" ? "active" : ""}`}
               >
                 <Truck size={20} />
                 <span>Quản lý vận chuyển</span>
               </button>
 
               <button
-                onClick={() => {
-                  setCurrentTab("pickup");
-                  setSelectedJourneyTrip(null);
-                }}
+                onClick={() => setCurrentTab("pickup")}
                 className={`nav-item ${currentTab === "pickup" ? "active" : ""}`}
               >
                 <PackageCheck size={20} />
@@ -403,37 +297,19 @@ export default function AgriChainLogistics() {
               </button>
 
               <button
-                onClick={() => {
-                  setCurrentTab("delivery");
-                  setSelectedJourneyTrip(null);
-                }}
-                className={`nav-item ${
-                  currentTab === "delivery" ? "active" : ""
-                }`}
+                onClick={() => setCurrentTab("delivery")}
+                className={`nav-item ${currentTab === "delivery" ? "active" : ""}`}
               >
                 <ClipboardCheck size={20} />
                 <span>Xác nhận giao hàng đến</span>
               </button>
             </nav>
 
-            {/* Action Buttons Xuất File */}
-            <div
-              style={{
-                padding: "0 12px 12px 12px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-              }}
-            >
+            <div style={{ padding: "0 12px 12px 12px", display: "flex", flexDirection: "column", gap: "6px" }}>
               <button
                 onClick={() => exportToCsv(trips)}
                 className="btn-secondary"
-                style={{
-                  width: "100%",
-                  justifyContent: "center",
-                  fontSize: "11px",
-                  padding: "6px",
-                }}
+                style={{ width: "100%", justifyContent: "center", fontSize: "11px", padding: "6px" }}
               >
                 <FileSpreadsheet size={14} />
                 <span>Xuất file Excel/CSV</span>
@@ -441,12 +317,7 @@ export default function AgriChainLogistics() {
               <button
                 onClick={() => exportToJson(trips)}
                 className="btn-secondary"
-                style={{
-                  width: "100%",
-                  justifyContent: "center",
-                  fontSize: "11px",
-                  padding: "6px",
-                }}
+                style={{ width: "100%", justifyContent: "center", fontSize: "11px", padding: "6px" }}
               >
                 <Download size={14} />
                 <span>Export Dữ Liệu JSON</span>
@@ -457,153 +328,31 @@ export default function AgriChainLogistics() {
               <div className="iot-status">
                 <span className="pulse-dot"></span>
                 <span>
-                  Hệ thống IoT Lạnh: <b>Đang đồng bộ</b>
+                  Tài khoản: <b>{user.ten_dang_nhap}</b>
                 </span>
               </div>
-              <p className="sub-note">GPS Tracker Active #MekongLog-01</p>
             </div>
           </aside>
 
-          {/* NỘI DUNG CHÍNH (MAIN WRAPPER) */}
           <div className="main-wrapper no-scrollbar">
-            {/* TAB 1: QUẢN LÝ VẬN CHUYỂN */}
-            {currentTab === "shipping" && (
-              <main className="view-container">
-                {selectedJourneyTrip ? (
-                  <div
-                    style={{
-                      flex: 1,
-                      overflowY: "auto",
-                      paddingBottom: "36px",
-                    }}
-                  >
-                    <div className="section-card">
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          borderBottom: "1px solid var(--border-color)",
-                          paddingBottom: "16px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <button
-                            onClick={() => setSelectedJourneyTrip(null)}
-                            className="btn-secondary"
-                            style={{ padding: "6px 12px", borderRadius: "8px" }}
-                          >
-                            <ArrowLeft size={16} />
-                            <span>Quay lại danh sách</span>
-                          </button>
-                          <div>
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "8px",
-                              }}
-                            >
-                              <h2
-                                style={{
-                                  fontSize: "16px",
-                                  fontWeight: 700,
-                                  color: "#1f2937",
-                                }}
-                              >
-                                Hành Trình Di Chuyển Chuyến Xe #
-                                {selectedJourneyTrip.id}
-                              </h2>
-                              <span className="tag-green">
-                                Lô: {selectedJourneyTrip.batchName} (#
-                                {selectedJourneyTrip.batchCode})
-                              </span>
-                            </div>
-                            <p
-                              style={{
-                                fontSize: "12px",
-                                color: "#6b7280",
-                                marginTop: "2px",
-                              }}
-                            >
-                              Lộ trình: {selectedJourneyTrip.route} | Tài xế:{" "}
-                              {selectedJourneyTrip.driver} (
-                              {selectedJourneyTrip.plate})
-                            </p>
-                          </div>
-                        </div>
+            {errorMsg && (
+              <div style={{ background: "#fef2f2", color: "#dc2626", padding: "12px 16px", borderRadius: "8px", margin: "16px" }}>
+                {errorMsg}
+              </div>
+            )}
 
-                        <button
-                          onClick={() => openModal("journeyLog")}
-                          className="btn-primary"
-                        >
-                          <PlusCircle size={16} />
-                          <span>Thêm Điểm Dừng / Cập Nhật GPS</span>
-                        </button>
-                      </div>
-
-                      <div
-                        className="timeline-track"
-                        style={{ marginTop: "12px" }}
-                      >
-                        <div className="timeline-item">
-                          <span className="timeline-dot"></span>
-                          <p className="timeline-title">
-                            13:15 - 30/09/2026: Bắt đầu xuất phát
-                          </p>
-                          <p className="timeline-desc">
-                            Lô hàng: <b>{selectedJourneyTrip.batchName}</b> (#
-                            {selectedJourneyTrip.batchCode}). Xuất phát với
-                            thùng xe làm lạnh ổn định ở mức 6.0°C. Niêm phong
-                            seal mã #SEAL-LOG-119.
-                          </p>
-                        </div>
-
-                        <div className="timeline-item">
-                          <span className="timeline-dot"></span>
-                          <p className="timeline-title">
-                            15:00 - 30/09/2026: Qua Cầu Mỹ Thuận 2
-                          </p>
-                          <p className="timeline-desc">
-                            Tốc độ trung bình 60km/h. Cảm biến nhiệt độ thùng
-                            lạnh đo được: 6.2°C, độ ẩm 85%.
-                          </p>
-                        </div>
-
-                        <div className="timeline-item">
-                          <span className="timeline-dot-ping"></span>
-                          <span className="timeline-dot current"></span>
-                          <p className="timeline-title current">
-                            16:45 - 30/09/2026: {selectedJourneyTrip.location}
-                          </p>
-                          <p
-                            className="timeline-desc"
-                            style={{ color: "#4b5563" }}
-                          >
-                            Tài xế kiểm tra thùng xe: Niêm phong nguyên vẹn,
-                            nhiệt độ duy trì tốt ({selectedJourneyTrip.temp}).
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    {/* METRICS ROW CHUẨN STYLE NÔNG DÂN - CỐ ĐỊNH 100% TRÊN CÙNG */}
+            {loading ? (
+              <div style={{ padding: "48px", textAlign: "center", color: "#6b7280" }}>Đang tải dữ liệu...</div>
+            ) : (
+              <>
+                {/* TAB 1: QUẢN LÝ VẬN CHUYỂN */}
+                {currentTab === "shipping" && (
+                  <main className="view-container">
                     <div className="metrics-row">
                       <div className="metric-card">
-                        <div className="metric-title">Đơn chờ tiếp nhận</div>
+                        <div className="metric-title">Đơn chờ chấp nhận</div>
                         <div className="metric-number">
-                          {
-                            trips.filter((t) => t.status === "pending_accept")
-                              .length
-                          }
+                          {trips.filter((t) => t.trang_thai === "CHO_CHAP_NHAN").length}
                           <span className="metric-unit">ĐƠN CHỜ NHẬN</span>
                         </div>
                       </div>
@@ -611,10 +360,7 @@ export default function AgriChainLogistics() {
                       <div className="metric-card">
                         <div className="metric-title">Đơn chờ lấy hàng</div>
                         <div className="metric-number">
-                          {
-                            trips.filter((t) => t.status === "pending_pickup")
-                              .length
-                          }
+                          {trips.filter((t) => t.trang_thai === "CHO_LAY_HANG").length}
                           <span className="metric-unit">ĐƠN SẴN SÀNG</span>
                         </div>
                       </div>
@@ -622,979 +368,446 @@ export default function AgriChainLogistics() {
                       <div className="metric-card">
                         <div className="metric-title">Chuyến xe đang chạy</div>
                         <div className="metric-number">
-                          {
-                            trips.filter((t) => t.status === "in_transit")
-                              .length
-                          }
-                          <span className="metric-unit">
-                            CHUYẾN ĐANG LĂN BÁNH
-                          </span>
+                          {trips.filter((t) => t.trang_thai === "DANG_VAN_CHUYEN").length}
+                          <span className="metric-unit">CHUYẾN ĐANG LĂN BÁNH</span>
                         </div>
                       </div>
 
                       <div className="actions-box">
-                        <select
-                          className="filter-select"
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value)}
-                        >
+                        <select className="filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                           <option value="all">-- Tất cả trạng thái --</option>
-                          <option value="pending_accept">Chờ chấp nhận</option>
-                          <option value="pending_pickup">Chờ lấy hàng</option>
-                          <option value="in_transit">Đang vận chuyển</option>
-                          <option value="pending_delivery">Chờ xác nhận</option>
+                          <option value="CHO_CHAP_NHAN">Chờ chấp nhận</option>
+                          <option value="CHO_LAY_HANG">Chờ lấy hàng</option>
+                          <option value="DANG_VAN_CHUYEN">Đang vận chuyển</option>
+                          <option value="CHO_TIEP_NHAN">Chờ bên nhận xác nhận</option>
+                          <option value="HOAN_THANH">Đã hoàn thành</option>
+                          <option value="TU_CHOI">Đã từ chối</option>
                         </select>
-
-                        <button
-                          onClick={() => openModal("createTrip")}
-                          className="btn-primary-action"
-                        >
-                          <Plus size={16} />
-                          <span>Tạo Lộ Trình Mới</span>
-                        </button>
                       </div>
                     </div>
 
-                    {/* VÙNG CUỘN ĐỘC LẬP CHO DANH SÁCH CHUYẾN XE */}
                     <div className="shipment-list-scroll">
                       {filteredTrips.length === 0 ? (
-                        <div
-                          className="section-card"
-                          style={{
-                            textAlign: "center",
-                            padding: "40px",
-                            color: "#6b7280",
-                          }}
-                        >
-                          Không có chuyến vận chuyển nào phù hợp với bộ lọc hiện
-                          tại.
+                        <div className="section-card" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
+                          <AlertCircle size={36} style={{ margin: "0 auto 10px", color: "#9ca3af" }} />
+                          Không có chuyến vận chuyển nào phù hợp với bộ lọc hiện tại.
                         </div>
                       ) : (
-                        filteredTrips.map((trip) => (
-                          <div key={trip.id} className="trip-card">
-                            <div className="trip-card-left">
-                              <div
-                                className={`icon-avatar ${
-                                  trip.status === "in_transit"
-                                    ? "blue"
-                                    : trip.status === "pending_accept"
-                                      ? "purple"
-                                      : trip.status === "pending_delivery"
-                                        ? "emerald"
-                                        : "amber"
-                                }`}
-                              >
-                                {trip.status === "in_transit" ? (
-                                  <Navigation size={30} />
-                                ) : trip.status === "pending_accept" ? (
-                                  <Clock size={30} />
-                                ) : trip.status === "pending_delivery" ? (
-                                  <ClipboardCheck size={30} />
-                                ) : (
-                                  <PackageSearch size={30} />
+                        filteredTrips.map((trip) => {
+                          const statusInfo = STATUS_LABEL[trip.trang_thai] || STATUS_LABEL.CHO_CHAP_NHAN;
+                          const StatusIcon = statusInfo.icon;
+
+                          return (
+                            <div key={trip.ma_van_don} className="trip-card">
+                              <div className="trip-card-left">
+                                <div
+                                  className={`icon-avatar ${
+                                    trip.trang_thai === "DANG_VAN_CHUYEN"
+                                      ? "blue"
+                                      : trip.trang_thai === "CHO_CHAP_NHAN"
+                                        ? "purple"
+                                        : trip.trang_thai === "CHO_TIEP_NHAN"
+                                          ? "emerald"
+                                          : "amber"
+                                  }`}
+                                >
+                                  <StatusIcon size={30} />
+                                </div>
+                                <div className="trip-details">
+                                  <div className="trip-header-line">
+                                    <h3>{trip.ten_san_pham}</h3>
+                                    <span className="tag-gray">#{trip.ma_van_don}</span>
+                                    <span className="tag-green">Mã lô: {trip.ma_lo_nong_san}</span>
+                                  </div>
+
+                                  <div className="trip-meta-row">
+                                    <p>
+                                      Xe tải & Tài xế:{" "}
+                                      <span className="meta-val">
+                                        {trip.bien_so_xe || "Chưa phân công"} ({trip.ten_tai_xe || "Chưa phân công"})
+                                      </span>
+                                    </p>
+                                    <p>
+                                      Lộ trình: <span className="meta-val">{tripRoute(trip)}</span>
+                                    </p>
+                                    <p>
+                                      Khối lượng hàng:{" "}
+                                      <span className="highlight-weight">{formatWeight(trip.khoi_luong, trip.don_vi_tinh)}</span>
+                                    </p>
+                                    <p>
+                                      Thời gian xuất: <span className="meta-val">{trip.thoi_gian_xuat}</span>
+                                    </p>
+                                  </div>
+
+                                  <div>
+                                    <span className={`status-badge-${statusInfo.tone}`}>
+                                      <StatusIcon size={13} style={{ marginRight: "4px" }} />
+                                      {statusInfo.text}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="actions-vertical">
+                                <button onClick={() => setDetailTrip(trip)} className="btn-action-detail">
+                                  <Eye size={15} />
+                                  <span>Xem chi tiết</span>
+                                </button>
+
+                                {trip.trang_thai === "CHO_CHAP_NHAN" && (
+                                  <>
+                                    <button onClick={() => handleOpenAccept(trip)} className="btn-primary" style={{ backgroundColor: "#7c3aed" }}>
+                                      <CheckCircle2 size={16} />
+                                      <span>Chấp nhận vận chuyển</span>
+                                    </button>
+                                    <button onClick={() => handleOpenReject(trip)} className="btn-secondary" style={{ color: "#dc2626" }}>
+                                      <XCircle size={16} />
+                                      <span>Từ chối</span>
+                                    </button>
+                                  </>
+                                )}
+
+                                {trip.trang_thai === "CHO_LAY_HANG" && (
+                                  <button onClick={() => handleOpenPickup(trip)} className="btn-primary">
+                                    <ArrowUpRight size={16} />
+                                    <span>Xác nhận lấy hàng đi</span>
+                                  </button>
+                                )}
+
+                                {trip.trang_thai === "DANG_VAN_CHUYEN" && (
+                                  <button onClick={() => handleConfirmArrival(trip)} className="btn-primary">
+                                    <CheckCircle size={14} />
+                                    <span>Xác nhận đã đến nơi</span>
+                                  </button>
                                 )}
                               </div>
-                              <div className="trip-details">
-                                <div className="trip-header-line">
-                                  <h3>{trip.title}</h3>
-                                  <span className="tag-gray">#{trip.id}</span>
-                                  <span className="tag-green">
-                                    Tên lô: {trip.batchName} (#{trip.batchCode})
-                                  </span>
-                                </div>
-
-                                <div className="trip-meta-row">
-                                  <p>
-                                    Xe tải & Tài xế:{" "}
-                                    <span className="meta-val">
-                                      {trip.plate} ({trip.driver})
-                                    </span>
-                                  </p>
-                                  <p>
-                                    Lộ trình:{" "}
-                                    <span className="meta-val">
-                                      {trip.route}
-                                    </span>
-                                  </p>
-                                  <p>
-                                    Khối lượng hàng:{" "}
-                                    <span className="highlight-weight">
-                                      {trip.weight}
-                                    </span>
-                                  </p>
-                                  <p>
-                                    Nhiệt độ thùng xe:{" "}
-                                    <span className="highlight-temp">
-                                      {trip.temp}
-                                    </span>
-                                  </p>
-                                </div>
-
-                                <div className="trip-location-note">
-                                  <p>Vị trí & Thông tin điều phối:</p>
-                                  <p>{trip.location}</p>
-                                </div>
-
-                                <div>
-                                  <span
-                                    className={
-                                      trip.status === "in_transit"
-                                        ? "status-badge-blue"
-                                        : trip.status === "pending_accept"
-                                          ? "status-badge-purple"
-                                          : trip.status === "pending_delivery"
-                                            ? "status-badge-emerald"
-                                            : "status-badge-amber"
-                                    }
-                                  >
-                                    {trip.statusText}
-                                  </span>
-                                </div>
-                              </div>
                             </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </main>
+                )}
 
-                            <div className="actions-vertical">
-                              {trip.status === "pending_accept" && (
-                                <button
-                                  onClick={() => handleAcceptTrip(trip.id)}
-                                  className="btn-primary"
-                                  style={{ backgroundColor: "#7c3aed" }}
-                                >
-                                  <CheckCircle2 size={16} />
-                                  <span>Chấp nhận vận chuyển</span>
-                                </button>
-                              )}
+                {/* TAB 2: XÁC NHẬN LẤY HÀNG ĐI */}
+                {currentTab === "pickup" && (
+                  <main className="view-container" style={{ overflowY: "auto", paddingBottom: "36px" }}>
+                    <div className="section-header-box">
+                      <div>
+                        <h2>Biên Bản Nhận Hàng & Xuất Phát</h2>
+                        <p>Các chuyến đã được chấp nhận, đang chờ xe đến lấy hàng tại điểm gửi.</p>
+                      </div>
+                    </div>
 
-                              {trip.status === "pending_pickup" && (
-                                <button
-                                  onClick={() => {
-                                    setPickupForm((prev) => ({
-                                      ...prev,
-                                      tripCode: `#${trip.id}`,
-                                      batchName: trip.batchName,
-                                      batchCode: `#${trip.batchCode}`,
-                                    }));
-                                    openModal("pickupAction");
-                                  }}
-                                  className="btn-primary"
-                                >
-                                  <ArrowUpRight size={16} />
-                                  <span>Xác nhận lấy hàng đi</span>
-                                </button>
-                              )}
-
-                              {trip.status === "in_transit" && (
-                                <>
-                                  <button
-                                    onClick={() => setSelectedJourneyTrip(trip)}
-                                    className="btn-secondary"
-                                  >
-                                    <MapPin size={14} />
-                                    <span>Ghi nhật ký hành trình</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setDeliveryForm((prev) => ({
-                                        ...prev,
-                                        tripCode: `#${trip.id}`,
-                                      }));
-                                      openModal("deliveryConfirm");
-                                    }}
-                                    className="btn-primary"
-                                  >
-                                    <CheckCircle size={14} />
-                                    <span>Xác nhận giao hàng đến</span>
-                                  </button>
-                                </>
-                              )}
-
-                              {/* KHUNG XÁC NHẬN GIAO: CÓ NÚT XEM CHI TIẾT */}
-                              {trip.status === "pending_delivery" && (
-                                <>
-                                  <button
-                                    onClick={() => handleOpenDetail(trip)}
-                                    className="btn-action-detail"
-                                    style={{ width: "100%" }}
-                                  >
-                                    <Eye size={15} />
-                                    <span>Xem chi tiết</span>
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setDeliveryForm((prev) => ({
-                                        ...prev,
-                                        tripCode: `#${trip.id}`,
-                                      }));
-                                      openModal("deliveryConfirm");
-                                    }}
-                                    className="btn-primary"
-                                  >
-                                    <CheckCircle2 size={16} />
-                                    <span>Ký xác nhận bàn giao</span>
-                                  </button>
-                                </>
-                              )}
+                    {pickupTrips.length === 0 ? (
+                      <div className="section-card" style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>
+                        Không có chuyến nào đang chờ lấy hàng.
+                      </div>
+                    ) : (
+                      pickupTrips.map((trip) => (
+                        <div className="section-card" key={trip.ma_van_don} style={{ marginBottom: "12px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <p style={{ fontWeight: 700, color: "#1f2937" }}>
+                                {trip.ten_san_pham} (#{trip.ma_lo_nong_san} - {formatWeight(trip.khoi_luong, trip.don_vi_tinh)})
+                              </p>
+                              <p style={{ color: "#6b7280", fontSize: "13px" }}>
+                                Lấy từ: {trip.ten_nguoi_gui} ➔ Tài xế {trip.ten_tai_xe} ({trip.bien_so_xe})
+                              </p>
                             </div>
+                            <button onClick={() => handleOpenPickup(trip)} className="btn-primary">
+                              <ArrowUpRight size={16} />
+                              <span>Xác nhận lấy hàng</span>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+
+                    <div className="section-card" style={{ marginTop: "16px" }}>
+                      <div style={{ fontWeight: 700, fontSize: "14px", color: "#1f2937", marginBottom: "10px" }}>
+                        Lịch sử các chuyến đã lấy hàng
+                      </div>
+                      {pickupHistory.length === 0 ? (
+                        <p style={{ color: "#9ca3af", fontSize: "13px" }}>Chưa có chuyến nào.</p>
+                      ) : (
+                        pickupHistory.map((t) => (
+                          <div
+                            key={t.ma_van_don}
+                            style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f3f4f6", fontSize: "13px" }}
+                          >
+                            <span>
+                              {t.ten_san_pham} (#{t.ma_lo_nong_san}) - {formatWeight(t.khoi_luong, t.don_vi_tinh)}
+                            </span>
+                            <span style={{ color: "#6b7280" }}>{STATUS_LABEL[t.trang_thai]?.text}</span>
                           </div>
                         ))
                       )}
                     </div>
-                  </>
+                  </main>
                 )}
-              </main>
-            )}
 
-            {/* TAB 2: XÁC NHẬN LẤY HÀNG ĐI */}
-            {currentTab === "pickup" && (
-              <main
-                className="view-container"
-                style={{ overflowY: "auto", paddingBottom: "36px" }}
-              >
-                <div className="section-header-box">
-                  <div>
-                    <h2>Biên Bản Nhận Hàng & Xuất Phát</h2>
-                    <p>
-                      Xác nhận trực tiếp giữa tài xế và bên bàn giao (Nhà vườn
-                      hoặc Cơ sở sơ chế), lưu thời gian thực lên chuỗi.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => openModal("pickupAction")}
-                    className="btn-primary"
-                  >
-                    <QrCode size={16} />
-                    <span>Quét QR Mã Lô Lấy Hàng</span>
-                  </button>
-                </div>
-
-                <div className="section-card">
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      borderBottom: "1px solid #f3f4f6",
-                      paddingBottom: "12px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontWeight: 700,
-                        fontSize: "14px",
-                        color: "#1f2937",
-                      }}
-                    >
-                      Danh Sách Lô Hàng Đã Lấy Đi Gần Đây
-                    </span>
-                    <span style={{ fontSize: "12px", color: "#6b7280" }}>
-                      Có chữ ký số 2 bên
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "12px",
-                      fontSize: "13px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        paddingBottom: "12px",
-                        borderBottom: "1px solid #f3f4f6",
-                      }}
-                    >
+                {/* TAB 3: XÁC NHẬN GIAO HÀNG ĐẾN */}
+                {currentTab === "delivery" && (
+                  <main className="view-container" style={{ overflowY: "auto", paddingBottom: "36px" }}>
+                    <div className="section-header-box">
                       <div>
-                        <p style={{ fontWeight: 700, color: "#1f2937" }}>
-                          Tên lô: Quýt Đường Đóng Thùng Xuất Khẩu (Mã:
-                          #SC-2026-001 - 1,200 kg)
-                        </p>
-                        <p style={{ color: "#6b7280" }}>
-                          Lấy từ: Cơ sở Sơ Chế Mekong ➔ Tài xế Nguyễn Văn Hùng
-                          nhận lúc 13:00 - 30/09/2026
+                        <h2>Xác Nhận Đến Điểm Giao</h2>
+                        <p>
+                          Khi xe đến nơi, bấm xác nhận để báo cho bên nhận biết hàng đã tới — bên nhận sẽ tự
+                          xác nhận tiếp nhận ở trang của họ.
                         </p>
                       </div>
-                      <span
-                        style={{
-                          backgroundColor: "#d1fae5",
-                          color: "#065f46",
-                          padding: "3px 10px",
-                          borderRadius: "4px",
-                          fontWeight: 600,
-                          fontSize: "12px",
-                        }}
-                      >
-                        Đã ký xác nhận nhận hàng
-                      </span>
                     </div>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <p style={{ fontWeight: 700, color: "#1f2937" }}>
-                          Tên lô: Cam Sành VietGAP Trà Ôn (Mã: #LH-8809 - 800
-                          kg)
-                        </p>
-                        <p style={{ color: "#6b7280" }}>
-                          Lấy từ: Nông trại Vườn Cam A1 ➔ Tài xế Lê Thành Đạt
-                          lúc 07:15 - 28/09/2026
-                        </p>
+                    {deliveryTrips.length === 0 ? (
+                      <div className="section-card" style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>
+                        Không có chuyến nào đang trên đường.
                       </div>
-                      <span
-                        style={{
-                          backgroundColor: "#d1fae5",
-                          color: "#065f46",
-                          padding: "3px 10px",
-                          borderRadius: "4px",
-                          fontWeight: 600,
-                          fontSize: "12px",
-                        }}
-                      >
-                        Đã hoàn thành chuyến
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </main>
-            )}
+                    ) : (
+                      deliveryTrips.map((trip) => (
+                        <div className="section-card" key={trip.ma_van_don} style={{ marginBottom: "12px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                              <h3 style={{ fontWeight: 700, fontSize: "15px", color: "#1f2937" }}>
+                                #{trip.ma_van_don} - {trip.ten_san_pham} ({trip.ma_lo_nong_san})
+                              </h3>
+                              <p style={{ fontSize: "12.5px", color: "#6b7280" }}>
+                                Điểm giao: {trip.ten_ben_nhan || trip.dia_chi_giao_hang || "—"}
+                              </p>
+                            </div>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button onClick={() => setDetailTrip(trip)} className="btn-action-detail">
+                                <Eye size={15} />
+                                <span>Xem chi tiết</span>
+                              </button>
+                              <button onClick={() => handleConfirmArrival(trip)} className="btn-primary">
+                                <Check size={16} />
+                                <span>Xác nhận đã đến nơi</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
 
-            {/* TAB 3: XÁC NHẬN GIAO HÀNG ĐẾN */}
-            {currentTab === "delivery" && (
-              <main
-                className="view-container"
-                style={{ overflowY: "auto", paddingBottom: "36px" }}
-              >
-                <div className="section-header-box">
-                  <div>
-                    <h2>Xác Nhận Bàn Giao Hàng Đến Điểm Đích</h2>
-                    <p>
-                      Chốt trạng thái hoàn thành chuyến đi, bàn giao sản phẩm
-                      cho siêu thị/đối tác bán lẻ kèm chữ ký nhận.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      exportToJson(
-                        {
-                          trip: "VC-2026-8801",
-                          item: "Quýt Đường Đóng Thùng Xuất Khẩu",
-                          batchCode: "SC-2026-001",
-                          quantity: "120 thùng (1,200 kg)",
-                          status: "Nguyên seal",
-                          tempAtArrival: "6.0°C",
-                          signedBy: "Phạm Thị Mai",
-                          timestamp: new Date().toISOString(),
-                        },
-                        "bien_ban_giao_hang_VC-8801.json",
-                      )
-                    }
-                    className="btn-secondary"
-                  >
-                    <Download size={14} />
-                    <span>Xuất Biên Bản Điện Tử</span>
-                  </button>
-                </div>
-
-                <div className="section-card">
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      borderBottom: "1px solid #f3f4f6",
-                      paddingBottom: "12px",
-                    }}
-                  >
-                    <div>
-                      <h3
-                        style={{
-                          fontWeight: 700,
-                          fontSize: "15px",
-                          color: "#1f2937",
-                        }}
-                      >
-                        Đơn Bàn Giao #VC-2026-8801 - Quýt Đường Đóng Thùng Xuất
-                        Khẩu (#SC-2026-001)
-                      </h3>
-                      <p style={{ fontSize: "12.5px", color: "#6b7280" }}>
-                        Điểm giao: Kho Phân Phối Bách Hóa Xanh Bình Tân
-                      </p>
+                    <div className="section-card" style={{ marginTop: "16px" }}>
+                      <div style={{ fontWeight: 700, fontSize: "14px", color: "#1f2937", marginBottom: "10px" }}>
+                        Các chuyến đã đến nơi / hoàn thành
+                      </div>
+                      {deliveryHistory.length === 0 ? (
+                        <p style={{ color: "#9ca3af", fontSize: "13px" }}>Chưa có chuyến nào.</p>
+                      ) : (
+                        deliveryHistory.map((t) => (
+                          <div
+                            key={t.ma_van_don}
+                            style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f3f4f6", fontSize: "13px" }}
+                          >
+                            <span>
+                              {t.ten_san_pham} (#{t.ma_lo_nong_san}) - {formatWeight(t.khoi_luong, t.don_vi_tinh)}
+                            </span>
+                            <span style={{ color: "#6b7280" }}>{STATUS_LABEL[t.trang_thai]?.text}</span>
+                          </div>
+                        ))
+                      )}
                     </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button
-                        onClick={() =>
-                          handleOpenDetail({
-                            id: "VC-2026-8801",
-                            title: "Chuyến Vận Chuyển: Quýt Đường Xuất Khẩu",
-                            batchName: "Quýt Đường Đóng Thùng Xuất Khẩu",
-                            batchCode: "SC-2026-001",
-                            driver: "Nguyễn Văn Hùng",
-                            plate: "65C-128.45",
-                            route:
-                              "HTX Sơ Chế Trà Vinh ➔ Trung Tâm Phân Phối Bách Hóa Xanh (TP.HCM)",
-                            weight: "1,200 kg (120 thùng)",
-                            temp: "6.0°C",
-                            recipient:
-                              "Kho Phân Phối Bách Hóa Xanh Bình Tân (Phạm Thị Mai)",
-                            sealCode: "SEAL-LOG-119",
-                            notes:
-                              "Nguyên seal không rách vỡ, nghiệm thu đạt 100%",
-                          })
-                        }
-                        className="btn-action-detail"
-                      >
-                        <Eye size={15} />
-                        <span>Xem chi tiết</span>
-                      </button>
-                      <button
-                        onClick={() => openModal("deliveryConfirm")}
-                        className="btn-primary"
-                      >
-                        <Check size={16} />
-                        <span>Lập Biên Bản Giao Nhận</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="data-summary-grid">
-                    <div>
-                      <span className="label">Số lượng bàn giao:</span>
-                      <span className="value">120 thùng carton (1,200 kg)</span>
-                    </div>
-                    <div>
-                      <span className="label">Tình trạng niêm phong:</span>
-                      <span className="value" style={{ color: "#047857" }}>
-                        Nguyên seal không rách vỡ
-                      </span>
-                    </div>
-                    <div>
-                      <span className="label">Nhiệt độ thùng khi mở cửa:</span>
-                      <span className="value" style={{ color: "#1d4ed8" }}>
-                        6.0°C
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </main>
+                  </main>
+                )}
+              </>
             )}
           </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* MODAL 1: TẠO CHUYẾN ĐI MỚI */}
-        {/* ========================================================= */}
-        {modalState.createTrip && (
-          <div className="modal-overlay">
-            <div className="modal-content lg">
-              <div className="modal-header">
-                <h3>
-                  <Truck size={20} color="#2e8b57" /> Khởi Tạo Chuyến Vận Chuyển
-                  Mới
-                </h3>
-                <button
-                  className="modal-close-btn"
-                  onClick={() => closeModal("createTrip")}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <form onSubmit={handleCreateTripSubmit}>
-                <div className="modal-body">
-                  <div className="form-group">
-                    <label>Chọn Lô Hàng Cần Chở (*)</label>
-                    <select
-                      className="form-select"
-                      value={newTripForm.batch}
-                      onChange={(e) =>
-                        setNewTripForm({
-                          ...newTripForm,
-                          batch: e.target.value,
-                        })
-                      }
-                    >
-                      <option>
-                        Lô #SC-2026-002 - Cam Sành Đóng Thùng (800 kg)
-                      </option>
-                      <option>
-                        Lô #LH-8824 - Quýt Đường Mới Thu Hoạch (1,500 kg)
-                      </option>
-                      <option>
-                        Lô #XCHL-2026-09 - Xoài Cát Hòa Lộc Tiêu Chuẩn GlobalGAP
-                        (2,000 kg)
-                      </option>
-                    </select>
-                  </div>
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label>Xe Tải Chuyên Dụng (*)</label>
-                      <input
-                        type="text"
-                        value={newTripForm.plate}
-                        onChange={(e) =>
-                          setNewTripForm({
-                            ...newTripForm,
-                            plate: e.target.value,
-                          })
-                        }
-                        placeholder="65C-128.45 (Xe Lạnh 2.5T)"
-                        className="form-input"
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Tài Xế Phụ Trách</label>
-                      <input
-                        type="text"
-                        value={newTripForm.driver}
-                        onChange={(e) =>
-                          setNewTripForm({
-                            ...newTripForm,
-                            driver: e.target.value,
-                          })
-                        }
-                        placeholder="Nguyễn Văn Hùng"
-                        className="form-input"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label>Điểm Nhận Hàng (Bắt Đầu)</label>
-                      <input
-                        type="text"
-                        value={newTripForm.from}
-                        onChange={(e) =>
-                          setNewTripForm({
-                            ...newTripForm,
-                            from: e.target.value,
-                          })
-                        }
-                        className="form-input"
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Điểm Giao Đến (Đích)</label>
-                      <input
-                        type="text"
-                        value={newTripForm.to}
-                        onChange={(e) =>
-                          setNewTripForm({ ...newTripForm, to: e.target.value })
-                        }
-                        placeholder="Kho Siêu Thị Co.opMart Cần Thơ"
-                        className="form-input"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn-cancel"
-                    onClick={() => closeModal("createTrip")}
-                  >
-                    Hủy
-                  </button>
-                  <button type="submit" className="btn-primary">
-                    Tạo Chuyến Đi
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* MODAL 2: XÁC NHẬN LẤY HÀNG (PICKUP) */}
-        {/* ========================================================= */}
-        {modalState.pickupAction && (
+        {/* MODAL: CHẤP NHẬN CHUYẾN */}
+        {acceptModalTrip && (
           <div className="modal-overlay">
             <div className="modal-content">
               <div className="modal-header">
                 <h3>
-                  <PackageCheck size={20} color="#2e8b57" /> Xác Nhận Lấy Hàng
-                  Lên Xe
+                  <CheckCircle2 size={20} color="#2e8b57" /> Chấp Nhận Chuyến Vận Chuyển
                 </h3>
-                <button
-                  className="modal-close-btn"
-                  onClick={() => closeModal("pickupAction")}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <form onSubmit={handleConfirmPickup}>
-                <div className="modal-body">
-                  <p style={{ color: "#4b5563" }}>
-                    Chuyến xe: <b>{pickupForm.tripCode}</b> | Lô hàng:{" "}
-                    <b>{pickupForm.batchName}</b> ({pickupForm.batchCode})
-                  </p>
-                  <div className="form-group">
-                    <label>Khối lượng thực nhận (kg)</label>
-                    <input
-                      type="number"
-                      value={pickupForm.weight}
-                      onChange={(e) =>
-                        setPickupForm({ ...pickupForm, weight: e.target.value })
-                      }
-                      className="form-input"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Mã chì niêm phong (Seal Truck)</label>
-                    <input
-                      type="text"
-                      value={pickupForm.sealCode}
-                      onChange={(e) =>
-                        setPickupForm({
-                          ...pickupForm,
-                          sealCode: e.target.value,
-                        })
-                      }
-                      className="form-input font-mono"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Nhiệt độ thùng xe lúc nhận (°C)</label>
-                    <input
-                      type="text"
-                      value={pickupForm.temp}
-                      onChange={(e) =>
-                        setPickupForm({ ...pickupForm, temp: e.target.value })
-                      }
-                      className="form-input font-mono"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn-cancel"
-                    onClick={() => closeModal("pickupAction")}
-                  >
-                    Đóng
-                  </button>
-                  <button type="submit" className="btn-primary">
-                    Xác Nhận & Xuất Phát
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* MODAL 3: GHI NHẬT KÝ HÀNH TRÌNH / GPS */}
-        {/* ========================================================= */}
-        {modalState.journeyLog && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h3>
-                  <MapPin size={20} color="#2e8b57" /> Cập Nhật Điểm Dừng & IoT
-                  Lạnh
-                </h3>
-                <button
-                  className="modal-close-btn"
-                  onClick={() => closeModal("journeyLog")}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <form onSubmit={handleAddJourneyPoint}>
-                <div className="modal-body">
-                  <div className="form-group">
-                    <label>Địa điểm / Tọa độ hiện tại (*)</label>
-                    <input
-                      type="text"
-                      value={journeyForm.location}
-                      onChange={(e) =>
-                        setJourneyForm({
-                          ...journeyForm,
-                          location: e.target.value,
-                        })
-                      }
-                      placeholder="VD: Trạm thu phí Long Phước (TP. Thủ Đức)"
-                      className="form-input"
-                      required
-                    />
-                  </div>
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label>Nhiệt độ thùng (°C)</label>
-                      <input
-                        type="text"
-                        value={journeyForm.temp}
-                        onChange={(e) =>
-                          setJourneyForm({
-                            ...journeyForm,
-                            temp: e.target.value,
-                          })
-                        }
-                        className="form-input font-mono"
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Độ ẩm (%)</label>
-                      <input
-                        type="text"
-                        value={journeyForm.humidity}
-                        onChange={(e) =>
-                          setJourneyForm({
-                            ...journeyForm,
-                            humidity: e.target.value,
-                          })
-                        }
-                        className="form-input font-mono"
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Ghi chú tình trạng nông sản</label>
-                    <textarea
-                      rows={3}
-                      value={journeyForm.note}
-                      onChange={(e) =>
-                        setJourneyForm({ ...journeyForm, note: e.target.value })
-                      }
-                      className="form-textarea"
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn-cancel"
-                    onClick={() => closeModal("journeyLog")}
-                  >
-                    Hủy
-                  </button>
-                  <button type="submit" className="btn-primary">
-                    Lưu Lên Hệ Thống
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* MODAL 4: XÁC NHẬN GIAO HÀNG ĐẾN */}
-        {/* ========================================================= */}
-        {modalState.deliveryConfirm && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h3>
-                  <CheckCircle2 size={20} color="#2e8b57" /> Nghiệm Thu & Giao
-                  Hàng Đến
-                </h3>
-                <button
-                  className="modal-close-btn"
-                  onClick={() => closeModal("deliveryConfirm")}
-                >
-                  <X size={20} />
-                </button>
-              </div>
-              <form onSubmit={handleConfirmDelivery}>
-                <div className="modal-body">
-                  <div className="form-group">
-                    <label>Người đại diện bên nhận (*)</label>
-                    <input
-                      type="text"
-                      value={deliveryForm.recipient}
-                      onChange={(e) =>
-                        setDeliveryForm({
-                          ...deliveryForm,
-                          recipient: e.target.value,
-                        })
-                      }
-                      placeholder="VD: Quản lý kho - Nguyễn Thị Mai"
-                      className="form-input"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Kết quả kiểm tra tình trạng</label>
-                    <input
-                      type="text"
-                      value={deliveryForm.checkResult}
-                      onChange={(e) =>
-                        setDeliveryForm({
-                          ...deliveryForm,
-                          checkResult: e.target.value,
-                        })
-                      }
-                      className="form-input"
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Mã xác thực biên bản / OTP giao hàng</label>
-                    <input
-                      type="text"
-                      value={deliveryForm.signatureOtp}
-                      onChange={(e) =>
-                        setDeliveryForm({
-                          ...deliveryForm,
-                          signatureOtp: e.target.value,
-                        })
-                      }
-                      className="form-input font-mono"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button
-                    type="button"
-                    className="btn-cancel"
-                    onClick={() => closeModal("deliveryConfirm")}
-                  >
-                    Hủy
-                  </button>
-                  <button type="submit" className="btn-primary">
-                    Hoàn Tất Bàn Giao
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* ========================================================= */}
-        {/* MODAL 5: XEM CHI TIẾT ĐƠN BÀN GIAO */}
-        {/* ========================================================= */}
-        {modalState.deliveryDetail && detailTrip && (
-          <div className="modal-overlay">
-            <div className="modal-content lg">
-              <div className="modal-header">
-                <h3>
-                  <Eye size={20} color="#2563eb" /> Chi Tiết Biên Bản Bàn Giao #
-                  {detailTrip.id}
-                </h3>
-                <button
-                  className="modal-close-btn"
-                  onClick={() => closeModal("deliveryDetail")}
-                >
+                <button className="modal-close-btn" onClick={() => setAcceptModalTrip(null)}>
                   <X size={20} />
                 </button>
               </div>
               <div className="modal-body">
-                <div
-                  className="form-grid-2 readonly-grid"
-                  style={{ gap: "14px" }}
-                >
+                <p style={{ color: "#4b5563" }}>
+                  Chuyến #{acceptModalTrip.ma_van_don}: <b>{acceptModalTrip.ten_san_pham}</b> ({acceptModalTrip.ma_lo_nong_san})
+                </p>
+                <div className="form-group">
+                  <label>Tài xế phụ trách (*)</label>
+                  <input
+                    type="text"
+                    value={acceptForm.ten_tai_xe}
+                    onChange={(e) => setAcceptForm({ ...acceptForm, ten_tai_xe: e.target.value })}
+                    className="form-input"
+                    placeholder="Nguyễn Văn Hùng"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Biển số xe (*)</label>
+                  <input
+                    type="text"
+                    value={acceptForm.bien_so_xe}
+                    onChange={(e) => setAcceptForm({ ...acceptForm, bien_so_xe: e.target.value })}
+                    className="form-input"
+                    placeholder="65C-128.45"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={() => setAcceptModalTrip(null)}>
+                  Hủy
+                </button>
+                <button className="btn-primary" onClick={handleSubmitAccept}>
+                  Xác Nhận Chấp Nhận
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: TỪ CHỐI CHUYẾN */}
+        {rejectModalTrip && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h3 style={{ color: "#dc2626" }}>
+                  <XCircle size={20} color="#dc2626" /> Từ Chối Chuyến Vận Chuyển
+                </h3>
+                <button className="modal-close-btn" onClick={() => setRejectModalTrip(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body">
+                <p style={{ color: "#4b5563" }}>
+                  Chuyến #{rejectModalTrip.ma_van_don}: <b>{rejectModalTrip.ten_san_pham}</b>
+                </p>
+                <div className="form-group">
+                  <label>Lý do từ chối (*)</label>
+                  <textarea
+                    rows={3}
+                    className="form-textarea"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="VD: Xe đang bận tuyến khác, quá tải trọng..."
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={() => setRejectModalTrip(null)}>
+                  Đóng
+                </button>
+                <button className="btn-primary" style={{ backgroundColor: "#dc2626" }} onClick={handleSubmitReject}>
+                  Xác Nhận Từ Chối
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: XÁC NHẬN LẤY HÀNG */}
+        {pickupModalTrip && (
+          <div className="modal-overlay">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h3>
+                  <PackageCheck size={20} color="#2e8b57" /> Xác Nhận Lấy Hàng Lên Xe
+                </h3>
+                <button className="modal-close-btn" onClick={() => setPickupModalTrip(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body">
+                <p style={{ color: "#4b5563" }}>
+                  Chuyến: <b>#{pickupModalTrip.ma_van_don}</b> | Lô hàng: <b>{pickupModalTrip.ten_san_pham}</b> ({pickupModalTrip.ma_lo_nong_san})
+                </p>
+                <div className="form-group">
+                  <label>Khối lượng thực nhận (kg)</label>
+                  <input
+                    type="number"
+                    value={pickupWeight}
+                    onChange={(e) => setPickupWeight(e.target.value)}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={() => setPickupModalTrip(null)}>
+                  Đóng
+                </button>
+                <button className="btn-primary" onClick={handleSubmitPickup}>
+                  Xác Nhận & Xuất Phát
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: XEM CHI TIẾT CHUYẾN */}
+        {detailTrip && (
+          <div className="modal-overlay">
+            <div className="modal-content lg">
+              <div className="modal-header">
+                <h3>
+                  <Eye size={20} color="#2563eb" /> Chi Tiết Chuyến Vận Chuyển #{detailTrip.ma_van_don}
+                </h3>
+                <button className="modal-close-btn" onClick={() => setDetailTrip(null)}>
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="modal-body">
+                <div className="form-grid-2 readonly-grid" style={{ gap: "14px" }}>
                   <div className="readonly-item">
-                    <label>Mã đơn vận chuyển</label>
-                    <span style={{ fontWeight: 700, color: "#1d4ed8" }}>
-                      #{detailTrip.id}
-                    </span>
+                    <label>Mã chuyến</label>
+                    <span style={{ fontWeight: 700, color: "#1d4ed8" }}>#{detailTrip.ma_van_don}</span>
                   </div>
                   <div className="readonly-item">
                     <label>Mã lô nông sản</label>
-                    <span
-                      className="tag-green"
-                      style={{ width: "fit-content" }}
-                    >
-                      #{detailTrip.batchCode}
+                    <span className="tag-green" style={{ width: "fit-content" }}>
+                      #{detailTrip.ma_lo_nong_san}
                     </span>
                   </div>
                   <div className="readonly-item">
                     <label>Tên nông sản / hàng hóa</label>
-                    <span style={{ fontWeight: 600, color: "#1f2937" }}>
-                      {detailTrip.batchName}
-                    </span>
+                    <span style={{ fontWeight: 600, color: "#1f2937" }}>{detailTrip.ten_san_pham}</span>
                   </div>
                   <div className="readonly-item">
-                    <label>Khối lượng / Quy cách</label>
+                    <label>Khối lượng</label>
                     <span style={{ fontWeight: 600, color: "#047857" }}>
-                      {detailTrip.weight}
+                      {formatWeight(detailTrip.khoi_luong, detailTrip.don_vi_tinh)}
                     </span>
                   </div>
                   <div className="readonly-item">
                     <label>Phương tiện & Tài xế</label>
                     <span>
-                      {detailTrip.plate} - {detailTrip.driver}
+                      {detailTrip.bien_so_xe || "Chưa phân công"} - {detailTrip.ten_tai_xe || "Chưa phân công"}
                     </span>
                   </div>
                   <div className="readonly-item">
-                    <label>Nhiệt độ thùng xe lúc đến</label>
-                    <span
-                      style={{
-                        fontWeight: 600,
-                        color: "#2563eb",
-                        fontFamily: "monospace",
-                      }}
-                    >
-                      {detailTrip.temp}
-                    </span>
+                    <label>Bên gửi</label>
+                    <span>{detailTrip.ten_nguoi_gui || "—"}</span>
                   </div>
                   <div className="readonly-item">
-                    <label>Mã seal niêm phong</label>
-                    <span style={{ fontFamily: "monospace", color: "#374151" }}>
-                      {detailTrip.sealCode || "SEAL-TRUCK-8842"}
-                    </span>
+                    <label>Bên nhận / Điểm giao</label>
+                    <span>{detailTrip.ten_ben_nhan || detailTrip.dia_chi_giao_hang || "—"}</span>
                   </div>
                   <div className="readonly-item">
-                    <label>Đơn vị / Đại diện nhận hàng</label>
-                    <span style={{ color: "#374151" }}>
-                      {detailTrip.recipient || "Ban quản lý tiếp nhận"}
-                    </span>
+                    <label>Thời gian xuất</label>
+                    <span>{detailTrip.thoi_gian_xuat}</span>
                   </div>
                 </div>
 
-                <div className="readonly-item" style={{ marginTop: "6px" }}>
-                  <label>Lộ trình di chuyển</label>
-                  <span style={{ color: "#4b5563", fontSize: "13px" }}>
-                    {detailTrip.route}
-                  </span>
-                </div>
-
-                <div className="readonly-item" style={{ marginTop: "6px" }}>
-                  <label>Ghi chú tình trạng nghiệm thu</label>
-                  <span style={{ color: "#4b5563", fontSize: "13px" }}>
-                    {detailTrip.notes ||
-                      "Nguyên đai nguyên kiện, bao bì không rách vỡ, tem QR truy xuất quét thành công."}
-                  </span>
-                </div>
+                {detailTrip.ghi_chu && (
+                  <div className="readonly-item" style={{ marginTop: "6px" }}>
+                    <label>Ghi chú</label>
+                    <span style={{ color: "#4b5563", fontSize: "13px" }}>{detailTrip.ghi_chu}</span>
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn-cancel"
-                  onClick={() => closeModal("deliveryDetail")}
-                >
+                <button className="btn-cancel" onClick={() => setDetailTrip(null)}>
                   Đóng
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => {
-                    closeModal("deliveryDetail");
-                    setDeliveryForm((prev) => ({
-                      ...prev,
-                      tripCode: `#${detailTrip.id}`,
-                    }));
-                    openModal("deliveryConfirm");
-                  }}
-                >
-                  <CheckCircle2 size={15} />
-                  <span>Tiến Hành Ký Giao Nhận</span>
                 </button>
               </div>
             </div>

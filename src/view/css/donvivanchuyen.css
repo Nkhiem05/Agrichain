@@ -454,7 +454,9 @@
 .vanchuyen .status-badge-blue,
 .vanchuyen .status-badge-amber,
 .vanchuyen .status-badge-purple,
-.vanchuyen .status-badge-emerald {
+.vanchuyen .status-badge-emerald,
+.vanchuyen .status-badge-success,
+.vanchuyen .status-badge-danger {
   display: inline-block;
   font-size: 11.5px;
   font-weight: 600;
@@ -476,6 +478,14 @@
 .vanchuyen .status-badge-emerald {
   background-color: #d1fae5;
   color: #065f46;
+}
+.vanchuyen .status-badge-success {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+.vanchuyen .status-badge-danger {
+  background-color: #fee2e2;
+  color: #b91c1c;
 }
 
 /* ========== BUTTONS ========== */
