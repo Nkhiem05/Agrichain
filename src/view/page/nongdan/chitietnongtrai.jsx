@@ -343,10 +343,7 @@ export default function FarmDetail() {
                 </p>
               </div>
 
-              <button
-                className="btn-add-plot"
-                onClick={handleOpenAdd}
-              >
+              <button className="btn-add-plot" onClick={handleOpenAdd}>
                 + Thêm thửa đất
               </button>
             </div>
@@ -550,7 +547,11 @@ export default function FarmDetail() {
                   Hủy
                 </button>
                 <button type="submit" className="btn-submit" disabled={saving}>
-                  {saving ? "Đang lưu..." : editingPlot ? "Cập nhật" : "Lưu thửa đất"}
+                  {saving
+                    ? "Đang lưu..."
+                    : editingPlot
+                      ? "Cập nhật"
+                      : "Lưu thửa đất"}
                 </button>
               </div>
             </form>

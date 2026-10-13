@@ -7,7 +7,7 @@ import DangNhap from "./view/page/dangnhap";
 import Dangky from "./view/page/dangky";
 
 //nông dân
-import Nongdan from "../view/page/nongdan/nongdan";
+import Nongdan from "./view/page/nongdan/nongdan";
 import Chitietnongtrai from "./view/page/nongdan/chitietnongtrai";
 import Chitietmuavu from "./view/page/nongdan/chitietmuavu";
 
@@ -27,6 +27,10 @@ import Trangcanhan from "./view/page/trangcanhan";
 
 // admin
 import Admin from "../src/view/page/admin/admin";
+
+// Nhà phân phối
+import Nhaphanphoi from "../src/view/page/nhaphanphoi/nhaphanphoi";
+import Chitietphanphoi from "../src/view/page/nhaphanphoi/chitietphanphoi";
 
 // user
 import User from "../src/view/page/user/user";
@@ -64,6 +68,10 @@ const AppRoutes = () => {
 
       {/*Admin*/}
       <Route path="/admin" element={<Admin />} />
+
+      {/*Admin*/}
+      <Route path="/nha-phan-phoi" element={<Nhaphanphoi />} />
+      <Route path="/chi-tiet-phan-phoi" element={<Chitietphanphoi />} />
 
       {/*Profile*/}
       <Route path="/trang-ca-nhan" element={<Trangcanhan />} />

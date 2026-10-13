@@ -1416,7 +1416,10 @@ const DashboardPage = () => {
   };
 
   const handleOpenShipping = () => {
-    setShippingForm({ ...EMPTY_SHIPPING_FORM, thoi_gian_xuat: nowLocalInput() });
+    setShippingForm({
+      ...EMPTY_SHIPPING_FORM,
+      thoi_gian_xuat: nowLocalInput(),
+    });
     setReadyBatches([]);
     fetchShippingOptions();
     setShowShippingModal(true);
@@ -2232,7 +2235,9 @@ const DashboardPage = () => {
                                 <CheckCircle2 size={15} />
                               )}
                               {status.tone === "warning" && <Clock size={15} />}
-                              {status.tone === "danger" && <XCircle size={15} />}
+                              {status.tone === "danger" && (
+                                <XCircle size={15} />
+                              )}
                               {status.label}
                             </span>
                           </td>
@@ -2282,7 +2287,9 @@ const DashboardPage = () => {
 
                 <div className="metric-card">
                   <div className="metric-title">Đã bàn giao thành công</div>
-                  <div className="metric-number">{shippingStats.da_ban_giao}</div>
+                  <div className="metric-number">
+                    {shippingStats.da_ban_giao}
+                  </div>
                 </div>
 
                 <div className="metric-card">
@@ -2381,7 +2388,10 @@ const DashboardPage = () => {
                             </div>
                           </td>
                           <td className="package-weight">
-                            {formatQuantity(order.khoi_luong, order.don_vi_tinh)}
+                            {formatQuantity(
+                              order.khoi_luong,
+                              order.don_vi_tinh,
+                            )}
                           </td>
                           <td className="export-time">
                             {formatDateTime(order.thoi_gian_xuat)}
@@ -2867,7 +2877,9 @@ const DashboardPage = () => {
 
                       <div className="readonly-item">
                         <label>Mùa vụ</label>
-                        <span style={readonlyValueStyle(!!info?.loai_cay_trong)}>
+                        <span
+                          style={readonlyValueStyle(!!info?.loai_cay_trong)}
+                        >
                           {info?.loai_cay_trong || "Chưa có dữ liệu"}
                         </span>
                       </div>
@@ -3058,7 +3070,10 @@ const DashboardPage = () => {
                 >
                   <option value="">-- Chọn lô thu hoạch --</option>
                   {readyBatches.map((item) => (
-                    <option key={item.ma_lo_nong_san} value={item.ma_lo_nong_san}>
+                    <option
+                      key={item.ma_lo_nong_san}
+                      value={item.ma_lo_nong_san}
+                    >
                       {item.ma_lo_nong_san} - {item.ten_san_pham}
                     </option>
                   ))}
@@ -3243,7 +3258,9 @@ const DashboardPage = () => {
 
                 <div className="readonly-item">
                   <label>Điểm nhận hàng</label>
-                  <span style={readonlyValueStyle(!!shippingDetail.ten_nong_trai)}>
+                  <span
+                    style={readonlyValueStyle(!!shippingDetail.ten_nong_trai)}
+                  >
                     {shippingDetail.ten_nong_trai
                       ? `${shippingDetail.ten_nong_trai} (${shippingDetail.dia_diem_nong_trai})`
                       : "—"}
@@ -3309,7 +3326,9 @@ const DashboardPage = () => {
                 <button
                   type="button"
                   className="btn-save btn-danger-solid"
-                  onClick={() => handleCancelShipping(shippingDetail.ma_van_don)}
+                  onClick={() =>
+                    handleCancelShipping(shippingDetail.ma_van_don)
+                  }
                 >
                   Hủy lệnh
                 </button>
