@@ -28,6 +28,7 @@
     "dotenv": "^18.0.4",
     "express": "^5.2.1",
     "file-saver": "^2.0.5",
+    "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.49.0",
     "multer": "^2.4.0",

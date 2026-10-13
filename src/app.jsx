@@ -34,6 +34,7 @@ import Chitietphanphoi from "../src/view/page/nhaphanphoi/chitietphanphoi";
 
 // user
 import User from "../src/view/page/user/user";
+import Chitietuser from "../src/view/page/user/chitietuser";
 
 const AppRoutes = () => {
   return (
@@ -65,6 +66,7 @@ const AppRoutes = () => {
 
       {/*User */}
       <Route path="/user" element={<User />} />
+      <Route path="/chi-tiet-user" element={<Chitietuser />} />
 
       {/*Admin*/}
       <Route path="/admin" element={<Admin />} />

@@ -23,6 +23,7 @@ const adminVanChuyenRoutes = require("./routes/routes_admin/vanchuyenAdminRoutes
 const trangcanhanRoutes = require("./routes/trangcanhanRoutes");
 const sochedonggoiRoutes = require("./routes/sochedonggoiRoutes");
 const donvivanchuyenRoutes = require("./routes/donvivanchuyenRoutes");
+const chitietuser = require("./routes/chitietuserRoute");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -78,6 +79,10 @@ app.use("/api/so-che", sochedonggoiRoutes);
 // Đơn vị vận chuyển (thao tác trên lệnh vận chuyển được chỉ định)
 app.use("/api/don-vi-van-chuyen", donvivanchuyenRoutes);
 
+// chi tiết user (quét mã qr)
+app.use("/api/chi-tiet-user", chitietuser);
+
+// Đơn vị vận chuyển (thao tác trên lệnh vận chuyển được chỉ địn
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);
 });

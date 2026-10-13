@@ -135,7 +135,7 @@ const HarvestDetailPage = () => {
   const currentStep = batch?.buoc_hien_tai || 1;
   const batchCode = batch?.ma_lo_nong_san || "";
 
-  const traceUrl = `https://agrichain.vn/trace/${batchCode}`;
+  const traceUrl = `http://localhost:5173/chi-tiet-user?malohang=${batchCode}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
     traceUrl,
   )}`;

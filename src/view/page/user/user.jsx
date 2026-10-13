@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   Sprout,
   Scissors,
@@ -7,594 +7,420 @@ import {
   Store,
   QrCode,
   Scan,
-  ArrowLeft,
-  CheckCircle2,
-  ShieldCheck,
-  Check,
+  Camera,
+  Image as ImageIcon,
   X,
+  FileCheck,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
+import { Html5Qrcode } from "html5-qrcode";
+import { useNavigate } from "react-router-dom";
 import "../../css/user.css";
 
-const DEFAULT_LOGO_IMG =
-  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
+const TraceScannerView = ({ batchCode, setBatchCode, onNavigateToDetail }) => {
+  const navigate = useNavigate();
+  const [internalBatchCode, setInternalBatchCode] = useState("");
+  const currentBatchCode = batchCode !== undefined ? batchCode : internalBatchCode;
+  const handleSetBatchCode = setBatchCode || setInternalBatchCode;
 
-const TraceabilityPage = () => {
-  const [currentScreen, setCurrentScreen] = useState("landing");
-  const [batchCode, setBatchCode] = useState("#SC-2026-001");
+  const goToDetail = (code) => {
+    if (onNavigateToDetail) {
+      onNavigateToDetail(code);
+    } else if (code && code.trim()) {
+      navigate(`/chi-tiet-user?malohang=${encodeURIComponent(code.trim())}`);
+    }
+  };
+
+  const [scanMode, setScanMode] = useState("camera"); // "camera" | "gallery"
   const [showScannerModal, setShowScannerModal] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isScanningFile, setIsScanningFile] = useState(false);
 
-  const handleSimulateScan = () => {
+  const fileInputRef = useRef(null);
+  const html5QrCodeScannerRef = useRef(null);
+
+  // Hàm kiểm tra xem chuỗi có phải là link web hợp lệ hay không
+  const isValidUrl = (text) => {
+    try {
+      const url = new URL(text.trim());
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch {
+      // Dự phòng trường hợp URL không có tiền tố http/https (như www.domain.com)
+      return /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(
+        text.trim(),
+      );
+    }
+  };
+
+  // Chuẩn hóa URL nếu thiếu tiền tố giao thức
+  const formatUrl = (text) => {
+    const trimmed = text.trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+
+  // Xử lý sau khi giải mã QR thành công (cả camera lẫn ảnh)
+  const handleScanSuccess = (decodedText) => {
+    stopCamera();
     setShowScannerModal(false);
-    setCurrentScreen("detail");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    const rawContent = decodedText.trim();
+
+    // Kiểm tra nếu là URL hợp lệ thì tự động mở web
+    if (isValidUrl(rawContent)) {
+      const targetUrl = formatUrl(rawContent);
+      window.open(targetUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    // Nếu không phải URL web, xử lý tra cứu mã lô bình thường
+    handleSetBatchCode(rawContent);
+    goToDetail(rawContent);
+  };
+
+  // Dừng camera và dọn dẹp bộ nhớ
+  const stopCamera = async () => {
+    if (html5QrCodeScannerRef.current) {
+      try {
+        if (html5QrCodeScannerRef.current.isScanning) {
+          await html5QrCodeScannerRef.current.stop();
+        }
+        html5QrCodeScannerRef.current.clear();
+      } catch (err) {
+        console.error("Lỗi khi tắt camera:", err);
+      }
+      html5QrCodeScannerRef.current = null;
+    }
+  };
+
+  // Kích hoạt camera khi mở modal
+  useEffect(() => {
+    if (showScannerModal) {
+      setErrorMessage("");
+      const scanner = new Html5Qrcode("reader");
+      html5QrCodeScannerRef.current = scanner;
+
+      scanner
+        .start(
+          { facingMode: "environment" }, // Ưu tiên camera sau trên thiết bị di động
+          {
+            fps: 10,
+            qrbox: { width: 220, height: 220 },
+          },
+          (decodedText) => {
+            handleScanSuccess(decodedText);
+          },
+          () => {
+            // Callback quét từng khung hình (bỏ qua để tối ưu hiệu năng)
+          },
+        )
+        .catch((err) => {
+          console.error("Lỗi truy cập camera:", err);
+          setErrorMessage(
+            "Không thể truy cập camera. Vui lòng cấp quyền máy ảnh hoặc chọn ảnh từ máy.",
+          );
+        });
+    }
+
+    return () => {
+      stopCamera();
+    };
+  }, [showScannerModal]);
+
+  // Quét giải mã QR từ file ảnh
+  const handleScanFromFile = async (file) => {
+    if (!file) return;
+    setIsScanningFile(true);
+    setErrorMessage("");
+
+    try {
+      const html5QrCode = new Html5Qrcode("hidden-file-scanner");
+      const decodedText = await html5QrCode.scanFile(file, true);
+      html5QrCode.clear();
+      handleScanSuccess(decodedText);
+    } catch (err) {
+      console.error("Lỗi đọc mã từ ảnh:", err);
+      setErrorMessage(
+        "Không tìm thấy hoặc không đọc được mã QR trong ảnh này.",
+      );
+    } finally {
+      setIsScanningFile(false);
+    }
+  };
+
+  // Xử lý khi nhấn nút Quét
+  const handleTriggerScan = () => {
+    setErrorMessage("");
+    if (scanMode === "camera") {
+      setShowScannerModal(true);
+    } else {
+      if (selectedImage) {
+        handleScanFromFile(selectedImage);
+      } else {
+        fileInputRef.current?.click();
+      }
+    }
+  };
+
+  // Khi chọn file ảnh từ máy
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      setErrorMessage("");
+    }
+  };
+
+  // Gỡ bỏ file ảnh đã chọn
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setErrorMessage("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
-    <div className="trace-page">
-      {/* HEADER */}
-      <header className="dashboard-header">
-        <div
-          className="header-left"
-          onClick={() => setCurrentScreen("landing")}
-        >
-          <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
-          <div>
-            <span className="header-brand-title">AGRICHAIN</span>
+    <>
+      {/* Khối ẩn phục vụ giải mã file ảnh */}
+      <div id="hidden-file-scanner" style={{ display: "none" }}></div>
+
+      <div className="landing-container">
+        {/* CỘT TRÁI: QUY TRÌNH CHUẨN */}
+        <div className="timeline-box">
+          <h1 className="scanner-heading">
+            Quy Trình Chuẩn Hóa Chuỗi Cung Ứng
+          </h1>
+          <p className="scanner-subheading">
+            Mỗi mắt xích đều ký số điện tử để xác nhận dữ liệu độc lập trên
+            Smart Contract.
+          </p>
+
+          <div className="timeline-vertical">
+            <div className="timeline-step">
+              <span className="timeline-step-dot dot-green"></span>
+              <div className="timeline-step-title">
+                1. <Sprout size={16} color="#16a34a" /> Gieo Trồng & Quản Lý
+                Canh Tác
+              </div>
+              <p className="timeline-step-desc">
+                Lập nhật ký bón phân, tưới tiêu và chi tiết hoạt chất BVTV theo
+                chuẩn an toàn sinh học.
+              </p>
+            </div>
+
+            <div className="timeline-step">
+              <span className="timeline-step-dot dot-green"></span>
+              <div className="timeline-step-title">
+                <Scissors size={16} color="#16a34a" /> 2. Thu Hoạch & Cách Ly An
+                Toàn
+              </div>
+              <p className="timeline-step-desc">
+                Đảm bảo thời gian cách ly hoạt chất và niêm phong lô quả trước
+                khi xuất vườn.
+              </p>
+            </div>
+
+            <div className="timeline-step">
+              <span className="timeline-step-dot dot-purple"></span>
+              <div className="timeline-step-title">
+                <Award size={16} color="#9333ea" /> 3. Kiểm Định & Giám Định
+                Chất Lượng
+              </div>
+              <p className="timeline-step-desc">
+                Đơn vị độc lập kiểm tra dư lượng hóa chất, vi sinh và công bố mã
+                giấy chứng nhận.
+              </p>
+            </div>
+
+            <div className="timeline-step">
+              <span className="timeline-step-dot dot-blue"></span>
+              <div className="timeline-step-title">
+                <Package size={16} color="#2563eb" /> 4. Sơ Chế, Khử Trùng &
+                Đóng Gói
+              </div>
+              <p className="timeline-step-desc">
+                Khử khuẩn sục ozon, sấy khô nhiệt độ chuẩn và gắn tem mã hóa QR
+                truy xuất.
+              </p>
+            </div>
+
+            <div className="timeline-step">
+              <span className="timeline-step-dot dot-amber"></span>
+              <div className="timeline-step-title">
+                <Store size={16} color="#d97706" /> 5. Vận Chuyển Chuỗi Lạnh &
+                Phân Phối
+              </div>
+              <p className="timeline-step-desc">
+                Giám sát nhiệt độ xe tải lạnh suốt hành trình trước khi chuyển
+                giao đến tay người tiêu dùng.
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="chain-badge">
-          <span className="pulse-dot"></span>
-          <span>Mainnet Online • Block #18,924,102</span>
-        </div>
-      </header>
-
-      {/* MÀN HÌNH 1: LANDING & QUÉT QR */}
-      {currentScreen === "landing" && (
-        <div className="landing-container">
-          {/* CỘT TRÁI: QUY TRÌNH CHUẨN */}
-          <div className="timeline-box">
-            <h1
-              style={{
-                fontSize: "22px",
-                fontWeight: "800",
-                color: "#111827",
-                marginBottom: "6px",
-              }}
-            >
-              Quy Trình Chuẩn Hóa Chuỗi Cung Ứng
-            </h1>
-            <p
-              style={{
-                fontSize: "12px",
-                color: "#6b7280",
-                marginBottom: "20px",
-              }}
-            >
-              Mỗi mắt xích đều ký số điện tử để xác nhận dữ liệu độc lập trên
-              Smart Contract[cite: 5].
-            </p>
-
-            <div className="timeline-vertical">
-              <div className="timeline-step">
-                <span className="timeline-step-dot"></span>
-                <div className="timeline-step-title">
-                  <Sprout size={16} color="#16a34a" /> 1. Gieo Trồng & Quản Lý
-                  Canh Tác
-                </div>
-                <p className="timeline-step-desc">
-                  Lập nhật ký bón phân, tưới tiêu và chi tiết hoạt chất BVTV
-                  theo chuẩn an toàn sinh học[cite: 1].
-                </p>
-              </div>
-
-              <div className="timeline-step">
-                <span className="timeline-step-dot"></span>
-                <div className="timeline-step-title">
-                  <Scissors size={16} color="#16a34a" /> 2. Thu Hoạch & Cách Ly
-                  An Toàn
-                </div>
-                <p className="timeline-step-desc">
-                  Đảm bảo thời gian cách ly hoạt chất và niêm phong lô quả trước
-                  khi xuất vườn.
-                </p>
-              </div>
-
-              <div className="timeline-step">
-                <span
-                  className="timeline-step-dot"
-                  style={{ backgroundColor: "#9333ea" }}
-                ></span>
-                <div className="timeline-step-title">
-                  <Award size={16} color="#9333ea" /> 3. Kiểm Định & Giám Định
-                  Chất Lượng
-                </div>
-                <p className="timeline-step-desc">
-                  Đơn vị độc lập kiểm tra dư lượng hóa chất, vi sinh và công bố
-                  mã giấy chứng nhận.
-                </p>
-              </div>
-
-              <div className="timeline-step">
-                <span
-                  className="timeline-step-dot"
-                  style={{ backgroundColor: "#2563eb" }}
-                ></span>
-                <div className="timeline-step-title">
-                  <Package size={16} color="#2563eb" /> 4. Sơ Chế, Khử Trùng &
-                  Đóng Gói
-                </div>
-                <p className="timeline-step-desc">
-                  Khử khuẩn sục ozon, sấy khô nhiệt độ chuẩn và gắn tem mã hóa
-                  QR truy xuất[cite: 5].
-                </p>
-              </div>
-
-              <div className="timeline-step">
-                <span
-                  className="timeline-step-dot"
-                  style={{ backgroundColor: "#d97706" }}
-                ></span>
-                <div className="timeline-step-title">
-                  <Store size={16} color="#d97706" /> 5. Vận Chuyển Chuỗi Lạnh &
-                  Phân Phối
-                </div>
-                <p className="timeline-step-desc">
-                  Giám sát nhiệt độ xe tải lạnh suốt hành trình trước khi chuyển
-                  giao đến tay người tiêu dùng[cite: 3, 4].
-                </p>
-              </div>
-            </div>
+        {/* CỘT PHẢI: QUÉT QR & NHẬP MÃ */}
+        <div className="qr-box">
+          <div className="scanner-icon-wrap">
+            <Scan size={38} />
           </div>
+          <h3 className="qr-box-title">Kiểm Tra Tem Nông Sản</h3>
+          <p className="qr-box-subtitle">
+            Hỗ trợ mở link tự động hoặc tra cứu thông tin tem QR nông sản.
+          </p>
 
-          {/* CỘT PHẢI: QUÉT QR & NHẬP MÃ */}
-          <div className="qr-box">
-            <div className="scanner-icon-wrap">
-              <Scan size={38} />
-            </div>
-            <h3 style={{ fontSize: "18px", fontWeight: "700" }}>
-              Kiểm Tra Tem Nông Sản
-            </h3>
-            <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
-              Hướng camera quét tem QR dán trên từng quả hoặc thùng carton[cite:
-              5].
-            </p>
-
+          {/* CHỌN PHƯƠNG THỨC */}
+          <div className="scan-mode-tabs">
             <button
-              className="btn-scan-primary"
-              onClick={() => setShowScannerModal(true)}
+              type="button"
+              className={`scan-tab-btn ${scanMode === "camera" ? "active" : ""}`}
+              onClick={() => {
+                setScanMode("camera");
+                setSelectedImage(null);
+                setErrorMessage("");
+              }}
             >
-              <QrCode size={18} /> Quét Mã QR Ngay[cite: 5]
+              <Camera size={16} /> Quét Camera
             </button>
+            <button
+              type="button"
+              className={`scan-tab-btn ${scanMode === "gallery" ? "active" : ""}`}
+              onClick={() => {
+                setScanMode("gallery");
+                setErrorMessage("");
+              }}
+            >
+              <ImageIcon size={16} /> Chọn từ thư viện
+            </button>
+          </div>
 
-            <div style={{ width: "100%", marginTop: "20px" }}>
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "#9ca3af",
-                  textTransform: "uppercase",
-                }}
+          {/* Input file ẩn phục vụ chọn ảnh */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handleFileChange}
+          />
+
+          {/* Hiển thị tệp ảnh đã chọn nếu ở chế độ gallery */}
+          {scanMode === "gallery" && selectedImage && (
+            <div className="selected-file-preview">
+              <div className="preview-info">
+                <FileCheck size={16} color="#10b981" />
+                <span>{selectedImage.name}</span>
+              </div>
+              <button
+                type="button"
+                className="btn-remove-file"
+                onClick={handleRemoveImage}
               >
-                Hoặc tra cứu bằng mã
-              </span>
-              <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                <input
-                  type="text"
-                  value={batchCode}
-                  onChange={(e) => setBatchCode(e.target.value)}
-                  style={{
-                    flex: 1,
-                    height: "38px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    padding: "0 10px",
-                    fontFamily: "monospace",
-                    fontSize: "13px",
-                  }}
-                />
-                <button
-                  style={{
-                    height: "38px",
-                    padding: "0 14px",
-                    backgroundColor: "#f3f4f6",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "8px",
-                    fontWeight: "700",
-                    fontSize: "12px",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => setCurrentScreen("detail")}
-                >
-                  Tra cứu
-                </button>
-              </div>
+                <X size={16} />
+              </button>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* MÀN HÌNH 2: CHI TIẾT SẢN PHẨM TRUY XUẤT */}
-      {currentScreen === "detail" && (
-        <div className="detail-container">
-          <div className="back-bar">
-            <button
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                border: "none",
-                background: "none",
-                color: "#16a34a",
-                fontWeight: "700",
-                fontSize: "13px",
-                cursor: "pointer",
-              }}
-              onClick={() => setCurrentScreen("landing")}
-            >
-              <ArrowLeft size={16} /> Quay lại màn hình quét[cite: 5]
-            </button>
-            <span
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                fontWeight: "700",
-                color: "#15803d",
-              }}
-            >
-              <CheckCircle2 size={16} /> Đã Khớp Chữ Ký Chuỗi Khối[cite: 5]
-            </span>
-          </div>
-
-          <div className="detail-grid">
-            {/* THÔNG TIN CHUNG & BLOCKCHAIN */}
+          {/* Thông báo lỗi nếu có */}
+          {errorMessage && (
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+              className="scanner-error-msg"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                justifyContent: "center",
+              }}
             >
-              <div className="timeline-box">
-                <span
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: "700",
-                    color: "#16a34a",
-                  }}
-                >
-                  {batchCode}
-                </span>
-                <h2
-                  style={{
-                    fontSize: "20px",
-                    fontWeight: "800",
-                    marginTop: "4px",
-                  }}
-                >
-                  Quýt Đường Đóng Thùng
-                </h2>
-                <p style={{ fontSize: "12px", color: "#6b7280" }}>
-                  Giống thuần canh tác tại Trà Vinh[cite: 1]
-                </p>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    marginTop: "8px",
-                    color: "#16a34a",
-                    fontSize: "12px",
-                    fontWeight: "600",
-                  }}
-                >
-                  <ShieldCheck size={16} /> Đạt Chứng Nhận VietGAP
-                </div>
-              </div>
-
-              <div className="blockchain-card">
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <span>XÁC THỰC CHUỖI KHỐI[cite: 5]</span>
-                  <span style={{ color: "#86efac" }}>100% Verified</span>
-                </div>
-                <p style={{ fontSize: "10px", color: "#d1fae5" }}>
-                  Transaction Hash[cite: 5]:
-                </p>
-                <p
-                  style={{
-                    wordBreak: "break-all",
-                    fontWeight: "700",
-                    color: "#ffffff",
-                    marginBottom: "8px",
-                  }}
-                >
-                  0x7c49f821e9ba0029b3014fec6491a381e9b2a74c
-                </p>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderTop: "1px solid rgba(255,255,255,0.2)",
-                    paddingTop: "8px",
-                  }}
-                >
-                  <span>Block: #18,924,102[cite: 5]</span>
-                  <span>AgriChain V2[cite: 5]</span>
-                </div>
-              </div>
+              <AlertCircle size={15} />
+              <span>{errorMessage}</span>
             </div>
+          )}
 
-            {/* DÒNG ĐỜI SẢN PHẨM */}
-            <div className="timeline-box">
-              <h3
-                style={{
-                  fontSize: "16px",
-                  fontWeight: "700",
-                  marginBottom: "16px",
+          {/* NÚT THỰC HIỆN QUÉT */}
+          <button
+            type="button"
+            className="btn-scan-primary"
+            onClick={handleTriggerScan}
+            disabled={isScanningFile}
+          >
+            {isScanningFile ? (
+              <>
+                <Loader2 size={18} className="animate-spin" /> Đang Phân Tích
+                Ảnh...
+              </>
+            ) : (
+              <>
+                <QrCode size={18} />
+                {scanMode === "camera"
+                  ? "Bật Camera Quét Mã"
+                  : selectedImage
+                    ? "Bắt Đầu Nhận Diện Mã QR"
+                    : "Chọn Ảnh Từ Thư Mục"}
+              </>
+            )}
+          </button>
+
+          <div className="manual-input-wrap">
+            <span className="manual-input-label">Hoặc tra cứu bằng mã</span>
+            <div className="manual-input-row">
+              <input
+                type="text"
+                value={currentBatchCode}
+                onChange={(e) => handleSetBatchCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    goToDetail(currentBatchCode);
+                  }
                 }}
+                placeholder="Nhập mã truy xuất (mã lô, mã kiểm định)..."
+                className="input-batch-code"
+              />
+              <button
+                type="button"
+                className="btn-search-code"
+                onClick={() => goToDetail(currentBatchCode)}
               >
-                Hồ Sơ Dòng Đời Sản Phẩm Minh Bạch
-              </h3>
-
-              <div className="timeline-vertical">
-                {/* 1. Nông Trại */}
-                <div className="timeline-step">
-                  <span className="timeline-step-dot"></span>
-                  <div className="timeline-step-title">
-                    <Sprout size={16} color="#16a34a" /> 1. Canh Tác & Thu Hoạch
-                  </div>
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "#16a34a",
-                      fontWeight: "600",
-                    }}
-                  >
-                    Vườn Cam A1 (#FARM-01111) - Nông dân: Nguyễn Văn A (Trà
-                    Vinh)[cite: 1]
-                  </p>
-                  <div
-                    style={{
-                      backgroundColor: "#f8fafc",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      marginTop: "8px",
-                    }}
-                  >
-                    <p style={{ fontSize: "12px", color: "#475569" }}>
-                      Bắt đầu: 18/06/2025 • Thu hoạch: 20/09/2026 (1,500
-                      kg)[cite: 1]
-                    </p>
-                    <table
-                      className="table-compact"
-                      style={{ marginTop: "8px" }}
-                    >
-                      <thead>
-                        <tr>
-                          <th>Ngày</th>
-                          <th>Hoạt chất BVTV / Phân bón[cite: 1]</th>
-                          <th>Cách ly</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>10/08/2026</td>
-                          <td>NPK Đầu Trâu 20-20-15[cite: 1]</td>
-                          <td>Bón lót nuôi quả</td>
-                        </tr>
-                        <tr>
-                          <td>25/08/2026</td>
-                          <td>Thuốc trừ sâu Decis 2.5EC[cite: 1]</td>
-                          <td style={{ color: "#16a34a", fontWeight: "700" }}>
-                            Cách ly 26 ngày (≥14 ngày)
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 2. Kiểm định */}
-                <div className="timeline-step">
-                  <span
-                    className="timeline-step-dot"
-                    style={{ backgroundColor: "#9333ea" }}
-                  ></span>
-                  <div className="timeline-step-title">
-                    <Award size={16} color="#9333ea" /> 2. Kiểm Định Chất Lượng
-                  </div>
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "#9333ea",
-                      fontWeight: "600",
-                    }}
-                  >
-                    Trung Tâm Giám Định Nông Nghiệp Vùng 2 - Giấy chứng nhận:
-                    VG-2026-8812
-                  </p>
-                  <div
-                    style={{
-                      backgroundColor: "#faf5ff",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      marginTop: "8px",
-                    }}
-                  >
-                    <table className="table-compact">
-                      <thead>
-                        <tr>
-                          <th>Chỉ tiêu xét nghiệm</th>
-                          <th>Hàm lượng</th>
-                          <th>Kết luận</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>Nitrate (NO3)</td>
-                          <td>0.02 mg/kg</td>
-                          <td style={{ color: "#16a34a", fontWeight: "700" }}>
-                            Đạt chuẩn
-                          </td>
-                        </tr>
-                        <tr>
-                          <td>Deltamethrin (Decis)[cite: 1]</td>
-                          <td>&lt; 0.005 mg/kg</td>
-                          <td style={{ color: "#16a34a", fontWeight: "700" }}>
-                            Không phát hiện tồn dư
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* 3. Sơ chế */}
-                <div className="timeline-step">
-                  <span
-                    className="timeline-step-dot"
-                    style={{ backgroundColor: "#2563eb" }}
-                  ></span>
-                  <div className="timeline-step-title">
-                    <Package size={16} color="#2563eb" /> 3. Sơ Chế & Đóng Gói
-                  </div>
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "#2563eb",
-                      fontWeight: "600",
-                    }}
-                  >
-                    HTX Sơ Chế & Chế Biến Mekong - Mã lô: #SC-2026-001[cite: 2]
-                  </p>
-                  <div
-                    style={{
-                      backgroundColor: "#eff6ff",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      marginTop: "8px",
-                      fontSize: "12px",
-                    }}
-                  >
-                    <p>• Rửa sục Ozon 0.5 ppm diệt nấm khuẩn (27/09/2026)</p>
-                    <p>
-                      • Sấy ráo khí mát 35°C và đóng thùng 10kg dán tem QR
-                      (28/09/2026)[cite: 5]
-                    </p>
-                  </div>
-                </div>
-
-                {/* 4. Phân phối */}
-                <div className="timeline-step">
-                  <span
-                    className="timeline-step-dot"
-                    style={{ backgroundColor: "#d97706" }}
-                  ></span>
-                  <div className="timeline-step-title">
-                    <Store size={16} color="#d97706" /> 4. Phân Phối & Bán Lẻ
-                  </div>
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "#d97706",
-                      fontWeight: "600",
-                    }}
-                  >
-                    Tổng Kho Bách Hóa Sài Gòn ➔ Siêu thị Co.opMart Lý Thường
-                    Kiệt[cite: 4]
-                  </p>
-                  <div
-                    style={{
-                      backgroundColor: "#fffbeb",
-                      padding: "12px",
-                      borderRadius: "8px",
-                      marginTop: "8px",
-                      fontSize: "12px",
-                    }}
-                  >
-                    <p>
-                      • Vận chuyển: Xe tải lạnh 65C-128.45 duy trì nhiệt độ 8°C
-                      (29/09/2026)[cite: 3, 4]
-                    </p>
-                    <p>
-                      • Trạng thái: Lên kệ phục vụ người tiêu dùng
-                      (30/09/2026)[cite: 4]
-                    </p>
-                  </div>
-                </div>
-              </div>
+                Tra cứu
+              </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* MODAL MÔ PHỎNG CAMERA QUÉT QR */}
+      {/* MODAL QUÉT CAMERA THẬT */}
       {showScannerModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(0,0,0,0.85)",
-            zIndex: 1000,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "24px",
-            color: "white",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              width: "100%",
-              maxWidth: "420px",
-            }}
-          >
-            <span>Hướng camera vào mã tem QR[cite: 5]</span>
+        <div className="scanner-modal-backdrop">
+          <div className="scanner-modal-header">
+            <span>Hướng camera vào mã QR</span>
             <button
-              style={{
-                background: "none",
-                border: "none",
-                color: "white",
-                cursor: "pointer",
+              type="button"
+              className="btn-close-modal"
+              onClick={() => {
+                stopCamera();
+                setShowScannerModal(false);
               }}
-              onClick={() => setShowScannerModal(false)}
             >
               <X size={20} />
             </button>
           </div>
 
-          <div
-            style={{
-              width: "240px",
-              height: "240px",
-              border: "2px solid #34d399",
-              borderRadius: "20px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <QrCode size={110} color="rgba(255,255,255,0.3)" />
+          <div className="scanner-camera-container">
+            <div id="reader"></div>
           </div>
 
-          <button
-            className="btn-scan-primary"
-            style={{ maxWidth: "420px" }}
-            onClick={handleSimulateScan}
-          >
-            <Check size={16} /> Nhận Diện Mã Thành Công (Mô Phỏng)[cite: 5]
-          </button>
+          {errorMessage && (
+            <div className="scanner-error-msg">{errorMessage}</div>
+          )}
+
+          <p style={{ fontSize: "13px", opacity: 0.8, textAlign: "center" }}>
+            Giữ mã QR nằm trong vùng quét để hệ thống nhận diện tự động.
+          </p>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
-export default TraceabilityPage;
+export default TraceScannerView;
