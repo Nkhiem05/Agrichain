@@ -24,6 +24,7 @@ const trangcanhanRoutes = require("./routes/trangcanhanRoutes");
 const sochedonggoiRoutes = require("./routes/sochedonggoiRoutes");
 const donvivanchuyenRoutes = require("./routes/donvivanchuyenRoutes");
 const chitietuser = require("./routes/chitietuserRoute");
+const nhaphanphoiRoutes = require("./routes/nhaphanphoiRoutes");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -81,8 +82,8 @@ app.use("/api/don-vi-van-chuyen", donvivanchuyenRoutes);
 
 // chi tiết user (quét mã qr)
 app.use("/api/chi-tiet-user", chitietuser);
-
-// Đơn vị vận chuyển (thao tác trên lệnh vận chuyển được chỉ địn
+// Nhà phân phối (tiếp nhận, kho hàng, phân phối cho đại lý, quản lý đại lý)
+app.use("/api/nha-phan-phoi", nhaphanphoiRoutes);
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);
 });

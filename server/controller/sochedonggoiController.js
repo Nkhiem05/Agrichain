@@ -864,6 +864,27 @@ const getTransporters = async (req, res) => {
   }
 };
 
+// Nhà phân phối có tài khoản chính thức để chọn làm bên nhận (tùy chọn,
+// thay cho nhập địa chỉ tự do khi chưa rõ ai nhận).
+const getDistributors = async (req, res) => {
+  try {
+    getProcessorId(req);
+
+    const [rows] = await db.execute(
+      `SELECT ma_nguoi_dung, ho_ten, dia_chi FROM nguoi_dung WHERE vai_tro = 'DISTRIBUTOR' AND trang_thai = 1 ORDER BY ho_ten ASC`,
+    );
+
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách nhà phân phối:",
+      "Không thể lấy danh sách nhà phân phối",
+    );
+  }
+};
+
 const SHIPMENT_SELECT = `
   SELECT
     v.ma_van_don,
@@ -955,12 +976,14 @@ const createShipment = async (req, res) => {
     const ma_don_vi_van_chuyen = cleanText(req.body?.ma_don_vi_van_chuyen);
     const ten_tai_xe = cleanText(req.body?.ten_tai_xe);
     const bien_so_xe = cleanText(req.body?.bien_so_xe);
-    const dia_chi_giao_hang = cleanText(req.body?.dia_chi_giao_hang);
+    const ma_ben_nhan = cleanText(req.body?.ma_ben_nhan);
+    let dia_chi_giao_hang = cleanText(req.body?.dia_chi_giao_hang);
     const ghi_chu = cleanText(req.body?.ghi_chu);
 
     if (!ma_lo_nong_san) throw new ApiError(400, "Vui lòng chọn lô hàng cần bàn giao");
     if (!ma_don_vi_van_chuyen) throw new ApiError(400, "Vui lòng chọn đơn vị vận chuyển");
-    if (!dia_chi_giao_hang) throw new ApiError(400, "Vui lòng nhập điểm giao hàng / kho tiếp nhận");
+    if (!ma_ben_nhan && !dia_chi_giao_hang)
+      throw new ApiError(400, "Vui lòng chọn nhà phân phối nhận hàng hoặc nhập điểm giao hàng");
     if (!ten_tai_xe) throw new ApiError(400, "Vui lòng nhập tên tài xế tiếp nhận");
     if (!bien_so_xe) throw new ApiError(400, "Vui lòng nhập biển số xe");
 
@@ -1006,19 +1029,35 @@ const createShipment = async (req, res) => {
             throw new ApiError(404, "Không tìm thấy đơn vị vận chuyển");
           }
 
+          if (ma_ben_nhan) {
+            const [distributors] = await connection.execute(
+              `SELECT ma_nguoi_dung, dia_chi FROM nguoi_dung WHERE ma_nguoi_dung = ? AND vai_tro = 'DISTRIBUTOR' AND trang_thai = 1`,
+              [ma_ben_nhan],
+            );
+
+            if (distributors.length === 0) {
+              throw new ApiError(404, "Không tìm thấy nhà phân phối nhận hàng");
+            }
+
+            if (!dia_chi_giao_hang) {
+              dia_chi_giao_hang = distributors[0].dia_chi || null;
+            }
+          }
+
           const newCode = await generateShipmentCode(connection);
 
           await connection.execute(
             `
             INSERT INTO lenh_van_chuyen
             (ma_van_don, ma_lo_nong_san, ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan, dia_chi_giao_hang, ten_tai_xe, bien_so_xe, khoi_luong, don_vi_tinh, thoi_gian_xuat, ghi_chu)
-            VALUES (?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, NOW(), ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)
             `,
             [
               newCode,
               ma_lo_nong_san,
               maCoSo,
               ma_don_vi_van_chuyen,
+              ma_ben_nhan || null,
               dia_chi_giao_hang,
               ten_tai_xe,
               bien_so_xe,
@@ -1163,6 +1202,7 @@ module.exports = {
   mergeBatch,
   getReadyToShip,
   getTransporters,
+  getDistributors,
   getShipments,
   getShipmentById,
   createShipment,

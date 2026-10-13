@@ -137,6 +137,13 @@ export const fetchTransporters = async () => {
   return parseJson(res);
 };
 
+export const fetchDistributors = async () => {
+  const res = await fetch(`${API_URL}/nha-phan-phoi`, {
+    headers: authHeaders(),
+  });
+  return parseJson(res);
+};
+
 export const fetchShipments = async () => {
   const res = await fetch(`${API_URL}/ban-giao`, { headers: authHeaders() });
   return parseJson(res);

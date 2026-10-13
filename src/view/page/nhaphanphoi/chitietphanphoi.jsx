@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ArrowLeft,
   Printer,
@@ -8,238 +8,223 @@ import {
   Building2,
   Package,
   FileText,
-  QrCode,
   AlertTriangle,
   MapPin,
   Phone,
   User,
-  CalendarClock,
   Weight,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import "../../css/chitietphanphoi.css";
+import {
+  fetchDispatchDetail,
+  markDispatchShipped,
+  markDispatchDelivered,
+} from "../../../api/nhaphanphoiApi";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
+const STATUS_LABEL = {
+  CHO_XUAT: { text: "Chờ xuất kho", tone: "warning" },
+  DANG_GIAO: { text: "Đang trên đường giao", tone: "info" },
+  DA_GIAO: { text: "Bàn giao hoàn tất", tone: "success" },
+  DA_HUY: { text: "Đã huỷ", tone: "danger" },
+};
+
 const ChiTietPhanPhoiPage = () => {
   const navigate = useNavigate();
-  const { id } = useParams();
+  const { maPhieu } = useParams();
 
-  // Dữ liệu chi tiết mẫu của phiếu phân phối
-  const [orderDetail] = useState({
-    maPhieu: id || "PXK-2026-081",
-    ngayLap: "12/10/2026 - 08:30",
-    trangThai: "DA_GIAO", // CHO_XUAT | DANG_GIAO | DA_GIAO
-    txHash: "0x9f88c42b10a239d...771e84",
+  const [orderDetail, setOrderDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [acting, setActing] = useState(false);
 
-    // Thông tin đại lý nhận
-    daiLy: {
-      maDL: "DL01",
-      ten: "Hệ thống Siêu Thị Co.opMart - Chi nhánh Lý Thường Kiệt",
-      nguoiDaiDien: "Nguyễn Thu Hà",
-      sdt: "0908 123 456",
-      diaChi: "497 Lý Thường Kiệt, Phường 7, Tân Bình, TP. Hồ Chí Minh",
+  const loadDetail = async () => {
+    if (!maPhieu) {
+      setErrorMsg("Thiếu mã phiếu xuất kho cần xem");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setErrorMsg("");
+    try {
+      const res = await fetchDispatchDetail(maPhieu);
+      setOrderDetail(res?.data || null);
+    } catch (err) {
+      setErrorMsg(err.message || "Không tìm thấy phiếu xuất kho");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDetail();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maPhieu]);
+
+  const handleMarkShipped = async () => {
+    if (!window.confirm(`Xác nhận đã xuất kho phiếu ${orderDetail.ma_phieu}?`)) return;
+    setActing(true);
+    try {
+      await markDispatchShipped(orderDetail.ma_phieu);
+      await loadDetail();
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận xuất kho");
+    } finally {
+      setActing(false);
+    }
+  };
+
+  const handleMarkDelivered = async () => {
+    if (!window.confirm(`Xác nhận đại lý đã nhận đủ hàng cho phiếu ${orderDetail.ma_phieu}?`)) return;
+    setActing(true);
+    try {
+      await markDispatchDelivered(orderDetail.ma_phieu);
+      await loadDetail();
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận giao hàng");
+    } finally {
+      setActing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="ctpp-page">
+        <div style={{ padding: 60, textAlign: "center", color: "#6b7280" }}>Đang tải...</div>
+      </div>
+    );
+  }
+
+  if (errorMsg || !orderDetail) {
+    return (
+      <div className="ctpp-page">
+        <main className="ctpp-main">
+          <button type="button" className="ctpp-btn-back" onClick={() => navigate(-1)}>
+            <ArrowLeft size={16} />
+            Quay lại danh sách
+          </button>
+          <div style={{ padding: 40, textAlign: "center", color: "#dc2626" }}>
+            {errorMsg || "Không tìm thấy phiếu xuất kho"}
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  const statusInfo = STATUS_LABEL[orderDetail.trang_thai] || { text: orderDetail.trang_thai, tone: "info" };
+
+  // Dòng thời gian thật, chỉ dựng từ các mốc đã thực sự xảy ra (không có bên
+  // thứ 2 xác nhận số liệu vì đại lý không có tài khoản trong hệ thống).
+  const timeline = [
+    {
+      tieuDe: "Lập phiếu xuất kho",
+      thoiGian: orderDetail.created_at ? new Date(orderDetail.created_at).toLocaleString("vi-VN") : null,
+      moTa: `Xuất ${orderDetail.so_luong_xuat} ${orderDetail.don_vi_tinh} lô ${orderDetail.ma_lo_nong_san} cho đại lý ${orderDetail.ten_dai_ly}.`,
+      hoanThanh: true,
     },
-
-    // Thông tin lô hàng nông sản
-    sanPham: {
-      maLo: "SC-2026-002",
-      tenSP: "Cam Sành Tiền Giang VietGAP",
-      khoXuat: "Kho Mát A (Kệ Pallet 04 - AgriHub Central #01)",
-      tieuChuan: "VietGAP (Chứng thư: VG-TG-2026-09)",
-      hanBaoQuan: "30/10/2026",
-      soLuongXuat: 300,
-      soLuongThucNhan: 300,
-      quyCach: "30 thùng × 10 kg",
-      haoHut: 0,
-      donGiaUocTinh: "28.000 đ/kg",
-    },
-
-    // Thông tin vận chuyển
-    vanChuyen: {
-      hinhThuc: "Đơn vị vận chuyển liên kết",
-      donVi: "Giao Hàng Nhanh AgriLogistics",
-      taiXe: "Trần Minh Trí",
-      bienSo: "51C-782.90",
-      sdtTaiXe: "0934 556 778",
-      thoiGianXuatKho: "12/10/2026 - 09:15",
-      thoiGianBanGiao: "12/10/2026 - 11:45",
-      ghiChuGiao:
-        "Bảo quản xe mát 8 – 12°C, xếp nhẹ tay tránh dập đáy thùng.",
-    },
-
-    // Lịch trình phân phối (Tracking timeline)
-    timeline: [
-      {
-        tieuDe: "Lập phiếu xuất kho thành công",
-        thoiGian: "12/10/2026 - 08:30",
-        moTa: "Thủ kho Bách Hóa Sài Gòn hoàn tất chỉ định xuất lô SC-2026-002.",
-        hoanThanh: true,
-      },
-      {
-        tieuDe: "Xuất xe & Niêm phong Seal",
-        thoiGian: "12/10/2026 - 09:15",
-        moTa: "Bàn giao 30 thùng cho tài xế Trần Minh Trí (Xe 51C-782.90). Mã seal: SEAL-PP-441.",
-        hoanThanh: true,
-      },
-      {
-        tieuDe: "Xe cập bãi đại lý",
-        thoiGian: "12/10/2026 - 11:20",
-        moTa: "Xe đến địa chỉ Siêu Thị Co.opMart Lý Thường Kiệt, kiểm tra seal nguyên vẹn.",
-        hoanThanh: true,
-      },
-      {
-        tieuDe: "Đại lý hoàn tất kiểm đếm & Nhận hàng",
-        thoiGian: "12/10/2026 - 11:45",
-        moTa: "Đại diện Nguyễn Thu Hà ký nhận đủ 300 kg, không phát hiện dập hỏng.",
-        hoanThanh: true,
-      },
-    ],
-  });
-
-  const haoHutKg =
-    orderDetail.sanPham.soLuongXuat - orderDetail.sanPham.soLuongThucNhan;
-  const haoHutPct =
-    orderDetail.sanPham.soLuongXuat > 0
-      ? ((haoHutKg / orderDetail.sanPham.soLuongXuat) * 100).toFixed(1)
-      : "0.0";
+  ];
+  if (orderDetail.thoi_gian_xuat) {
+    timeline.push({
+      tieuDe: "Đã xuất kho, bắt đầu giao hàng",
+      thoiGian: orderDetail.thoi_gian_xuat,
+      moTa:
+        orderDetail.hinh_thuc === "TU_GIAO"
+          ? `${orderDetail.ten_tai_xe || "—"} (${orderDetail.bien_so_xe || "—"})`
+          : orderDetail.ten_don_vi_van_chuyen || "—",
+      hoanThanh: true,
+    });
+  }
+  if (orderDetail.thoi_gian_giao) {
+    timeline.push({
+      tieuDe: "Đại lý đã nhận hàng",
+      thoiGian: orderDetail.thoi_gian_giao,
+      moTa: `Nhà phân phối xác nhận đã bàn giao đủ hàng cho ${orderDetail.ten_dai_ly}.`,
+      hoanThanh: true,
+    });
+  }
 
   return (
     <div className="ctpp-page">
-      {/* =================== HEADER =================== */}
       <header className="ctpp-header">
         <div className="ctpp-header-left">
           <img src={DEFAULT_LOGO_IMG} alt="Logo" className="ctpp-logo" />
           <span className="ctpp-brand">AGRICHAIN</span>
         </div>
-        <div className="ctpp-header-profile">
-          <div className="ctpp-avatar">NPP</div>
-          <div className="ctpp-profile-meta">
-            <span className="ctpp-profile-name">Tổng Kho Bách Hóa Sài Gòn</span>
-            <span className="ctpp-profile-role">Đơn vị phân phối trung chuyển</span>
-          </div>
-        </div>
       </header>
 
-      {/* =================== MAIN =================== */}
       <main className="ctpp-main">
-        {/* TOP BAR: Quay lại + In phiếu */}
         <div className="ctpp-topbar">
-          <button
-            type="button"
-            className="ctpp-btn-back"
-            onClick={() => navigate(-1)}
-          >
+          <button type="button" className="ctpp-btn-back" onClick={() => navigate(-1)}>
             <ArrowLeft size={16} />
             Quay lại danh sách
           </button>
           <div className="ctpp-topbar-actions">
-            <button
-              type="button"
-              className="ctpp-btn-print"
-              onClick={() =>
-                alert(`Đang in phiếu xuất kho điện tử ${orderDetail.maPhieu}...`)
-              }
-            >
+            <button type="button" className="ctpp-btn-print" onClick={() => window.print()}>
               <Printer size={15} />
               In Phiếu Giao Nhận
             </button>
           </div>
         </div>
 
-        {/* ===== HERO CARD (Banner tổng quan) ===== */}
         <div className="ctpp-hero-card">
           <div className="ctpp-hero-left">
-            <div className="ctpp-hero-badge">
+            <div className={`ctpp-status-pill ${statusInfo.tone}`} style={{ marginBottom: 10 }}>
               <CheckCircle2 size={13} />
-              Bàn giao hoàn tất
+              {statusInfo.text}
             </div>
-            <h2 className="ctpp-hero-title">
-              Phiếu Phân Phối: {orderDetail.maPhieu}
-            </h2>
+            <h2 className="ctpp-hero-title">Phiếu Phân Phối: {orderDetail.ma_phieu}</h2>
             <p className="ctpp-hero-sub">
-              Lập lệnh lúc: <b>{orderDetail.ngayLap}</b> &nbsp;•&nbsp; Kho
-              xuất: <b>{orderDetail.sanPham.khoXuat}</b>
+              Lập lệnh lúc: <b>{new Date(orderDetail.created_at).toLocaleString("vi-VN")}</b>
             </p>
           </div>
 
           <div className="ctpp-hero-right">
-            <div className="ctpp-txhash-box">
-              <QrCode size={24} color="#86efac" />
-              <div>
-                <span className="ctpp-txhash-label">Mã xác thực Blockchain</span>
-                <span className="ctpp-txhash-value">{orderDetail.txHash}</span>
-              </div>
-            </div>
+            {orderDetail.trang_thai === "CHO_XUAT" && (
+              <button type="button" className="ctpp-btn-print" disabled={acting} onClick={handleMarkShipped}>
+                <Truck size={15} />
+                Xác Nhận Đã Xuất Kho
+              </button>
+            )}
+            {orderDetail.trang_thai === "DANG_GIAO" && (
+              <button type="button" className="ctpp-btn-print" disabled={acting} onClick={handleMarkDelivered}>
+                <CheckCircle2 size={15} />
+                Xác Nhận Đã Giao Hàng
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ===== 4 Ô STATS đối chiếu số lượng ===== */}
         <div className="ctpp-stats-row">
           <div className="ctpp-stat-box">
             <span className="ctpp-stat-label">Khối lượng xuất kho</span>
             <div>
-              <span className="ctpp-stat-value">
-                {orderDetail.sanPham.soLuongXuat}
-              </span>
-              <span className="ctpp-stat-unit"> kg</span>
+              <span className="ctpp-stat-value">{orderDetail.so_luong_xuat}</span>
+              <span className="ctpp-stat-unit"> {orderDetail.don_vi_tinh}</span>
             </div>
             <span className="ctpp-stat-badge info">
               <Package size={11} />
-              {orderDetail.sanPham.quyCach}
+              {orderDetail.ma_lo_nong_san}
             </span>
           </div>
 
           <div className="ctpp-stat-box">
-            <span className="ctpp-stat-label">Khối lượng thực nhận</span>
+            <span className="ctpp-stat-label">Hình thức giao hàng</span>
             <div>
-              <span className="ctpp-stat-value green">
-                {orderDetail.sanPham.soLuongThucNhan}
-              </span>
-              <span className="ctpp-stat-unit"> kg</span>
-            </div>
-            <span className="ctpp-stat-badge success">
-              <CheckCircle2 size={11} />
-              Khớp đầy đủ
-            </span>
-          </div>
-
-          <div className="ctpp-stat-box">
-            <span className="ctpp-stat-label">Hao hụt vận chuyển</span>
-            <div>
-              <span
-                className={`ctpp-stat-value ${haoHutKg > 0 ? "amber" : "green"}`}
-              >
-                {haoHutKg}
-              </span>
-              <span className="ctpp-stat-unit"> kg ({haoHutPct}%)</span>
-            </div>
-            <span
-              className={`ctpp-stat-badge ${haoHutKg > 0 ? "warning" : "success"}`}
-            >
-              <Weight size={11} />
-              {haoHutKg === 0 ? "Không hao hụt" : "Có hao hụt"}
-            </span>
-          </div>
-
-          <div className="ctpp-stat-box">
-            <span className="ctpp-stat-label">Đơn giá ước tính</span>
-            <div>
-              <span className="ctpp-stat-value blue" style={{ fontSize: 17 }}>
-                {orderDetail.sanPham.donGiaUocTinh}
+              <span className="ctpp-stat-value" style={{ fontSize: 17 }}>
+                {orderDetail.hinh_thuc === "TU_GIAO" ? "Tự giao xe kho" : "Đơn vị vận chuyển đối tác"}
               </span>
             </div>
             <span className="ctpp-stat-badge info">
-              <CalendarClock size={11} />
-              HSD: {orderDetail.sanPham.hanBaoQuan}
+              <Weight size={11} />
+              {statusInfo.text}
             </span>
           </div>
         </div>
 
-        {/* ===== GRID 2 CỘT: Đại lý + Lô hàng ===== */}
         <div className="ctpp-info-grid">
-          {/* Cột 1: Đại lý nhận */}
           <div className="ctpp-info-card">
             <div className="ctpp-info-card-title">
               <div className="ctpp-info-card-title-icon blue">
@@ -253,39 +238,32 @@ const ChiTietPhanPhoiPage = () => {
                   <Building2 size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
                   Tên đại lý:
                 </span>
-                <span className="ctpp-field-value">{orderDetail.daiLy.ten}</span>
+                <span className="ctpp-field-value">{orderDetail.ten_dai_ly}</span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">
                   <User size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
                   Người đại diện:
                 </span>
-                <span className="ctpp-field-value muted">
-                  {orderDetail.daiLy.nguoiDaiDien}
-                </span>
+                <span className="ctpp-field-value muted">{orderDetail.dai_ly?.nguoi_lien_he || "—"}</span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">
                   <Phone size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
                   Số điện thoại:
                 </span>
-                <span className="ctpp-field-value blue">
-                  {orderDetail.daiLy.sdt}
-                </span>
+                <span className="ctpp-field-value blue">{orderDetail.dai_ly?.so_dien_thoai || "—"}</span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">
                   <MapPin size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
                   Địa chỉ giao hàng:
                 </span>
-                <span className="ctpp-field-value muted">
-                  {orderDetail.daiLy.diaChi}
-                </span>
+                <span className="ctpp-field-value muted">{orderDetail.dai_ly?.dia_chi || "—"}</span>
               </div>
             </div>
           </div>
 
-          {/* Cột 2: Lô hàng nông sản */}
           <div className="ctpp-info-card">
             <div className="ctpp-info-card-title">
               <div className="ctpp-info-card-title-icon green">
@@ -297,35 +275,21 @@ const ChiTietPhanPhoiPage = () => {
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">Tên sản phẩm:</span>
                 <span className="ctpp-field-value">
-                  {orderDetail.sanPham.tenSP}
-                  <span className="ctpp-tag">{orderDetail.sanPham.maLo}</span>
+                  {orderDetail.ten_san_pham}
+                  <span className="ctpp-tag">{orderDetail.ma_lo_nong_san}</span>
                 </span>
               </div>
               <div className="ctpp-field-row">
-                <span className="ctpp-field-label">Tiêu chuẩn chất lượng:</span>
+                <span className="ctpp-field-label">Số lượng xuất:</span>
                 <span className="ctpp-field-value green">
-                  {orderDetail.sanPham.tieuChuan}
-                </span>
-              </div>
-              <div className="ctpp-field-row">
-                <span className="ctpp-field-label">Quy cách đóng gói:</span>
-                <span className="ctpp-field-value muted">
-                  {orderDetail.sanPham.quyCach}
-                </span>
-              </div>
-              <div className="ctpp-field-row">
-                <span className="ctpp-field-label">Hạn lưu kho tối đa:</span>
-                <span className="ctpp-field-value muted">
-                  {orderDetail.sanPham.hanBaoQuan}
+                  {orderDetail.so_luong_xuat} {orderDetail.don_vi_tinh}
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ===== GRID 2 CỘT: Vận chuyển ===== */}
         <div className="ctpp-info-grid">
-          {/* Cột 1: Đơn vị giao hàng */}
           <div className="ctpp-info-card">
             <div className="ctpp-info-card-title">
               <div className="ctpp-info-card-title-icon amber">
@@ -334,111 +298,62 @@ const ChiTietPhanPhoiPage = () => {
               Thông Tin Vận Chuyển
             </div>
             <div className="ctpp-field-list">
-              <div className="ctpp-field-row">
-                <span className="ctpp-field-label">Đơn vị vận chuyển:</span>
-                <span className="ctpp-field-value">
-                  {orderDetail.vanChuyen.donVi}
-                </span>
-              </div>
-              <div className="ctpp-field-row">
-                <span className="ctpp-field-label">Tài xế & Biển số:</span>
-                <span className="ctpp-field-value muted">
-                  {orderDetail.vanChuyen.taiXe}{" "}
-                  <span className="ctpp-tag">{orderDetail.vanChuyen.bienSo}</span>
-                </span>
-              </div>
-              <div className="ctpp-field-row">
-                <span className="ctpp-field-label">SĐT tài xế:</span>
-                <span className="ctpp-field-value blue">
-                  {orderDetail.vanChuyen.sdtTaiXe}
-                </span>
-              </div>
+              {orderDetail.hinh_thuc === "TU_GIAO" ? (
+                <>
+                  <div className="ctpp-field-row">
+                    <span className="ctpp-field-label">Tài xế phụ trách:</span>
+                    <span className="ctpp-field-value">{orderDetail.ten_tai_xe || "—"}</span>
+                  </div>
+                  <div className="ctpp-field-row">
+                    <span className="ctpp-field-label">Biển số xe:</span>
+                    <span className="ctpp-field-value muted">
+                      <span className="ctpp-tag">{orderDetail.bien_so_xe || "—"}</span>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="ctpp-field-row">
+                  <span className="ctpp-field-label">Đơn vị vận chuyển:</span>
+                  <span className="ctpp-field-value">{orderDetail.ten_don_vi_van_chuyen || "—"}</span>
+                </div>
+              )}
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">Giờ xuất kho:</span>
-                <span className="ctpp-field-value muted">
-                  {orderDetail.vanChuyen.thoiGianXuatKho}
-                </span>
+                <span className="ctpp-field-value muted">{orderDetail.thoi_gian_xuat || "Chưa xuất kho"}</span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">Giờ bàn giao:</span>
-                <span className="ctpp-field-value muted">
-                  {orderDetail.vanChuyen.thoiGianBanGiao}
-                </span>
+                <span className="ctpp-field-value muted">{orderDetail.thoi_gian_giao || "Chưa bàn giao"}</span>
               </div>
             </div>
           </div>
 
-          {/* Cột 2: Ghi chú điều phối */}
-          <div className="ctpp-info-card">
-            <div className="ctpp-info-card-title">
-              <div className="ctpp-info-card-title-icon slate">
-                <FileText size={16} />
-              </div>
-              Ghi Chú Điều Phối Giao Hàng
-            </div>
-            <div
-              style={{
-                background: "#fffbeb",
-                border: "1px solid #fde68a",
-                borderRadius: 8,
-                padding: "12px 14px",
-                fontSize: 13,
-                color: "#78350f",
-                lineHeight: 1.65,
-                fontStyle: "italic",
-              }}
-            >
-              <AlertTriangle
-                size={14}
-                style={{ marginRight: 6, verticalAlign: "middle", color: "#b45309" }}
-              />
-              {orderDetail.vanChuyen.ghiChuGiao}
-            </div>
-
-            {/* Thống kê nhanh */}
-            <div
-              style={{
-                marginTop: 14,
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 10,
-              }}
-            >
-              <div
-                style={{
-                  background: "#f0fdf4",
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  textAlign: "center",
-                }}
-              >
-                <div style={{ fontSize: 11, color: "#15803d", fontWeight: 600, textTransform: "uppercase", marginBottom: 3 }}>
-                  Hình thức
+          {orderDetail.ghi_chu && (
+            <div className="ctpp-info-card">
+              <div className="ctpp-info-card-title">
+                <div className="ctpp-info-card-title-icon slate">
+                  <FileText size={16} />
                 </div>
-                <div style={{ fontSize: 12.5, color: "#0f172a", fontWeight: 700 }}>
-                  {orderDetail.vanChuyen.hinhThuc}
-                </div>
+                Ghi Chú
               </div>
               <div
                 style={{
-                  background: "#f0fdf4",
+                  background: "#fffbeb",
+                  border: "1px solid #fde68a",
                   borderRadius: 8,
-                  padding: "10px 12px",
-                  textAlign: "center",
+                  padding: "12px 14px",
+                  fontSize: 13,
+                  color: "#78350f",
+                  lineHeight: 1.65,
                 }}
               >
-                <div style={{ fontSize: 11, color: "#15803d", fontWeight: 600, textTransform: "uppercase", marginBottom: 3 }}>
-                  Kết quả
-                </div>
-                <div style={{ fontSize: 12.5, color: "#15803d", fontWeight: 700 }}>
-                  ✓ Giao đủ hàng
-                </div>
+                <AlertTriangle size={14} style={{ marginRight: 6, verticalAlign: "middle", color: "#b45309" }} />
+                {orderDetail.ghi_chu}
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* ===== TIMELINE HÀNH TRÌNH ===== */}
         <div className="ctpp-section-card">
           <div className="ctpp-section-title">
             <div className="ctpp-section-title-icon">
@@ -449,11 +364,9 @@ const ChiTietPhanPhoiPage = () => {
 
           <div className="ctpp-timeline">
             <div className="ctpp-timeline-line" />
-            {orderDetail.timeline.map((step, idx) => (
+            {timeline.map((step, idx) => (
               <div className="ctpp-timeline-item" key={idx}>
-                <div
-                  className={`ctpp-timeline-dot${step.hoanThanh ? "" : " pending"}`}
-                />
+                <div className={`ctpp-timeline-dot${step.hoanThanh ? "" : " pending"}`} />
                 <div>
                   <div className="ctpp-timeline-header">
                     <span className="ctpp-timeline-title">{step.tieuDe}</span>

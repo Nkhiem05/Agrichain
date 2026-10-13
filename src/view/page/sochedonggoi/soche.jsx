@@ -45,6 +45,7 @@ import {
   mergeBatch,
   fetchReadyToShip,
   fetchTransporters,
+  fetchDistributors,
   fetchShipments,
   createShipment,
 } from "../../../api/sochedonggoiApi";
@@ -122,8 +123,10 @@ const ProcessingPage = () => {
     ma_don_vi_van_chuyen: "",
     ten_tai_xe: "",
     bien_so_xe: "",
+    ma_ben_nhan: "",
     dia_chi_giao_hang: "",
   });
+  const [distributors, setDistributors] = useState([]);
 
   const [showShippingDetailModal, setShowShippingDetailModal] = useState(false);
   const [selectedShippingDetail, setSelectedShippingDetail] = useState(null);
@@ -174,7 +177,7 @@ const ProcessingPage = () => {
     setLoading(true);
     setErrorMsg("");
     try {
-      const [incoming, processing, rawLots, splitLots, log, ready, trans, ships] =
+      const [incoming, processing, rawLots, splitLots, log, ready, trans, dists, ships] =
         await Promise.all([
           fetchIncomingShipments(),
           fetchProcessingBatches(),
@@ -183,6 +186,7 @@ const ProcessingPage = () => {
           fetchSplitMergeLog(),
           fetchReadyToShip(),
           fetchTransporters(),
+          fetchDistributors(),
           fetchShipments(),
         ]);
       setIncomingShipments(incoming?.data || []);
@@ -192,6 +196,7 @@ const ProcessingPage = () => {
       setSplitMergeLog(log?.data || []);
       setReadyToShip(ready?.data || []);
       setTransporters(trans?.data || []);
+      setDistributors(dists?.data || []);
       setShipments(ships?.data || []);
     } catch (err) {
       setErrorMsg(err.message || "Không thể tải dữ liệu từ máy chủ");
@@ -337,6 +342,7 @@ const ProcessingPage = () => {
       ma_don_vi_van_chuyen: transporters[0]?.ma_nguoi_dung || "",
       ten_tai_xe: "",
       bien_so_xe: "",
+      ma_ben_nhan: "",
       dia_chi_giao_hang: "",
     });
     setShowHandoverModal(true);
@@ -412,11 +418,13 @@ const ProcessingPage = () => {
   };
 
   const handleConfirmHandover = async () => {
-    const { ma_don_vi_van_chuyen, ten_tai_xe, bien_so_xe, dia_chi_giao_hang } = handoverForm;
+    const { ma_don_vi_van_chuyen, ten_tai_xe, bien_so_xe, ma_ben_nhan, dia_chi_giao_hang } =
+      handoverForm;
     if (!ma_don_vi_van_chuyen) return alert("Vui lòng chọn đơn vị vận chuyển!");
     if (!ten_tai_xe.trim() || !bien_so_xe.trim())
       return alert("Vui lòng điền đủ tên tài xế và biển số xe vận chuyển!");
-    if (!dia_chi_giao_hang.trim()) return alert("Vui lòng nhập điểm giao hàng / kho tiếp nhận!");
+    if (!ma_ben_nhan && !dia_chi_giao_hang.trim())
+      return alert("Vui lòng chọn nhà phân phối nhận hàng hoặc nhập điểm giao hàng!");
 
     try {
       const maLoHang = handoverBatch.ma_lo_moi || handoverBatch.ma_lo_nong_san;
@@ -425,7 +433,8 @@ const ProcessingPage = () => {
         ma_don_vi_van_chuyen,
         ten_tai_xe: ten_tai_xe.trim(),
         bien_so_xe: bien_so_xe.trim(),
-        dia_chi_giao_hang: dia_chi_giao_hang.trim(),
+        ma_ben_nhan: ma_ben_nhan || undefined,
+        dia_chi_giao_hang: dia_chi_giao_hang.trim() || undefined,
       });
       setShowHandoverModal(false);
       await loadAll();
@@ -1284,16 +1293,39 @@ const ProcessingPage = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Điểm giao hàng / Kho tiếp nhận (*)</label>
-                  <input
-                    type="text"
-                    placeholder="VD: Kho Trung Chuyển Metro"
-                    value={handoverForm.dia_chi_giao_hang}
+                  <label>Nhà phân phối nhận hàng</label>
+                  <select
+                    value={handoverForm.ma_ben_nhan}
                     onChange={(e) =>
-                      setHandoverForm({ ...handoverForm, dia_chi_giao_hang: e.target.value })
+                      setHandoverForm({
+                        ...handoverForm,
+                        ma_ben_nhan: e.target.value,
+                        dia_chi_giao_hang: e.target.value ? "" : handoverForm.dia_chi_giao_hang,
+                      })
                     }
-                  />
+                  >
+                    <option value="">-- Chưa có tài khoản, nhập địa chỉ bên dưới --</option>
+                    {distributors.map((d) => (
+                      <option key={d.ma_nguoi_dung} value={d.ma_nguoi_dung}>
+                        {d.ho_ten}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+
+                {!handoverForm.ma_ben_nhan && (
+                  <div className="form-group">
+                    <label>Điểm giao hàng / Kho tiếp nhận (*)</label>
+                    <input
+                      type="text"
+                      placeholder="VD: Kho Trung Chuyển Metro"
+                      value={handoverForm.dia_chi_giao_hang}
+                      onChange={(e) =>
+                        setHandoverForm({ ...handoverForm, dia_chi_giao_hang: e.target.value })
+                      }
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="modal-footer">

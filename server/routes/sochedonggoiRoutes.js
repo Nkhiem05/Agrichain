@@ -28,6 +28,7 @@ router.post("/tach-gop/gop", sochedonggoiController.mergeBatch);
 // 4. Bàn giao vận chuyển
 router.get("/san-sang-ban-giao", sochedonggoiController.getReadyToShip);
 router.get("/don-vi-van-chuyen", sochedonggoiController.getTransporters);
+router.get("/nha-phan-phoi", sochedonggoiController.getDistributors);
 router.get("/ban-giao", sochedonggoiController.getShipments);
 router.get("/ban-giao/:maVanDon", sochedonggoiController.getShipmentById);
 router.post("/ban-giao", sochedonggoiController.createShipment);

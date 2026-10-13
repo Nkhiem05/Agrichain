@@ -329,6 +329,43 @@ const changeAccountRole = async (req, res) => {
   }
 };
 
+// Admin đặt/đổi mật khẩu cho 1 tài khoản đã có sẵn. Không nhập mật khẩu thì
+// tự sinh mật khẩu tạm ngẫu nhiên (giống lúc tạo tài khoản).
+const resetAccountPassword = async (req, res) => {
+  const { maNguoiDung } = req.params;
+
+  try {
+    const mat_khau_input = cleanText(req.body?.mat_khau);
+    if (mat_khau_input && mat_khau_input.length < 6) {
+      throw new ApiError(400, "Mật khẩu phải có ít nhất 6 ký tự");
+    }
+
+    const [accounts] = await db.execute(
+      `SELECT ma_nguoi_dung FROM nguoi_dung WHERE ma_nguoi_dung = ? LIMIT 1`,
+      [maNguoiDung],
+    );
+    if (accounts.length === 0) {
+      throw new ApiError(404, "Không tìm thấy tài khoản");
+    }
+
+    const plainPassword = mat_khau_input || randomPassword();
+    const hash = bcrypt.hashSync(plainPassword, 12);
+
+    await db.execute(`UPDATE nguoi_dung SET mat_khau = ? WHERE ma_nguoi_dung = ?`, [
+      hash,
+      maNguoiDung,
+    ]);
+
+    return res.json({
+      success: true,
+      message: "Đã đặt lại mật khẩu",
+      data: { mat_khau_moi: plainPassword },
+    });
+  } catch (err) {
+    return sendError(res, err, "Lỗi đặt lại mật khẩu:", "Không thể đặt lại mật khẩu");
+  }
+};
+
 /*
 ==================================================
 YÊU CẦU CẤP TÀI KHOẢN (đơn đăng ký)
@@ -516,6 +553,7 @@ module.exports = {
   createAccount,
   toggleAccountLock,
   changeAccountRole,
+  resetAccountPassword,
   getAccountRequests,
   approveAccountRequest,
   rejectAccountRequest,

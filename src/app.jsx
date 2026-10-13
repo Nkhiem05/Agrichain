@@ -71,9 +71,10 @@ const AppRoutes = () => {
       {/*Admin*/}
       <Route path="/admin" element={<Admin />} />
 
-      {/*Admin*/}
+      {/*Nhà phân phối*/}
       <Route path="/nha-phan-phoi" element={<Nhaphanphoi />} />
       <Route path="/chi-tiet-phan-phoi" element={<Chitietphanphoi />} />
+      <Route path="/chi-tiet-phan-phoi/:maPhieu" element={<Chitietphanphoi />} />
 
       {/*Profile*/}
       <Route path="/trang-ca-nhan" element={<Trangcanhan />} />

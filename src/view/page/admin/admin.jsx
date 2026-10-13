@@ -22,6 +22,7 @@ import {
   Users,
   UserCheck,
   MoreVertical,
+  KeyRound,
 } from "lucide-react";
 import "../../css/admin.css";
 
@@ -192,9 +193,13 @@ export default function AdminDashboard() {
     ho_ten: "",
     vai_tro: "FARMER_COOP",
     so_dien_thoai: "",
+    mat_khau: "",
     ten_nong_trai: "",
     dia_diem_nong_trai: "",
   });
+
+  const [resetPasswordUser, setResetPasswordUser] = useState(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
 
   const [newCat, setNewCat] = useState({
     categoryType: "giong_cay_trong",
@@ -499,6 +504,9 @@ export default function AdminDashboard() {
     ) {
       return alert("Vui lòng nhập tên nông trại và địa điểm");
     }
+    if (newUser.mat_khau && newUser.mat_khau.length < 6) {
+      return alert("Mật khẩu phải có ít nhất 6 ký tự");
+    }
 
     try {
       const res = await fetch(`${API_URL}/api/admin/tai-khoan`, {
@@ -510,7 +518,9 @@ export default function AdminDashboard() {
       if (!data.success) return alert(data.message || "Không thể tạo tài khoản");
 
       alert(
-        `Đã tạo tài khoản!\nTên đăng nhập: ${data.data.ten_dang_nhap}\nMật khẩu tạm: ${data.data.mat_khau_tam}`,
+        newUser.mat_khau
+          ? `Đã tạo tài khoản!\nTên đăng nhập: ${data.data.ten_dang_nhap}\nMật khẩu: ${data.data.mat_khau_tam}`
+          : `Đã tạo tài khoản!\nTên đăng nhập: ${data.data.ten_dang_nhap}\nMật khẩu tạm: ${data.data.mat_khau_tam}`,
       );
       setShowUserModal(false);
       setNewUser({
@@ -518,6 +528,7 @@ export default function AdminDashboard() {
         ho_ten: "",
         vai_tro: "FARMER_COOP",
         so_dien_thoai: "",
+        mat_khau: "",
         ten_nong_trai: "",
         dia_diem_nong_trai: "",
       });
@@ -542,6 +553,30 @@ export default function AdminDashboard() {
       if (!data.success) return alert(data.message || "Không thể đổi vai trò");
       setEditingRoleUser(null);
       refreshAll();
+    } catch (err) {
+      alert("Không thể kết nối tới máy chủ");
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    if (resetPasswordValue && resetPasswordValue.length < 6) {
+      return alert("Mật khẩu phải có ít nhất 6 ký tự");
+    }
+    try {
+      const res = await fetch(
+        `${API_URL}/api/admin/tai-khoan/${resetPasswordUser.ma_nguoi_dung}/mat-khau`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ mat_khau: resetPasswordValue || undefined }),
+        },
+      );
+      const data = await res.json();
+      if (!data.success) return alert(data.message || "Không thể đặt lại mật khẩu");
+      alert(`Đã đặt lại mật khẩu cho ${resetPasswordUser.ten_dang_nhap}!\nMật khẩu mới: ${data.data.mat_khau_moi}`);
+      setResetPasswordUser(null);
+      setResetPasswordValue("");
     } catch (err) {
       alert("Không thể kết nối tới máy chủ");
     }
@@ -1321,6 +1356,19 @@ export default function AdminDashboard() {
                                   >
                                     <UserCheck size={15} color="#16a34a" />
                                     <span>Phân quyền & Vai trò</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="dropdown-item"
+                                    onClick={() => {
+                                      setResetPasswordUser({ ...user });
+                                      setResetPasswordValue("");
+                                      setOpenDropdownUser(null);
+                                    }}
+                                  >
+                                    <KeyRound size={15} color="#7c3aed" />
+                                    <span>Đặt lại mật khẩu</span>
                                   </button>
 
                                   <div className="dropdown-divider"></div>
@@ -2175,6 +2223,59 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* ================= MODAL ĐẶT LẠI MẬT KHẨU ================= */}
+      {resetPasswordUser && (
+        <div className="modal-overlay">
+          <form className="modal-container" onSubmit={handleResetPassword}>
+            <div className="modal-header">
+              <h3>Đặt lại mật khẩu</h3>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setResetPasswordUser(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Tài khoản người dùng</label>
+                <input
+                  type="text"
+                  value={`${resetPasswordUser.ho_ten} (${resetPasswordUser.ten_dang_nhap})`}
+                  disabled
+                  style={{ background: "#f3f4f6", cursor: "not-allowed" }}
+                />
+              </div>
+              <div className="form-group">
+                <label>Mật khẩu mới</label>
+                <input
+                  type="text"
+                  placeholder="Để trống để hệ thống tự sinh mật khẩu ngẫu nhiên"
+                  value={resetPasswordValue}
+                  onChange={(e) => setResetPasswordValue(e.target.value)}
+                />
+                <small style={{ color: "#6b7280", marginTop: 6, fontSize: 12 }}>
+                  Tối thiểu 6 ký tự nếu tự đặt. Mật khẩu cũ sẽ không còn dùng được.
+                </small>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setResetPasswordUser(null)}
+              >
+                Hủy
+              </button>
+              <button type="submit" className="btn-save">
+                Đặt lại mật khẩu
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* ================= MODAL ĐĂNG KÝ NÔNG TRẠI ================= */}
       {showActorModal && (
         <div className="modal-overlay">
@@ -2352,6 +2453,20 @@ export default function AdminDashboard() {
                     }
                   />
                 </div>
+              </div>
+              <div className="form-group">
+                <label>Mật khẩu</label>
+                <input
+                  type="text"
+                  placeholder="Để trống để hệ thống tự sinh mật khẩu tạm"
+                  value={newUser.mat_khau}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, mat_khau: e.target.value })
+                  }
+                />
+                <small style={{ color: "#6b7280", marginTop: 6, fontSize: 12 }}>
+                  Tối thiểu 6 ký tự nếu tự đặt.
+                </small>
               </div>
               {newUser.vai_tro === "FARMER_COOP" && (
                 <div className="form-grid-2">

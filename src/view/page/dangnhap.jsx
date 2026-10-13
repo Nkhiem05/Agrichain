@@ -83,7 +83,7 @@ const LoginPage = () => {
           break;
 
         case "DISTRIBUTOR":
-          alert("Đăng nhập đơn vị phân phối thành công");
+          navigate("/nha-phan-phoi");
           break;
 
         case "CONSUMER":
