@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Máy chủ: 127.0.0.1
--- Thời gian đã tạo: Th10 13, 2026 lúc 07:03 AM
+-- Thời gian đã tạo: Th10 13, 2026 lúc 02:44 AM
 -- Phiên bản máy phục vụ: 10.4.32-MariaDB
 -- Phiên bản PHP: 8.2.12
 
@@ -66,12 +66,16 @@ CREATE TABLE `chi_so_kiem_dinh` (
 --
 
 INSERT INTO `chi_so_kiem_dinh` (`ma_chi_so_kd`, `ma_kiem_dinh`, `loai_chi_so`, `ma_chi_so`, `ten_chi_so`, `gia_tri`, `thu_tu`, `created_at`, `updated_at`) VALUES
-(116, 'KD-2026-003', 'CO_DINH', 'DU_LUONG_BVTV', 'Dư lượng hoạt chất BVTV cấm', '0.001', 1, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
-(117, 'KD-2026-003', 'CO_DINH', 'KIM_LOAI_NANG', 'Chì (Pb)', '0.0001', 2, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
-(118, 'KD-2026-003', 'CO_DINH', 'KIM_LOAI_NANG', 'Cadimi (Cd)', '0.0001', 3, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
-(119, 'KD-2026-003', 'CO_DINH', 'VI_SINH', 'Vi khuẩn E.coli', '0.005', 4, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
-(120, 'KD-2026-003', 'CO_DINH', 'VI_SINH', 'Salmonella', '0.005', 5, '2026-10-13 07:50:39', '2026-10-13 07:50:39'),
-(121, 'KD-2026-003', 'CO_DINH', 'NITRATE', 'Hàm lượng Nitrate (NO3-)', '0.005', 6, '2026-10-13 07:50:39', '2026-10-13 07:50:39');
+(92, 'KD-2026-001', 'CO_DINH', 'DU_LUONG_BVTV', 'Dư lượng hoạt chất BVTV cấm', '0', 1, '2026-10-13 00:19:29', '2026-10-13 00:19:29'),
+(93, 'KD-2026-001', 'CO_DINH', 'KIM_LOAI_NANG', 'Chì (Pb)', '0', 2, '2026-10-13 00:19:29', '2026-10-13 00:19:29'),
+(94, 'KD-2026-001', 'CO_DINH', 'KIM_LOAI_NANG', 'Cadimi (Cd)', '0', 3, '2026-10-13 00:19:29', '2026-10-13 00:19:29'),
+(95, 'KD-2026-001', 'CO_DINH', 'VI_SINH', 'Vi khuẩn E.coli', '0', 4, '2026-10-13 00:19:29', '2026-10-13 00:19:29'),
+(96, 'KD-2026-001', 'CO_DINH', 'VI_SINH', 'Salmonella', '0', 5, '2026-10-13 00:19:29', '2026-10-13 00:19:29'),
+(97, 'KD-2026-001', 'CO_DINH', 'NITRATE', 'Hàm lượng Nitrate (NO3-)', '0', 6, '2026-10-13 00:19:29', '2026-10-13 00:19:29'),
+(10, 'KD001', 'CO_DINH', 'DU_LUONG_BVTV', 'Dư lượng BVTV (Hóa chất cấm)', '2', 1, '2026-10-12 19:17:48', '2026-10-12 19:17:48'),
+(11, 'KD001', 'CO_DINH', 'KIM_LOAI_NANG', 'Kim loại nặng (Chì, Cadimi)', '1', 2, '2026-10-12 19:17:48', '2026-10-12 19:17:48'),
+(12, 'KD001', 'CO_DINH', 'VI_SINH', 'Vi sinh (E.coli, Salmonella)', '1', 3, '2026-10-12 19:17:48', '2026-10-12 19:17:48'),
+(13, 'KD001', 'CO_DINH', 'NITRATE', 'Dư lượng Nitrate (NO3-)', '1', 4, '2026-10-12 19:17:48', '2026-10-12 19:17:48');
 
 -- --------------------------------------------------------
 
@@ -144,10 +148,11 @@ CREATE TABLE `kiem_dinh_lo_hang` (
 --
 
 INSERT INTO `kiem_dinh_lo_hang` (`ma_kiem_dinh`, `ma_ho_so`, `ma_lo_nong_san`, `ma_co_quan`, `tieu_chuan_dang_ky`, `noi_dung_de_nghi`, `ngay_hen_lay_mau`, `gio_hen_lay_mau`, `kiem_dinh_vien`, `ghi_chu_chuan_bi`, `ma_niem_phong`, `khoi_luong_mau`, `phuong_phap_lay_mau`, `tinh_trang_cam_quan`, `thoi_gian_lay_mau`, `chi_so_xet_nghiem`, `so_chung_nhan`, `ket_luan`, `hieu_luc_tu`, `hieu_luc_den`, `ly_do_thu_hoi`, `ngay_thu_hoi`, `trang_thai_ho_so`, `created_at`, `updated_at`) VALUES
-('KD-2026-001', 'HS-KD-9041', 'LH-8824', 'CQKD001', 'VIETGAP', 'Đề nghị kiểm tra dư lượng thuốc BVTV và kim loại nặng để phục vụ đóng gói phân phối siêu thị.', '2026-10-13', '07:35:00', 'KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)', NULL, 'QR-Seal-0000000012', '12', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', '12', '2026-10-12 17:45:15', NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_HEN_LICH', '2026-10-05 08:30:00', '2026-10-13 07:35:34'),
+('KD-2026-001', 'HS-KD-9041', 'LH-8824', 'CQKD001', 'VIETGAP', 'Đề nghị kiểm tra dư lượng thuốc BVTV và kim loại nặng để phục vụ đóng gói phân phối siêu thị.', '2026-10-12', '19:12:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, 'QR-Seal-0000000009', '12', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', '12', '2026-10-12 17:45:15', NULL, NULL, 'PASSED', NULL, NULL, NULL, NULL, 'DA_LAY_MAU', '2026-10-05 08:30:00', '2026-10-13 00:19:29'),
 ('KD-2026-002', 'HS-KD-9042', 'LH-8825', 'CQKD001', 'GLOBALGAP', 'Lô xoài xuất khẩu đợt 1, đề nghị kiểm tra dư lượng hóa chất cấm theo tiêu chuẩn GlobalGAP.', '2026-10-06', '17:34:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_CONG_BO', '2026-10-06 09:15:00', '2026-10-11 22:41:26'),
-('KD-2026-003', 'HS-KD-9043', 'LH-8821', 'CQKD001', 'ORGANIC', 'Đề nghị giám định vi sinh và cấp tem chứng nhận Organic cho nông trại hữu cơ.', '2026-10-13', '07:33:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, 'QR-Seal-0000000011', '1kg', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', 'tốt', '2026-10-13 07:36:30', NULL, NULL, 'PENDING', NULL, NULL, '', NULL, 'DA_LAY_MAU', '2026-10-07 14:00:00', '2026-10-13 07:50:39'),
-('KD001', 'HS-KD-9044', 'LO001', 'CQKD001', 'VIETGAP', 'yêu cầu kiểm định các  chất trong sản phẩm lúa', '2026-10-14', '05:20:00', 'KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)', NULL, 'QR-Seal-0000000001', 'test', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', '123', NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_CONG_BO', '2026-10-11 19:31:41', '2026-10-11 23:33:53');
+('KD-2026-003', 'HS-KD-9043', 'LH-8821', 'CQKD001', 'ORGANIC', 'Đề nghị giám định vi sinh và cấp tem chứng nhận Organic cho nông trại hữu cơ.', '2026-10-12', '19:14:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, 'QR-Seal-0000000010', '12', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', '12', NULL, NULL, NULL, 'PENDING', NULL, NULL, '', NULL, 'CHO_LAY_MAU', '2026-10-07 14:00:00', '2026-10-12 19:20:49'),
+('KD001', 'HS-KD-9044', 'LO001', 'CQKD001', 'VIETGAP', 'kiểm định dư lượng thuốc', '2026-10-12', '19:17:00', 'ThS. Lê Hoàng Yến (Chuyên viên vi sinh)', NULL, 'QR-Seal-0000000003', '10 quả', 'Lấy chéo góc 5 điểm ngẫu nhiên trên liếp vườn', 'đạt yêu cầu', NULL, NULL, NULL, 'PASSED', NULL, NULL, NULL, NULL, 'DA_CONG_BO', '2026-10-12 19:09:27', '2026-10-12 19:25:52'),
+('KD002', 'HS-KD-9045', 'LO003', 'CQKD001', 'VIETGAP', 'yêu cầu kiểm định các  chất trong sản phẩm lúa', '2026-10-14', '05:20:00', 'KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)', NULL, 'QR-Seal-0000000001', 'test', 'Lấy ngẫu nhiên trên khay chứa tại kho đệm', '123', NULL, NULL, NULL, 'PENDING', NULL, NULL, NULL, NULL, 'DA_CONG_BO', '2026-10-11 19:31:41', '2026-10-11 23:33:53');
 
 -- --------------------------------------------------------
 
@@ -160,7 +165,8 @@ CREATE TABLE `lenh_van_chuyen` (
   `ma_lo_nong_san` varchar(64) NOT NULL,
   `ma_nguoi_gui` varchar(50) NOT NULL COMMENT 'Nông dân tạo lệnh',
   `ma_don_vi_van_chuyen` varchar(50) NOT NULL COMMENT 'Người dùng vai trò TRANSPORTER',
-  `ma_ben_nhan` varchar(50) NOT NULL COMMENT 'Người dùng vai trò PROCESSOR',
+  `ma_ben_nhan` varchar(50) DEFAULT NULL COMMENT 'Người dùng vai trò PROCESSOR/DISTRIBUTOR, có thể để trống nếu giao tới nơi chưa có tài khoản',
+  `dia_chi_giao_hang` varchar(255) DEFAULT NULL COMMENT 'Địa chỉ/kho nhận hàng dạng text khi chưa có tài khoản bên nhận',
   `khoi_luong` decimal(18,3) NOT NULL COMMENT 'Khối lượng lô tại thời điểm tạo lệnh',
   `don_vi_tinh` varchar(30) NOT NULL,
   `thoi_gian_xuat` datetime NOT NULL COMMENT 'Thời gian xuất hàng (dự kiến, đơn vị vận chuyển có thể cập nhật khi lấy hàng)',
@@ -171,6 +177,15 @@ CREATE TABLE `lenh_van_chuyen` (
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `lenh_van_chuyen`
+--
+
+INSERT INTO `lenh_van_chuyen` (`ma_van_don`, `ma_lo_nong_san`, `ma_nguoi_gui`, `ma_don_vi_van_chuyen`, `ma_ben_nhan`, `dia_chi_giao_hang`, `khoi_luong`, `don_vi_tinh`, `thoi_gian_xuat`, `ten_tai_xe`, `bien_so_xe`, `ghi_chu`, `trang_thai`, `created_at`, `updated_at`) VALUES
+('VD-LOG-1001', 'LH-8825', 'ND001', 'VC001', 'SC001', NULL, 8.500, 'Tấn', '2026-10-18 02:01:00', NULL, NULL, NULL, 'HOAN_THANH', '2026-10-11 14:02:10', '2026-10-12 18:43:12'),
+('VD-LOG-1002', 'LO001', 'ND001', 'VC001', 'SC001', NULL, 1000.000, 'kg', '2026-10-12 19:35:00', 'Nguyễn Văn A', '65C-12345', NULL, 'HOAN_THANH', '2026-10-12 19:32:20', '2026-10-12 19:35:16'),
+('VD-LOG-1003', 'LO002', 'SC001', 'VC001', NULL, 'Kho trung tâm vận chuyển metro', 1000.000, 'kg', '2026-10-12 19:38:00', 'Nguyễn Văn A', '65C-12345', NULL, 'CHO_TIEP_NHAN', '2026-10-12 19:38:00', '2026-10-12 19:38:31');
 
 -- --------------------------------------------------------
 
@@ -212,6 +227,13 @@ CREATE TABLE `lien_ket_nguon_goc_lo` (
   `thoi_diem_tao_lien_ket` datetime NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Đang đổ dữ liệu cho bảng `lien_ket_nguon_goc_lo`
+--
+
+INSERT INTO `lien_ket_nguon_goc_lo` (`ma_lien_ket`, `relation_group_id`, `ma_lo_nguon`, `ma_lo_duoc_tao_ra`, `loai_lien_ket`, `so_luong_tham_gia`, `don_vi_tinh`, `thoi_diem_tao_lien_ket`) VALUES
+('LK001', 'REL001', 'LO001', 'LO002', 'TRANSFORM', 1000.000, 'kg', '2026-10-12 19:35:53');
+
 -- --------------------------------------------------------
 
 --
@@ -225,6 +247,7 @@ CREATE TABLE `lo_nong_san` (
   `ma_nguoi_quan_ly` varchar(50) NOT NULL,
   `ngay_thu_hoach` date DEFAULT NULL,
   `so_luong_hien_tai` decimal(18,3) NOT NULL,
+  `ghi_chu` varchar(255) DEFAULT NULL,
   `don_vi_tinh` varchar(30) NOT NULL,
   `giai_doan_hien_tai` enum('CREATED','HARVESTED','PROCESSED','PACKAGED','IN_TRANSIT','RECEIVED','DISTRIBUTED','COMPLETED') NOT NULL DEFAULT 'CREATED',
   `tinh_trang_su_dung` enum('ACTIVE','CONSUMED_BY_SPLIT','CONSUMED_BY_MERGE','CONSUMED_BY_TRANSFORM','CANCELLED') NOT NULL DEFAULT 'ACTIVE',
@@ -240,12 +263,14 @@ CREATE TABLE `lo_nong_san` (
 -- Đang đổ dữ liệu cho bảng `lo_nong_san`
 --
 
-INSERT INTO `lo_nong_san` (`ma_lo_nong_san`, `ma_mua_vu`, `ma_san_pham`, `ma_nguoi_quan_ly`, `ngay_thu_hoach`, `so_luong_hien_tai`, `don_vi_tinh`, `giai_doan_hien_tai`, `tinh_trang_su_dung`, `latest_event_sequence`, `latest_event_hash`, `blockchain_sync_status`, `integrity_status`, `created_at`, `updated_at`) VALUES
-('LH-8821', 'MV002', 'SP002', 'ND001', '2026-09-28', 3500.000, 'kg', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
-('LH-8824', 'MV002', 'SP002', 'ND001', '2026-10-01', 5000.000, 'kg', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
-('LH-8825', 'MV001', 'SP001', 'ND001', '2026-10-05', 8.500, 'Tấn', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
-('LO001', 'MV004', 'SP003', 'ND001', '2027-02-11', 1000.000, 'kg', 'CREATED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-11 19:12:20', '2026-10-11 19:12:20'),
-('LOXOAI001', 'MV001', 'SP001', 'ADMIN001', '2026-09-26', 10.000, 'Tấn', 'CREATED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-09-27 05:57:38', '2026-09-27 05:57:38');
+INSERT INTO `lo_nong_san` (`ma_lo_nong_san`, `ma_mua_vu`, `ma_san_pham`, `ma_nguoi_quan_ly`, `ngay_thu_hoach`, `so_luong_hien_tai`, `ghi_chu`, `don_vi_tinh`, `giai_doan_hien_tai`, `tinh_trang_su_dung`, `latest_event_sequence`, `latest_event_hash`, `blockchain_sync_status`, `integrity_status`, `created_at`, `updated_at`) VALUES
+('LH-8821', 'MV002', 'SP002', 'ND001', '2026-09-28', 3500.000, NULL, 'kg', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
+('LH-8824', 'MV002', 'SP002', 'ND001', '2026-10-01', 5000.000, NULL, 'kg', 'HARVESTED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
+('LH-8825', 'MV001', 'SP001', 'SC001', '2026-10-05', 9.000, NULL, 'Tấn', 'RECEIVED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-07 23:28:35', '2026-10-12 18:43:12'),
+('LO001', 'MV002', 'SP002', 'SC001', '2026-10-12', 0.000, NULL, 'kg', 'RECEIVED', 'CONSUMED_BY_TRANSFORM', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-12 19:08:43', '2026-10-12 19:35:53'),
+('LO002', 'MV002', 'SP002', 'SC001', NULL, 1000.000, NULL, 'kg', 'PACKAGED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-12 19:35:53', '2026-10-12 19:37:21'),
+('LO003', 'MV004', 'SP003', 'ND001', '2027-02-11', 1000.000, NULL, 'kg', 'CREATED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-10-11 19:12:20', '2026-10-11 19:12:20'),
+('LOXOAI001', 'MV001', 'SP001', 'ADMIN001', '2026-09-26', 10.000, NULL, 'Tấn', 'CREATED', 'ACTIVE', 0, NULL, 'QUEUED', 'NOT_CHECKED', '2026-09-27 05:57:38', '2026-09-27 05:57:38');
 
 -- --------------------------------------------------------
 
@@ -328,9 +353,9 @@ CREATE TABLE `nguoi_dung` (
 --
 
 INSERT INTO `nguoi_dung` (`ma_nguoi_dung`, `ho_ten`, `ten_dang_nhap`, `mat_khau`, `vai_tro`, `so_dien_thoai`, `email`, `dia_chi`, `anh_dai_dien`, `trang_thai`, `created_at`, `updated_at`) VALUES
-('ADMIN001', 'Quản trị viên', 'admin', '$2b$12$JiobVJRGTmb.9Dhw1yYd0.RyTU3vtSHkml1A/NzmJRX/qCt0zXwIG', 'ADMIN', '0900000000', NULL, NULL, NULL, 1, '2026-09-27 05:29:46', '2026-10-03 11:44:35'),
+('ADMIN001', 'Quản trị viên', 'admin', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'ADMIN', '0900000000', NULL, NULL, NULL, 1, '2026-09-27 05:29:46', '2026-10-11 13:57:17'),
 ('CQKD001', 'Trung Tâm Giám Định Nông Nghiệp Vùng 2', 'kiemdinhvung2', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'CERT_AUTHORITY', '02923888999', NULL, NULL, NULL, 1, '2026-10-07 23:28:13', '2026-10-07 23:53:35'),
-('ND001', 'Nguyễn Hoàng', 'nongdan01', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'FARMER_COOP', '0901234567', NULL, 'cần thơ', NULL, 1, '2026-09-27 05:29:24', '2026-10-11 13:23:52'),
+('ND001', 'Nguyễn Hoàng', 'nongdan01', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'FARMER_COOP', '0901234567', 'hoang114890@gmail.com', 'cần thơ', '/uploads/avatars/1791701746523-617612690.jpg', 1, '2026-09-27 05:29:24', '2026-10-11 13:55:46'),
 ('SC001', 'Khu Sơ Chế Chế Biến Mekong', 'sochemekong', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'PROCESSOR', '0977777777', NULL, NULL, NULL, 1, '2026-10-08 19:38:08', '2026-10-08 19:38:08'),
 ('VC001', 'Mekong Cold Logistics', 'vanchuyen01', '$2y$12$KIo6BpxLVK3shWMVfEMaFuiY8lzBhUTCscGVacQVFqxHjVLnHhQxa', 'TRANSPORTER', '0944444444', NULL, NULL, NULL, 1, '2026-10-08 19:38:08', '2026-10-08 19:38:08');
 
@@ -397,7 +422,7 @@ CREATE TABLE `nong_trai` (
 --
 
 INSERT INTO `nong_trai` (`ma_nong_trai`, `ma_nguoi_dung`, `ten_nong_trai`, `dia_diem_nong_trai`, `dien_tich_nong_trai`, `anh_nong_trai`, `trang_thai`, `created_at`, `updated_at`) VALUES
-('123', 'ND001', '123', '123', 123.00, '/uploads/farms/1791483268394-340621062.png', 1, '2026-10-09 01:14:28', '2026-10-09 01:14:28'),
+('123', 'ND001', '123', '123', 123.00, '/uploads/farms/1791483268394-340621062.png', 1, '2026-10-09 01:14:28', '2026-10-11 13:58:34'),
 ('NT001', 'ND001', 'Nông Trại Hoàng Ngọc', 'Hậu Giang', 100.00, NULL, 1, '2026-09-27 05:35:19', '2026-10-07 10:02:24'),
 ('NT002', 'ND001', 'Nông Trại Hoàng Nguyễn', 'Cần Thơ', 200.00, '/uploads/farms/1791004710307-248307264.jpg', 1, '2026-10-03 12:18:30', '2026-10-03 12:18:30');
 
@@ -441,6 +466,33 @@ INSERT INTO `san_pham_nong_san` (`ma_san_pham`, `ten_san_pham`, `loai_san_pham`,
 ('SP001', 'Xoải Cát Chu', 'Trái Cây', NULL, 'tan', 1, '2026-09-27 05:56:50', '2026-09-27 05:56:50'),
 ('SP002', 'Quýt Đường', 'Trái Cây', 'Quýt đường ngọt mọng nước miền Tây', 'kg', 1, '2026-10-07 23:28:35', '2026-10-07 23:28:35'),
 ('SP003', 'Lúa vụ đông xuân 2026', 'Nông sản', NULL, 'kg', 1, '2026-10-11 19:12:20', '2026-10-11 19:12:20');
+
+-- --------------------------------------------------------
+
+--
+-- Cấu trúc bảng cho bảng `so_che_lo_hang`
+--
+
+CREATE TABLE `so_che_lo_hang` (
+  `ma_so_che` varchar(64) NOT NULL,
+  `ma_co_so` varchar(50) NOT NULL COMMENT 'Người dùng vai trò PROCESSOR thực hiện',
+  `ma_lo_moi` varchar(64) NOT NULL COMMENT 'Lô sơ chế/đóng gói, tham chiếu lo_nong_san',
+  `tieu_de` varchar(255) NOT NULL,
+  `khu_vuc_so_che` varchar(150) DEFAULT NULL,
+  `quy_cach_tieu_chuan` text DEFAULT NULL,
+  `giai_doan_so_che` enum('DANG_RUA_KHU_KHUAN','DANG_PHAN_LOAI','DANG_DONG_GOI','DA_HOAN_TAT') NOT NULL DEFAULT 'DANG_RUA_KHU_KHUAN',
+  `ngay_bat_dau` date NOT NULL,
+  `ngay_hoan_tat` date DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Đang đổ dữ liệu cho bảng `so_che_lo_hang`
+--
+
+INSERT INTO `so_che_lo_hang` (`ma_so_che`, `ma_co_so`, `ma_lo_moi`, `tieu_de`, `khu_vuc_so_che`, `quy_cach_tieu_chuan`, `giai_doan_so_che`, `ngay_bat_dau`, `ngay_hoan_tat`, `created_at`, `updated_at`) VALUES
+('SC001', 'SC001', 'LO002', 'Quýt đường loại 1', 'Dây chuyền rửa Ozon A', NULL, 'DA_HOAN_TAT', '2026-10-12', '2026-10-12', '2026-10-12 19:35:53', '2026-10-12 19:37:21');
 
 -- --------------------------------------------------------
 
@@ -640,6 +692,14 @@ ALTER TABLE `san_pham_nong_san`
   ADD PRIMARY KEY (`ma_san_pham`);
 
 --
+-- Chỉ mục cho bảng `so_che_lo_hang`
+--
+ALTER TABLE `so_che_lo_hang`
+  ADD PRIMARY KEY (`ma_so_che`),
+  ADD UNIQUE KEY `uq_soche_lo_moi` (`ma_lo_moi`),
+  ADD KEY `idx_soche_co_so` (`ma_co_so`,`giai_doan_so_che`);
+
+--
 -- Chỉ mục cho bảng `thua_dat`
 --
 ALTER TABLE `thua_dat`
@@ -676,7 +736,7 @@ ALTER TABLE `blockchain_outbox`
 -- AUTO_INCREMENT cho bảng `chi_so_kiem_dinh`
 --
 ALTER TABLE `chi_so_kiem_dinh`
-  MODIFY `ma_chi_so_kd` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=122;
+  MODIFY `ma_chi_so_kd` bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=98;
 
 --
 -- AUTO_INCREMENT cho bảng `mua_vu_vat_tu`
@@ -788,6 +848,13 @@ ALTER TABLE `nong_trai`
 ALTER TABLE `quyen_thao_tac_lo`
   ADD CONSTRAINT `fk_quyen_lo_nong_san` FOREIGN KEY (`ma_lo_nong_san`) REFERENCES `lo_nong_san` (`ma_lo_nong_san`) ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_quyen_nguoi_dung` FOREIGN KEY (`ma_nguoi_dung`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON UPDATE CASCADE;
+
+--
+-- Các ràng buộc cho bảng `so_che_lo_hang`
+--
+ALTER TABLE `so_che_lo_hang`
+  ADD CONSTRAINT `fk_soche_co_so` FOREIGN KEY (`ma_co_so`) REFERENCES `nguoi_dung` (`ma_nguoi_dung`) ON UPDATE CASCADE,
+  ADD CONSTRAINT `fk_soche_lo_moi` FOREIGN KEY (`ma_lo_moi`) REFERENCES `lo_nong_san` (`ma_lo_nong_san`) ON UPDATE CASCADE;
 
 --
 -- Các ràng buộc cho bảng `thua_dat`

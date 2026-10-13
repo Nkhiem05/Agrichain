@@ -31,7 +31,6 @@ const TraceScannerView = ({ batchCode, setBatchCode, onNavigateToDetail }) => {
       navigate(`/chi-tiet-user?malohang=${encodeURIComponent(code.trim())}`);
     }
   };
-
   const [scanMode, setScanMode] = useState("camera"); // "camera" | "gallery"
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -48,7 +47,7 @@ const TraceScannerView = ({ batchCode, setBatchCode, onNavigateToDetail }) => {
       return url.protocol === "http:" || url.protocol === "https:";
     } catch {
       // Dự phòng trường hợp URL không có tiền tố http/https (như www.domain.com)
-      return /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/i.test(
+      return /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?\$/i.test(
         text.trim(),
       );
     }
@@ -374,7 +373,7 @@ const TraceScannerView = ({ batchCode, setBatchCode, onNavigateToDetail }) => {
                     goToDetail(currentBatchCode);
                   }
                 }}
-                placeholder="Nhập mã truy xuất (mã lô, mã kiểm định)..."
+                placeholder="Nhập mã truy xuất..."
                 className="input-batch-code"
               />
               <button

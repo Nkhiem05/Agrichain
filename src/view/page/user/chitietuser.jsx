@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
   Sprout,
   Award,
@@ -7,18 +8,111 @@ import {
   ArrowLeft,
   CheckCircle2,
   ShieldCheck,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import "../../css/chitietuser.css";
+import { fetchChiTietUser } from "../../../api/chitietuserApi";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
-const TraceDetailPage = ({ batchCode = "#SC-2026-001", onBack }) => {
+const formatDate = (dateStr) => {
+  if (!dateStr) return "Chưa cập nhật";
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString("vi-VN");
+};
+
+const TraceDetailPage = ({ onBack }) => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Đọc mã lô hàng từ URL: /chi-tiet-user?malohang=LO001
+  const rawBatchCode =
+    searchParams.get("malohang") || searchParams.get("batchCode") || "";
+  const currentBatchCode = rawBatchCode.trim();
+
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack();
+    } else {
+      navigate(-1);
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!currentBatchCode) {
+      setLoading(false);
+      setError("Không tìm thấy mã lô hàng trên liên kết (?malohang=...)");
+      return;
+    }
+
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await fetchChiTietUser(currentBatchCode);
+        if (isMounted) setData(result);
+      } catch (err) {
+        if (isMounted) setError(err.message);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentBatchCode]);
+
+  if (loading) {
+    return (
+      <div className="trace-loading-screen">
+        <div className="trace-loading-inner">
+          <Loader2 className="animate-spin" size={24} /> Đang truy vấn sổ cái
+          chuỗi khối...
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="trace-error-box">
+        <AlertCircle
+          size={48}
+          color="#ef4444"
+          style={{ margin: "0 auto 12px" }}
+        />
+        <h3 style={{ fontSize: "18px", color: "#1f2937" }}>
+          Không thể truy xuất thông tin
+        </h3>
+        <p style={{ color: "#6b7280", margin: "8px 0 20px" }}>
+          {error || "Lô hàng không tồn tại hoặc chưa được kích hoạt."}
+        </p>
+        <button onClick={handleBack} className="btn-back-action">
+          Quay lại màn hình quét
+        </button>
+      </div>
+    );
+  }
+
+  const { batch, blockchain, farming, audit, processing, shipping } = data;
+  const latestShipment = shipping && shipping.length > 0 ? shipping[0] : null;
+
   return (
     <div className="trace-page">
       {/* HEADER */}
       <header className="dashboard-header">
-        <div className="header-left" onClick={onBack}>
+        <div className="header-left" onClick={handleBack}>
           <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
           <div>
             <span className="header-brand-title">AGRICHAIN</span>
@@ -27,119 +121,54 @@ const TraceDetailPage = ({ batchCode = "#SC-2026-001", onBack }) => {
 
         <div className="chain-badge">
           <span className="pulse-dot"></span>
-          <span>Mainnet Online • Block #18,924,102</span>
+          <span>
+            Mainnet Online • Block #
+            {blockchain?.so_thu_tu_su_kien || "18,924,102"}
+          </span>
         </div>
       </header>
 
       {/* CHI TIẾT SẢN PHẨM TRUY XUẤT */}
       <div className="detail-container">
         <div className="back-bar">
-          <button
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              border: "none",
-              background: "none",
-              color: "#16a34a",
-              fontWeight: "700",
-              fontSize: "13px",
-              cursor: "pointer",
-            }}
-            onClick={onBack}
-          >
+          <button className="back-btn" onClick={handleBack}>
             <ArrowLeft size={16} /> Quay lại màn hình quét
           </button>
-          <span
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "12px",
-              fontWeight: "700",
-              color: "#15803d",
-            }}
-          >
+          <span className="chain-verify-status">
             <CheckCircle2 size={16} /> Đã Khớp Chữ Ký Chuỗi Khối
           </span>
         </div>
 
         <div className="detail-grid">
           {/* THÔNG TIN CHUNG & BLOCKCHAIN */}
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-          >
+          <div className="info-column">
             <div className="timeline-box">
-              <span
-                style={{
-                  fontSize: "11px",
-                  fontWeight: "700",
-                  color: "#16a34a",
-                }}
-              >
-                {batchCode}
-              </span>
-              <h2
-                style={{
-                  fontSize: "20px",
-                  fontWeight: "800",
-                  marginTop: "4px",
-                }}
-              >
-                Quýt Đường Đóng Thùng
-              </h2>
-              <p style={{ fontSize: "12px", color: "#6b7280" }}>
-                Giống thuần canh tác tại Trà Vinh
+              <span className="batch-code-label">#{batch?.ma_lo_nong_san}</span>
+              <h2 className="batch-product-title">{batch?.ten_san_pham}</h2>
+              <p className="batch-description">
+                {batch?.mo_ta_san_pham ||
+                  `${batch?.loai_san_pham} tiêu chuẩn kiểm định`}
               </p>
 
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  marginTop: "8px",
-                  color: "#16a34a",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                }}
-              >
-                <ShieldCheck size={16} /> Đạt Chứng Nhận VietGAP
+              <div className="cert-status-badge">
+                <ShieldCheck size={16} /> Đạt Chứng Nhận{" "}
+                {audit?.tieu_chuan_dang_ky || "VietGAP"}
               </div>
             </div>
 
             <div className="blockchain-card">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: "8px",
-                }}
-              >
+              <div className="blockchain-card-header">
                 <span>XÁC THỰC CHUỖI KHỐI</span>
-                <span style={{ color: "#86efac" }}>100% Verified</span>
+                <span className="text-verified">100% Verified</span>
               </div>
-              <p style={{ fontSize: "10px", color: "#d1fae5" }}>
-                Transaction Hash:
+              <p className="tx-hash-label">Transaction Hash:</p>
+              <p className="tx-hash-value">
+                {blockchain?.ma_giao_dich_blockchain ||
+                  batch?.latest_event_hash ||
+                  "0x7c49f821e9ba0029b3014fec6491a381e9b2a74c"}
               </p>
-              <p
-                style={{
-                  wordBreak: "break-all",
-                  fontWeight: "700",
-                  color: "#ffffff",
-                  marginBottom: "8px",
-                }}
-              >
-                0x7c49f821e9ba0029b3014fec6491a381e9b2a74c
-              </p>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderTop: "1px solid rgba(255,255,255,0.2)",
-                  paddingTop: "8px",
-                }}
-              >
-                <span>Block: #18,924,102</span>
+              <div className="blockchain-card-footer">
+                <span>Trạng thái: {batch?.integrity_status}</span>
                 <span>AgriChain V2</span>
               </div>
             </div>
@@ -147,195 +176,146 @@ const TraceDetailPage = ({ batchCode = "#SC-2026-001", onBack }) => {
 
           {/* DÒNG ĐỜI SẢN PHẨM */}
           <div className="timeline-box">
-            <h3
-              style={{
-                fontSize: "16px",
-                fontWeight: "700",
-                marginBottom: "16px",
-              }}
-            >
+            <h3 className="timeline-header-title">
               Hồ Sơ Dòng Đời Sản Phẩm Minh Bạch
             </h3>
 
             <div className="timeline-vertical">
               {/* 1. Nông Trại */}
-              <div className="timeline-step">
-                <span className="timeline-step-dot"></span>
-                <div className="timeline-step-title">
-                  <Sprout size={16} color="#16a34a" /> 1. Canh Tác & Thu Hoạch
-                </div>
-                <p
-                  style={{
-                    fontSize: "12px",
-                    color: "#16a34a",
-                    fontWeight: "600",
-                  }}
-                >
-                  Vườn Cam A1 (#FARM-01111) - Nông dân: Nguyễn Văn A (Trà Vinh)
-                </p>
-                <div
-                  style={{
-                    backgroundColor: "#f8fafc",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    marginTop: "8px",
-                  }}
-                >
-                  <p style={{ fontSize: "12px", color: "#475569" }}>
-                    Bắt đầu: 18/06/2025 • Thu hoạch: 20/09/2026 (1,500 kg)
+              {farming && (
+                <div className="timeline-step">
+                  <span className="timeline-step-dot dot-farming"></span>
+                  <div className="timeline-step-title">
+                    <Sprout size={16} color="#16a34a" /> 1. Canh Tác & Thu Hoạch
+                  </div>
+                  <p className="farm-info-highlight">
+                    {farming.ten_nong_trai} - Nông dân: {farming.ten_nong_dan} (
+                    {farming.dia_diem_nong_trai})
                   </p>
-                  <table className="table-compact" style={{ marginTop: "8px" }}>
-                    <thead>
-                      <tr>
-                        <th>Ngày</th>
-                        <th>Hoạt chất BVTV / Phân bón</th>
-                        <th>Cách ly</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>10/08/2026</td>
-                        <td>NPK Đầu Trâu 20-20-15</td>
-                        <td>Bón lót nuôi quả</td>
-                      </tr>
-                      <tr>
-                        <td>25/08/2026</td>
-                        <td>Thuốc trừ sâu Decis 2.5EC</td>
-                        <td style={{ color: "#16a34a", fontWeight: "700" }}>
-                          Cách ly 26 ngày (≥14 ngày)
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div className="step-card-box bg-farming">
+                    <p className="step-detail-time">
+                      Bắt đầu: {formatDate(farming.ngay_gieo_trong)} • Thu
+                      hoạch: {formatDate(batch.ngay_thu_hoach)} (
+                      {Number(batch.so_luong_hien_tai).toLocaleString()}{" "}
+                      {batch.don_vi_tinh})
+                    </p>
+                    {farming.supplies && farming.supplies.length > 0 && (
+                      <table className="table-compact">
+                        <thead>
+                          <tr>
+                            <th>Ngày</th>
+                            <th>Hoạt chất BVTV / Phân bón</th>
+                            <th>Liều lượng</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {farming.supplies.map((item, idx) => (
+                            <tr key={idx}>
+                              <td>{formatDate(item.ngay_su_dung)}</td>
+                              <td>{item.ten_vat_tu}</td>
+                              <td className="supply-amount">
+                                {item.lieu_luong} {item.don_vi_tinh}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 2. Kiểm định */}
-              <div className="timeline-step">
-                <span
-                  className="timeline-step-dot"
-                  style={{ backgroundColor: "#9333ea" }}
-                ></span>
-                <div className="timeline-step-title">
-                  <Award size={16} color="#9333ea" /> 2. Kiểm Định Chất Lượng
+              {audit && (
+                <div className="timeline-step">
+                  <span className="timeline-step-dot dot-audit"></span>
+                  <div className="timeline-step-title">
+                    <Award size={16} color="#9333ea" /> 2. Kiểm Định Chất Lượng
+                  </div>
+                  <p className="audit-info-highlight">
+                    {audit.ten_co_quan} - Mã hồ sơ: {audit.ma_ho_so}
+                  </p>
+                  <div className="step-card-box bg-audit">
+                    {audit.indicators && audit.indicators.length > 0 ? (
+                      <table className="table-compact">
+                        <thead>
+                          <tr>
+                            <th>Chỉ tiêu xét nghiệm</th>
+                            <th>Hàm lượng</th>
+                            <th>Kết luận</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {audit.indicators.map((ind, idx) => (
+                            <tr key={idx}>
+                              <td>{ind.ten_chi_so}</td>
+                              <td>{ind.gia_tri}</td>
+                              <td className="table-status-pass">Đạt chuẩn</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="empty-subtext">
+                        Đã công bố kết quả ({audit.ket_luan}).
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p
-                  style={{
-                    fontSize: "12px",
-                    color: "#9333ea",
-                    fontWeight: "600",
-                  }}
-                >
-                  Trung Tâm Giám Định Nông Nghiệp Vùng 2 - Giấy chứng nhận:
-                  VG-2026-8812
-                </p>
-                <div
-                  style={{
-                    backgroundColor: "#faf5ff",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    marginTop: "8px",
-                  }}
-                >
-                  <table className="table-compact">
-                    <thead>
-                      <tr>
-                        <th>Chỉ tiêu xét nghiệm</th>
-                        <th>Hàm lượng</th>
-                        <th>Kết luận</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>Nitrate (NO3)</td>
-                        <td>0.02 mg/kg</td>
-                        <td style={{ color: "#16a34a", fontWeight: "700" }}>
-                          Đạt chuẩn
-                        </td>
-                      </tr>
-                      <tr>
-                        <td>Deltamethrin (Decis)</td>
-                        <td>&lt; 0.005 mg/kg</td>
-                        <td style={{ color: "#16a34a", fontWeight: "700" }}>
-                          Không phát hiện tồn dư
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              )}
 
               {/* 3. Sơ chế */}
-              <div className="timeline-step">
-                <span
-                  className="timeline-step-dot"
-                  style={{ backgroundColor: "#2563eb" }}
-                ></span>
-                <div className="timeline-step-title">
-                  <Package size={16} color="#2563eb" /> 3. Sơ Chế & Đóng Gói
-                </div>
-                <p
-                  style={{
-                    fontSize: "12px",
-                    color: "#2563eb",
-                    fontWeight: "600",
-                  }}
-                >
-                  HTX Sơ Chế & Chế Biến Mekong - Mã lô: {batchCode}
-                </p>
-                <div
-                  style={{
-                    backgroundColor: "#eff6ff",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    marginTop: "8px",
-                    fontSize: "12px",
-                  }}
-                >
-                  <p>• Rửa sục Ozon 0.5 ppm diệt nấm khuẩn (27/09/2026)</p>
-                  <p>
-                    • Sấy ráo khí mát 35°C và đóng thùng 10kg dán tem QR
-                    (28/09/2026)
+              {processing && (
+                <div className="timeline-step">
+                  <span className="timeline-step-dot dot-processing"></span>
+                  <div className="timeline-step-title">
+                    <Package size={16} color="#2563eb" /> 3. Sơ Chế & Đóng Gói
+                  </div>
+                  <p className="processing-info-highlight">
+                    {processing.ten_co_so} - {processing.tieu_de}
                   </p>
+                  <div className="step-card-box bg-processing">
+                    <p>
+                      • Dây chuyền:{" "}
+                      {processing.khu_vuc_so_che ||
+                        "Khu vực phân loại đóng gói"}
+                    </p>
+                    <p>
+                      • Thời gian hoàn tất:{" "}
+                      {formatDate(
+                        processing.ngay_hoan_tat || processing.ngay_bat_dau,
+                      )}{" "}
+                      - Trạng thái: {processing.giai_doan_so_che}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 4. Phân phối */}
-              <div className="timeline-step">
-                <span
-                  className="timeline-step-dot"
-                  style={{ backgroundColor: "#d97706" }}
-                ></span>
-                <div className="timeline-step-title">
-                  <Store size={16} color="#d97706" /> 4. Phân Phối & Bán Lẻ
-                </div>
-                <p
-                  style={{
-                    fontSize: "12px",
-                    color: "#d97706",
-                    fontWeight: "600",
-                  }}
-                >
-                  Tổng Kho Bách Hóa Sài Gòn ➔ Siêu thị Co.opMart Lý Thường Kiệt
-                </p>
-                <div
-                  style={{
-                    backgroundColor: "#fffbeb",
-                    padding: "12px",
-                    borderRadius: "8px",
-                    marginTop: "8px",
-                    fontSize: "12px",
-                  }}
-                >
-                  <p>
-                    • Vận chuyển: Xe tải lạnh 65C-128.45 duy trì nhiệt độ 8°C
-                    (29/09/2026)
+              {latestShipment && (
+                <div className="timeline-step">
+                  <span className="timeline-step-dot dot-shipping"></span>
+                  <div className="timeline-step-title">
+                    <Store size={16} color="#d97706" /> 4. Phân Phối & Bán Lẻ
+                  </div>
+                  <p className="shipping-info-highlight">
+                    {latestShipment.ten_don_vi_van_chuyen} ➔{" "}
+                    {latestShipment.ten_ben_nhan ||
+                      latestShipment.dia_chi_giao_hang ||
+                      "Điểm bán lẻ"}
                   </p>
-                  <p>
-                    • Trạng thái: Lên kệ phục vụ người tiêu dùng (30/09/2026)
-                  </p>
+                  <div className="step-card-box bg-shipping">
+                    <p>
+                      • Tài xế: {latestShipment.ten_tai_xe || "Chưa phân công"}{" "}
+                      (Biển số: {latestShipment.bien_so_xe || "N/A"})
+                    </p>
+                    <p>
+                      • Xuất phát: {formatDate(latestShipment.thoi_gian_xuat)} •
+                      Trạng thái: {latestShipment.trang_thai}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

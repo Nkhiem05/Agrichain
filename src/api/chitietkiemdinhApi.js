@@ -19,3 +19,6 @@ export const fetchChiTietKiemDinh = async (maKiemDinh) => {
 
   return data;
 };
+
+export const fetchChiTietUser = fetchChiTietKiemDinh;
+export default fetchChiTietKiemDinh;
