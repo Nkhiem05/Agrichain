@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   ShieldCheck,
@@ -23,6 +24,8 @@ import {
   UserCheck,
   MoreVertical,
   KeyRound,
+  Pencil,
+  LogOut,
 } from "lucide-react";
 import "../../css/admin.css";
 
@@ -107,6 +110,17 @@ const formatQuantity = (value, unit) => {
 };
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+
+  const savedUser = localStorage.getItem("user");
+  const loggedInUser = savedUser ? JSON.parse(savedUser) : null;
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/dang-nhap");
+  };
+
   // ================= TABS =================
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
@@ -200,6 +214,13 @@ export default function AdminDashboard() {
 
   const [resetPasswordUser, setResetPasswordUser] = useState(null);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
+
+  const [editInfoUser, setEditInfoUser] = useState(null);
+  const [editInfoForm, setEditInfoForm] = useState({
+    ho_ten: "",
+    so_dien_thoai: "",
+    ten_dang_nhap: "",
+  });
 
   const [newCat, setNewCat] = useState({
     categoryType: "giong_cay_trong",
@@ -558,6 +579,33 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUpdateAccountInfo = async (e) => {
+    e.preventDefault();
+    if (!editInfoForm.ho_ten.trim()) {
+      return alert("Vui lòng nhập họ tên / tên đơn vị");
+    }
+    try {
+      const res = await fetch(
+        `${API_URL}/api/admin/tai-khoan/${editInfoUser.ma_nguoi_dung}/thong-tin`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({
+            ho_ten: editInfoForm.ho_ten.trim(),
+            so_dien_thoai: editInfoForm.so_dien_thoai.trim() || undefined,
+            ten_dang_nhap: editInfoForm.ten_dang_nhap.trim() || undefined,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!data.success) return alert(data.message || "Không thể cập nhật thông tin");
+      setEditInfoUser(null);
+      refreshAll();
+    } catch (err) {
+      alert("Không thể kết nối tới máy chủ");
+    }
+  };
+
   const handleResetPassword = async (e) => {
     e.preventDefault();
     if (resetPasswordValue && resetPasswordValue.length < 6) {
@@ -677,10 +725,27 @@ export default function AdminDashboard() {
           />
         </div>
 
-        <div className="header-profile">
-          <div className="avatar-circle">AD</div>
+        <div
+          className="header-profile"
+          style={{ cursor: "pointer" }}
+          onClick={() => navigate("/trang-ca-nhan")}
+          title="Xem hồ sơ cá nhân"
+        >
+          <div className="avatar-circle" style={{ overflow: "hidden" }}>
+            {loggedInUser?.anh_dai_dien ? (
+              <img
+                src={`http://localhost:3000${loggedInUser.anh_dai_dien}`}
+                alt="avatar"
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+              />
+            ) : (
+              (loggedInUser?.ho_ten || "AD").slice(0, 2).toUpperCase()
+            )}
+          </div>
           <div className="profile-meta">
-            <span className="profile-name">Quản Trị Viên Hệ Thống</span>
+            <span className="profile-name">
+              {loggedInUser?.ho_ten || "Quản Trị Viên Hệ Thống"}
+            </span>
             <span className="profile-role">Super Administrator</span>
           </div>
         </div>
@@ -766,11 +831,36 @@ export default function AdminDashboard() {
             </nav>
           </div>
 
-          <div className="sidebar-footer">
-            <span className="pulse-dot"></span>
-            <span>
-              AgriChain Core: <b>v2.4.0 (Active)</b>
-            </span>
+          <div style={{ marginTop: "auto" }}>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "calc(100% - 24px)",
+                margin: "0 12px 10px",
+                padding: "10px 12px",
+                border: "1px solid #fecaca",
+                background: "#fef2f2",
+                color: "#dc2626",
+                borderRadius: 8,
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <LogOut size={17} />
+              Đăng xuất
+            </button>
+
+            <div className="sidebar-footer">
+              <span className="pulse-dot"></span>
+              <span>
+                AgriChain Core: <b>v2.4.0 (Active)</b>
+              </span>
+            </div>
           </div>
         </aside>
 
@@ -1356,6 +1446,23 @@ export default function AdminDashboard() {
                                   >
                                     <UserCheck size={15} color="#16a34a" />
                                     <span>Phân quyền & Vai trò</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="dropdown-item"
+                                    onClick={() => {
+                                      setEditInfoUser({ ...user });
+                                      setEditInfoForm({
+                                        ho_ten: user.ho_ten || "",
+                                        so_dien_thoai: user.so_dien_thoai || "",
+                                        ten_dang_nhap: user.ten_dang_nhap || "",
+                                      });
+                                      setOpenDropdownUser(null);
+                                    }}
+                                  >
+                                    <Pencil size={15} color="#2563eb" />
+                                    <span>Sửa thông tin</span>
                                   </button>
 
                                   <button
@@ -2217,6 +2324,69 @@ export default function AdminDashboard() {
               </button>
               <button type="submit" className="btn-save">
                 Cập nhật vai trò
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* ================= MODAL SỬA THÔNG TIN TÀI KHOẢN ================= */}
+      {editInfoUser && (
+        <div className="modal-overlay">
+          <form className="modal-container" onSubmit={handleUpdateAccountInfo}>
+            <div className="modal-header">
+              <h3>Sửa thông tin tài khoản</h3>
+              <button
+                type="button"
+                className="btn-close-modal"
+                onClick={() => setEditInfoUser(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Tên đăng nhập</label>
+                <input
+                  type="text"
+                  value={editInfoForm.ten_dang_nhap}
+                  onChange={(e) =>
+                    setEditInfoForm({ ...editInfoForm, ten_dang_nhap: e.target.value })
+                  }
+                />
+              </div>
+              <div className="form-group">
+                <label>Họ và tên (*)</label>
+                <input
+                  type="text"
+                  value={editInfoForm.ho_ten}
+                  onChange={(e) =>
+                    setEditInfoForm({ ...editInfoForm, ho_ten: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Số điện thoại</label>
+                <input
+                  type="text"
+                  value={editInfoForm.so_dien_thoai}
+                  onChange={(e) =>
+                    setEditInfoForm({ ...editInfoForm, so_dien_thoai: e.target.value })
+                  }
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setEditInfoUser(null)}
+              >
+                Hủy
+              </button>
+              <button type="submit" className="btn-save">
+                Lưu thay đổi
               </button>
             </div>
           </form>

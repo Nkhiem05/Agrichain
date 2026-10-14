@@ -128,9 +128,15 @@ const updateProfile = async (req, res) => {
       ],
     );
 
+    const [rows] = await db.execute(
+      `SELECT ho_ten, so_dien_thoai, anh_dai_dien FROM nguoi_dung WHERE ma_nguoi_dung = ? LIMIT 1`,
+      [req.user.ma_nguoi_dung],
+    );
+
     return res.json({
       success: true,
       message: "Đã cập nhật hồ sơ cá nhân",
+      data: rows[0] || null,
     });
   } catch (err) {
     return sendError(

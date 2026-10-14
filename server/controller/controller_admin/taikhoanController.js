@@ -329,6 +329,53 @@ const changeAccountRole = async (req, res) => {
   }
 };
 
+// Admin sửa thông tin cơ bản (họ tên, SĐT, tên đăng nhập) của 1 tài khoản
+// đã có sẵn. Không đụng tới mật khẩu/vai trò (đã có chức năng riêng).
+const updateAccountInfo = async (req, res) => {
+  const { maNguoiDung } = req.params;
+
+  try {
+    const ho_ten = cleanText(req.body?.ho_ten);
+    const so_dien_thoai = cleanText(req.body?.so_dien_thoai);
+    const ten_dang_nhap_input = cleanText(req.body?.ten_dang_nhap);
+
+    if (!ho_ten) throw new ApiError(400, "Vui lòng nhập họ tên / tên đơn vị");
+
+    const [accounts] = await db.execute(
+      `SELECT ten_dang_nhap FROM nguoi_dung WHERE ma_nguoi_dung = ? LIMIT 1`,
+      [maNguoiDung],
+    );
+    if (accounts.length === 0) {
+      throw new ApiError(404, "Không tìm thấy tài khoản");
+    }
+
+    let ten_dang_nhap = accounts[0].ten_dang_nhap;
+    if (ten_dang_nhap_input && ten_dang_nhap_input !== ten_dang_nhap) {
+      const [existing] = await db.execute(
+        `SELECT ma_nguoi_dung FROM nguoi_dung WHERE ten_dang_nhap = ? AND ma_nguoi_dung != ? LIMIT 1`,
+        [ten_dang_nhap_input, maNguoiDung],
+      );
+      if (existing.length > 0) {
+        throw new ApiError(409, "Tên đăng nhập đã được sử dụng");
+      }
+      ten_dang_nhap = ten_dang_nhap_input;
+    }
+
+    await db.execute(
+      `UPDATE nguoi_dung SET ho_ten = ?, so_dien_thoai = ?, ten_dang_nhap = ? WHERE ma_nguoi_dung = ?`,
+      [ho_ten, so_dien_thoai, ten_dang_nhap, maNguoiDung],
+    );
+
+    return res.json({
+      success: true,
+      message: "Đã cập nhật thông tin tài khoản",
+      data: { ten_dang_nhap },
+    });
+  } catch (err) {
+    return sendError(res, err, "Lỗi cập nhật thông tin tài khoản:", "Không thể cập nhật thông tin tài khoản");
+  }
+};
+
 // Admin đặt/đổi mật khẩu cho 1 tài khoản đã có sẵn. Không nhập mật khẩu thì
 // tự sinh mật khẩu tạm ngẫu nhiên (giống lúc tạo tài khoản).
 const resetAccountPassword = async (req, res) => {
@@ -553,6 +600,7 @@ module.exports = {
   createAccount,
   toggleAccountLock,
   changeAccountRole,
+  updateAccountInfo,
   resetAccountPassword,
   getAccountRequests,
   approveAccountRequest,

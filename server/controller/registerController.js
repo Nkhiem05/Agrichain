@@ -32,7 +32,13 @@ const register = async (req, res) => {
       vaiTro = "FARMER_COOP";
     }
 
-    const validRoles = ["FARMER_COOP", "TRANSPORTER", "DISTRIBUTOR"];
+    const validRoles = [
+      "FARMER_COOP",
+      "TRANSPORTER",
+      "DISTRIBUTOR",
+      "PROCESSOR",
+      "CERT_AUTHORITY",
+    ];
     if (!validRoles.includes(vaiTro)) {
       return res.status(400).json({
         ok: false,

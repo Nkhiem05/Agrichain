@@ -29,6 +29,7 @@ import {
   ClipboardCheck,
   Check,
   Edit3,
+  LogOut,
 } from "lucide-react";
 import "../../css/coquankiemdinh.css";
 import { useNavigate } from "react-router-dom";
@@ -186,6 +187,12 @@ function Coquankiemdinh() {
   const handlechitietkiemdinh = (e) => {
     e.preventDefault();
     navigate("/chi-tiet-kiem-dinh");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/dang-nhap");
   };
 
   const [modalAcceptOpen, setModalAcceptOpen] = useState(false);
@@ -563,10 +570,20 @@ function Coquankiemdinh() {
             onClick={() => navigate("/trang-ca-nhan")}
             title="Xem hồ sơ cá nhân"
           >
-            <div className="avatar-circle"></div>
+            <div className="avatar-circle" style={{ overflow: "hidden" }}>
+              {user?.anh_dai_dien ? (
+                <img
+                  src={`http://localhost:3000${user.anh_dai_dien}`}
+                  alt="avatar"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                />
+              ) : (
+                (user?.ho_ten || "KD").slice(0, 2).toUpperCase()
+              )}
+            </div>
             <div className="profile-meta">
               <span className="profile-name">
-                Trung Tâm Giám Định Nông Nghiệp Vùng 2
+                {user?.ho_ten || "Cơ quan kiểm định"}
               </span>
               <span className="profile-role">
                 Cơ quan kiểm định &amp; Chứng nhận
@@ -628,11 +645,36 @@ function Coquankiemdinh() {
               </nav>
             </div>
 
-            <div className="sidebar-footer">
-              <span className="pulse-dot"></span>
-              <span>
-                Node kiểm định: <b>Cert-Authority-VN</b>
-              </span>
+            <div style={{ marginTop: "auto" }}>
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "calc(100% - 24px)",
+                  margin: "0 12px 10px",
+                  padding: "10px 12px",
+                  border: "1px solid #fecaca",
+                  background: "#fef2f2",
+                  color: "#dc2626",
+                  borderRadius: 8,
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <LogOut size={17} />
+                Đăng xuất
+              </button>
+
+              <div className="sidebar-footer">
+                <span className="pulse-dot"></span>
+                <span>
+                  Node kiểm định: <b>Cert-Authority-VN</b>
+                </span>
+              </div>
             </div>
           </aside>
 

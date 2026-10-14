@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   User,
   Briefcase,
@@ -10,6 +11,7 @@ import {
   Edit,
   X,
   Camera,
+  LogOut,
 } from "lucide-react";
 import "../css/trangcanhan.css";
 
@@ -27,6 +29,14 @@ const authHeaders = () => {
 const avatarUrl = (path) => (path ? `${API_URL}${path}` : null);
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/dang-nhap");
+  };
+
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -118,6 +128,20 @@ const ProfilePage = () => {
         return;
       }
 
+      // Đồng bộ lại tên/ảnh đại diện vào localStorage để header các trang
+      // khác cập nhật theo mà không cần đăng nhập lại.
+      if (data.data) {
+        try {
+          const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
+          localStorage.setItem(
+            "user",
+            JSON.stringify({ ...savedUser, ...data.data }),
+          );
+        } catch {
+          // Bỏ qua nếu dữ liệu user cũ bị lỗi định dạng
+        }
+      }
+
       setIsEditModalOpen(false);
       await fetchProfile();
     } catch (err) {
@@ -135,6 +159,26 @@ const ProfilePage = () => {
           <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
           <span className="header-brand-title">AGRICHAIN PROFILE</span>
         </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 14px",
+            border: "1px solid #fecaca",
+            background: "#fef2f2",
+            color: "#dc2626",
+            borderRadius: 8,
+            fontSize: 13.5,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+        >
+          <LogOut size={16} />
+          Đăng xuất
+        </button>
       </header>
 
       {/* NỘI DUNG PROFILE */}

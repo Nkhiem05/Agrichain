@@ -11,6 +11,7 @@ import {
   XCircle,
   MoreVertical,
   Pencil,
+  LogOut,
 } from "lucide-react";
 import "../../css/nongdan.css";
 import { useNavigate } from "react-router-dom";
@@ -340,6 +341,12 @@ const DashboardPage = () => {
       navigate("/");
     }
   }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/dang-nhap");
+  };
 
   // =========================================================
   // LẤY DANH SÁCH NÔNG TRẠI
@@ -1572,7 +1579,17 @@ const DashboardPage = () => {
           onClick={() => navigate("/trang-ca-nhan")}
           title="Xem hồ sơ cá nhân"
         >
-          <div className="avatar-circle"></div>
+          <div className="avatar-circle" style={{ overflow: "hidden" }}>
+            {user?.anh_dai_dien ? (
+              <img
+                src={`http://localhost:3000${user.anh_dai_dien}`}
+                alt="avatar"
+                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+              />
+            ) : (
+              (user?.ho_ten || "ND").slice(0, 2).toUpperCase()
+            )}
+          </div>
           <div className="profile-meta">
             <span className="profile-name">{user?.ho_ten || "Nông dân"}</span>
             <span className="profile-role">Nông dân</span>
@@ -1648,11 +1665,36 @@ const DashboardPage = () => {
             </nav>
           </div>
 
-          <div className="sidebar-footer">
-            <span className="pulse-dot"></span>
-            <span>
-              Node nông dân: <b>Agri-Farm-Node</b>
-            </span>
+          <div style={{ marginTop: "auto" }}>
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "calc(100% - 24px)",
+                margin: "0 12px 10px",
+                padding: "10px 12px",
+                border: "1px solid #fecaca",
+                background: "#fef2f2",
+                color: "#dc2626",
+                borderRadius: 8,
+                fontSize: 13.5,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              <LogOut size={17} />
+              Đăng xuất
+            </button>
+
+            <div className="sidebar-footer">
+              <span className="pulse-dot"></span>
+              <span>
+                Node nông dân: <b>Agri-Farm-Node</b>
+              </span>
+            </div>
           </div>
         </aside>
 

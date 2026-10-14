@@ -75,6 +75,7 @@ const login = async (req, res) => {
         ten_dang_nhap: user.ten_dang_nhap,
         vai_tro: user.vai_tro,
         so_dien_thoai: user.so_dien_thoai,
+        anh_dai_dien: user.anh_dai_dien || null,
       },
     });
   } catch (error) {

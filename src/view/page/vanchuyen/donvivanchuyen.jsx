@@ -19,6 +19,7 @@ import {
   Eye,
   XCircle,
   AlertCircle,
+  LogOut,
 } from "lucide-react";
 import "../../css/donvivanchuyen.css";
 import {
@@ -86,6 +87,12 @@ export default function AgriChainLogistics() {
       navigate("/");
     }
   }, [navigate]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/dang-nhap");
+  };
 
   const loadTrips = useCallback(async () => {
     setLoading(true);
@@ -268,7 +275,17 @@ export default function AgriChainLogistics() {
             onClick={() => navigate("/trang-ca-nhan")}
             title="Xem hồ sơ cá nhân"
           >
-            <div className="avatar-circle">{(user.ho_ten || "VC").slice(0, 2).toUpperCase()}</div>
+            <div className="avatar-circle" style={{ overflow: "hidden" }}>
+              {user.anh_dai_dien ? (
+                <img
+                  src={`http://localhost:3000${user.anh_dai_dien}`}
+                  alt="avatar"
+                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                />
+              ) : (
+                (user.ho_ten || "VC").slice(0, 2).toUpperCase()
+              )}
+            </div>
             <div className="profile-meta">
               <span className="profile-name">{user.ho_ten || "Đơn vị vận chuyển"}</span>
               <span className="profile-role">Đơn vị vận chuyển</span>
@@ -324,12 +341,37 @@ export default function AgriChainLogistics() {
               </button>
             </div>
 
-            <div className="sidebar-footer">
-              <div className="iot-status">
-                <span className="pulse-dot"></span>
-                <span>
-                  Tài khoản: <b>{user.ten_dang_nhap}</b>
-                </span>
+            <div style={{ marginTop: "auto" }}>
+              <button
+                type="button"
+                onClick={handleLogout}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  width: "calc(100% - 24px)",
+                  margin: "0 12px 10px",
+                  padding: "10px 12px",
+                  border: "1px solid #fecaca",
+                  background: "#fef2f2",
+                  color: "#dc2626",
+                  borderRadius: 8,
+                  fontSize: 13.5,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <LogOut size={17} />
+                Đăng xuất
+              </button>
+
+              <div className="sidebar-footer">
+                <div className="iot-status">
+                  <span className="pulse-dot"></span>
+                  <span>
+                    Tài khoản: <b>{user.ten_dang_nhap}</b>
+                  </span>
+                </div>
               </div>
             </div>
           </aside>

@@ -21,6 +21,10 @@ router.put(
   taikhoanController.changeAccountRole,
 );
 router.put(
+  "/tai-khoan/:maNguoiDung/thong-tin",
+  taikhoanController.updateAccountInfo,
+);
+router.put(
   "/tai-khoan/:maNguoiDung/mat-khau",
   taikhoanController.resetAccountPassword,
 );

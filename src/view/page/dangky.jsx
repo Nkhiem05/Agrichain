@@ -60,6 +60,64 @@ const ACTOR_DATA = {
       "Chịu trách nhiệm bảo quản nguyên vẹn hàng hoá trong phạm vi phụ trách.",
     ],
   },
+  PROCESSOR: {
+    id: "PROCESSOR",
+    name: "Cơ Sở Sơ Chế / Đóng Gói",
+    shortName: "Sơ chế",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"
+        />
+      </svg>
+    ),
+    roleDesc:
+      "Tiếp nhận nông sản thô từ nông trại, sơ chế/khử khuẩn/đóng gói, tách gộp lô hàng và bàn giao vận chuyển tới bên phân phối.",
+    terms: [
+      "Đảm bảo vệ sinh an toàn thực phẩm trong toàn bộ quy trình sơ chế, đóng gói.",
+      "Ghi nhận trung thực khối lượng thực nhận, hao hụt và khu vực/dây chuyền xử lý.",
+      "Chịu trách nhiệm về tính nguyên vẹn của lô hàng khi bàn giao cho vận chuyển.",
+      "Phối hợp cung cấp hồ sơ truy xuất khi có yêu cầu kiểm tra từ cơ quan chức năng.",
+    ],
+  },
+  CERT_AUTHORITY: {
+    id: "CERT_AUTHORITY",
+    name: "Cơ Quan Kiểm Định / Chứng Nhận",
+    shortName: "Kiểm định",
+    icon: (
+      <svg
+        width="24"
+        height="24"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="2"
+          d="M9 12.75l2.25 2.25 3.75-5.25M21 12c0 4.556-3.04 8.408-7.2 9.631a1.5 1.5 0 01-1.6 0C7.04 20.408 4 16.556 4 12V6.5a1.5 1.5 0 01.9-1.374l6.5-2.8a1.5 1.5 0 011.2 0l6.5 2.8a1.5 1.5 0 01.9 1.374V12z"
+        />
+      </svg>
+    ),
+    roleDesc:
+      "Tiếp nhận yêu cầu kiểm định, lấy mẫu xét nghiệm dư lượng/chỉ tiêu an toàn và công bố hoặc thu hồi chứng nhận chất lượng cho lô hàng.",
+    terms: [
+      "Thực hiện kiểm định khách quan, độc lập, đúng quy trình và tiêu chuẩn đăng ký.",
+      "Công bố kết quả, chứng nhận trung thực, kịp thời dựa trên chỉ số xét nghiệm thực tế.",
+      "Chịu trách nhiệm pháp lý về kết luận kiểm định đã công bố trên hệ thống.",
+      "Thu hồi chứng nhận ngay khi phát hiện sai phạm hoặc dữ liệu không còn chính xác.",
+    ],
+  },
   DISTRIBUTOR: {
     id: "DISTRIBUTOR",
     name: "Bên Phân phối / Điểm bán lẻ",
