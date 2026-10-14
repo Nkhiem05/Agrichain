@@ -57,7 +57,7 @@ app.use("/api/mua-vu", muavuRoutes);
 app.use("/api/lo-thu-hoach", lothuhoachRoutes);
 
 // Chi tiết nông trại
-app.use("api/nong-trai", nongtraiRoutes);
+app.use("/api/nong-trai", nongtraiRoutes);
 
 // Vận chuyển & bàn giao
 app.use("/api/van-chuyen", vanchuyenRoutes);

@@ -42,10 +42,22 @@ const DEFAULT_LOGO_IMG =
 // Nhãn + badge cho trạng thái lệnh vận chuyển (lenh_van_chuyen.trang_thai) -
 // các bước trước CHO_TIEP_NHAN do đơn vị vận chuyển tự điều khiển.
 const INCOMING_STATUS = {
-  CHO_CHAP_NHAN: { text: "Chờ đơn vị vận chuyển xác nhận", tone: "warning", icon: Clock },
+  CHO_CHAP_NHAN: {
+    text: "Chờ đơn vị vận chuyển xác nhận",
+    tone: "warning",
+    icon: Clock,
+  },
   CHO_LAY_HANG: { text: "Chờ xe đến lấy hàng", tone: "info", icon: Truck },
-  DANG_VAN_CHUYEN: { text: "Đang vận chuyển tới kho", tone: "info", icon: Truck },
-  CHO_TIEP_NHAN: { text: "Đã đến nơi - Sẵn sàng tiếp nhận", tone: "purple", icon: Clock },
+  DANG_VAN_CHUYEN: {
+    text: "Đang vận chuyển tới kho",
+    tone: "info",
+    icon: Truck,
+  },
+  CHO_TIEP_NHAN: {
+    text: "Đã đến nơi - Sẵn sàng tiếp nhận",
+    tone: "purple",
+    icon: Clock,
+  },
   HOAN_THANH: { text: "Đã nhập kho", tone: "success", icon: CheckCircle2 },
   TU_CHOI: { text: "Đã từ chối", tone: "danger", icon: XCircle },
 };
@@ -212,7 +224,8 @@ const NhaPhanPhoiPage = () => {
   // TÍNH TOÁN METRICS
   // ==========================================
   const incomingActiveCount = importOrders.filter(
-    (o) => o.trang_thai === "DANG_VAN_CHUYEN" || o.trang_thai === "CHO_TIEP_NHAN",
+    (o) =>
+      o.trang_thai === "DANG_VAN_CHUYEN" || o.trang_thai === "CHO_TIEP_NHAN",
   ).length;
   const totalStockKg = inventoryList.reduce(
     (acc, cur) => acc + Number(cur.so_luong_hien_tai),
@@ -288,7 +301,9 @@ const NhaPhanPhoiPage = () => {
       });
       setShowReceiveModal(false);
       await loadAll();
-      alert(`Đã nhập kho thành công ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}!`);
+      alert(
+        `Đã nhập kho thành công ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}!`,
+      );
     } catch (err) {
       alert(err.message || "Không thể xác nhận nhập kho");
     }
@@ -307,7 +322,10 @@ const NhaPhanPhoiPage = () => {
       return;
     }
     try {
-      await rejectReceiveShipment(selectedOrder.ma_van_don, rejectReason.trim());
+      await rejectReceiveShipment(
+        selectedOrder.ma_van_don,
+        rejectReason.trim(),
+      );
       setShowRejectModal(false);
       await loadAll();
     } catch (err) {
@@ -320,11 +338,20 @@ const NhaPhanPhoiPage = () => {
   // ==========================================
   const handleOpenCreateDispatch = () => {
     const validLots = inventoryList
-      .filter((lot) => lot.trang_thai_chung_thu !== "REVOKED" && Number(lot.so_luong_hien_tai) > 0)
-      .sort((a, b) => new Date(a.han_luu_kho || "9999-12-31") - new Date(b.han_luu_kho || "9999-12-31"));
+      .filter(
+        (lot) =>
+          lot.trang_thai_chung_thu !== "REVOKED" &&
+          Number(lot.so_luong_hien_tai) > 0,
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.han_luu_kho || "9999-12-31") -
+          new Date(b.han_luu_kho || "9999-12-31"),
+      );
 
     setDispatchForm({
-      daiLyId: dealers.find((d) => d.trang_thai === "HOAT_DONG")?.ma_dai_ly || "",
+      daiLyId:
+        dealers.find((d) => d.trang_thai === "HOAT_DONG")?.ma_dai_ly || "",
       maLo: validLots[0]?.ma_lo_nong_san || "",
       soLuongXuat: "",
       hinhThuc: "TU_GIAO",
@@ -340,10 +367,16 @@ const NhaPhanPhoiPage = () => {
     if (!dispatchForm.maLo) return alert("Vui lòng chọn lô xuất hàng!");
     const xuatKg = Number(dispatchForm.soLuongXuat);
     if (!xuatKg || xuatKg <= 0) return alert("Số lượng xuất phải lớn hơn 0!");
-    if (dispatchForm.hinhThuc === "TU_GIAO" && (!dispatchForm.taiXe.trim() || !dispatchForm.bienSo.trim())) {
+    if (
+      dispatchForm.hinhThuc === "TU_GIAO" &&
+      (!dispatchForm.taiXe.trim() || !dispatchForm.bienSo.trim())
+    ) {
       return alert("Vui lòng điền tài xế và biển số xe!");
     }
-    if (dispatchForm.hinhThuc === "DV_VAN_CHUYEN" && !dispatchForm.tenDonViVC.trim()) {
+    if (
+      dispatchForm.hinhThuc === "DV_VAN_CHUYEN" &&
+      !dispatchForm.tenDonViVC.trim()
+    ) {
       return alert("Vui lòng nhập tên đơn vị vận chuyển!");
     }
 
@@ -436,7 +469,7 @@ const NhaPhanPhoiPage = () => {
   if (!user) return null;
 
   return (
-    <div className="nongdan dashboard-layout">
+    <div className="nhaphanphoi dashboard-layout">
       {/* ================= HEADER ================= */}
       <header className="dashboard-header">
         <div className="header-left">
@@ -462,7 +495,12 @@ const NhaPhanPhoiPage = () => {
               <img
                 src={`http://localhost:3000${user.anh_dai_dien}`}
                 alt="avatar"
-                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                }}
               />
             ) : (
               (user.ho_ten || "NPP").slice(0, 2).toUpperCase()
@@ -625,7 +663,10 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {importOrders.length === 0 ? (
                           <tr>
-                            <td colSpan={8} style={{ padding: 24, color: "#6b7280" }}>
+                            <td
+                              colSpan={8}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
                               Chưa có lệnh vận chuyển nào gửi tới kho của bạn.
                             </td>
                           </tr>
@@ -633,7 +674,9 @@ const NhaPhanPhoiPage = () => {
                           importOrders.map((order) => {
                             const isDropdownActive =
                               openDropdown === `order-${order.ma_van_don}`;
-                            const statusInfo = INCOMING_STATUS[order.trang_thai] || {
+                            const statusInfo = INCOMING_STATUS[
+                              order.trang_thai
+                            ] || {
                               text: order.trang_thai,
                               tone: "info",
                               icon: Clock,
@@ -643,9 +686,13 @@ const NhaPhanPhoiPage = () => {
                             return (
                               <tr
                                 key={order.ma_van_don}
-                                className={isDropdownActive ? "row-has-open-menu" : ""}
+                                className={
+                                  isDropdownActive ? "row-has-open-menu" : ""
+                                }
                               >
-                                <td style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                                <td
+                                  style={{ fontWeight: 700, color: "#1d4ed8" }}
+                                >
                                   {order.ma_van_don}
                                 </td>
                                 <td>
@@ -660,19 +707,29 @@ const NhaPhanPhoiPage = () => {
                                     {order.ma_lo_nong_san}
                                   </span>
                                 </td>
-                                <td style={{ fontWeight: 600, color: "#1f2937" }}>
+                                <td
+                                  style={{ fontWeight: 600, color: "#1f2937" }}
+                                >
                                   {order.ten_san_pham}
                                 </td>
                                 <td>{order.ten_nguoi_gui}</td>
-                                <td style={{ fontWeight: 700, color: "#15803d" }}>
-                                  {Number(order.khoi_luong).toLocaleString("vi-VN")}{" "}
+                                <td
+                                  style={{ fontWeight: 700, color: "#15803d" }}
+                                >
+                                  {Number(order.khoi_luong).toLocaleString(
+                                    "vi-VN",
+                                  )}{" "}
                                   {order.don_vi_tinh}
                                 </td>
-                                <td style={{ color: "#64748b", fontSize: 12.5 }}>
+                                <td
+                                  style={{ color: "#64748b", fontSize: 12.5 }}
+                                >
                                   {order.thoi_gian_xuat}
                                 </td>
                                 <td>
-                                  <span className={`status-pill ${statusInfo.tone}`}>
+                                  <span
+                                    className={`status-pill ${statusInfo.tone}`}
+                                  >
                                     <StatusIcon size={13} /> {statusInfo.text}
                                   </span>
                                 </td>
@@ -686,7 +743,10 @@ const NhaPhanPhoiPage = () => {
                                         <CheckCircle2 size={16} />
                                       </span>
                                     ) : (
-                                      <span className="status-icon-modern empty" title="Chưa nhập kho">
+                                      <span
+                                        className="status-icon-modern empty"
+                                        title="Chưa nhập kho"
+                                      >
                                         <span className="empty-indicator"></span>
                                       </span>
                                     )}
@@ -696,7 +756,12 @@ const NhaPhanPhoiPage = () => {
                                         type="button"
                                         className="btn-more-dots"
                                         title="Thao tác"
-                                        onClick={(e) => handleToggleMenu(e, `order-${order.ma_van_don}`)}
+                                        onClick={(e) =>
+                                          handleToggleMenu(
+                                            e,
+                                            `order-${order.ma_van_don}`,
+                                          )
+                                        }
                                       >
                                         <MoreVertical size={18} />
                                       </button>
@@ -706,22 +771,43 @@ const NhaPhanPhoiPage = () => {
                                           className={`dropdown-menu dropdown-fixed ${menuPos.up ? "dropdown-up" : ""}`}
                                           style={{
                                             right: menuPos.right,
-                                            ...(menuPos.up ? { bottom: menuPos.bottom } : { top: menuPos.top }),
+                                            ...(menuPos.up
+                                              ? { bottom: menuPos.bottom }
+                                              : { top: menuPos.top }),
                                           }}
                                         >
-                                          <div className="dropdown-item" onClick={() => handleOpenDetailModal(order)}>
+                                          <div
+                                            className="dropdown-item"
+                                            onClick={() =>
+                                              handleOpenDetailModal(order)
+                                            }
+                                          >
                                             <Eye size={15} />
                                             Xem chi tiết
                                           </div>
 
-                                          {order.trang_thai === "CHO_TIEP_NHAN" && (
+                                          {order.trang_thai ===
+                                            "CHO_TIEP_NHAN" && (
                                             <>
                                               <div className="dropdown-divider"></div>
-                                              <div className="dropdown-item" onClick={() => handleOpenReceiveModal(order)}>
-                                                <Check size={15} color="#15803d" />
+                                              <div
+                                                className="dropdown-item"
+                                                onClick={() =>
+                                                  handleOpenReceiveModal(order)
+                                                }
+                                              >
+                                                <Check
+                                                  size={15}
+                                                  color="#15803d"
+                                                />
                                                 Nghiệm thu & Nhập kho
                                               </div>
-                                              <div className="dropdown-item danger" onClick={() => handleOpenRejectModal(order)}>
+                                              <div
+                                                className="dropdown-item danger"
+                                                onClick={() =>
+                                                  handleOpenRejectModal(order)
+                                                }
+                                              >
                                                 <XCircle size={15} />
                                                 Từ chối nhận
                                               </div>
@@ -759,7 +845,12 @@ const NhaPhanPhoiPage = () => {
                     <div style={{ width: 250 }}>
                       <select
                         className="filter-select"
-                        style={{ width: "100%", height: 38, cursor: "pointer", fontWeight: 500 }}
+                        style={{
+                          width: "100%",
+                          height: 38,
+                          cursor: "pointer",
+                          fontWeight: 500,
+                        }}
                         value={selectedWarehouse}
                         onChange={(e) => setSelectedWarehouse(e.target.value)}
                       >
@@ -789,36 +880,74 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {filteredInventory.length === 0 ? (
                           <tr>
-                            <td colSpan={7} style={{ padding: 24, color: "#6b7280" }}>
+                            <td
+                              colSpan={7}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
                               Không có lô hàng nào tồn trong khu vực kho này.
                             </td>
                           </tr>
                         ) : (
                           filteredInventory.map((lot) => {
                             const daysLeft = getDaysRemaining(lot.han_luu_kho);
-                            const isRevoked = lot.trang_thai_chung_thu === "REVOKED";
-                            const isExpiringSoon = daysLeft !== null && daysLeft <= 7 && daysLeft > 0;
-                            const isExpired = daysLeft !== null && daysLeft <= 0;
+                            const isRevoked =
+                              lot.trang_thai_chung_thu === "REVOKED";
+                            const isExpiringSoon =
+                              daysLeft !== null &&
+                              daysLeft <= 7 &&
+                              daysLeft > 0;
+                            const isExpired =
+                              daysLeft !== null && daysLeft <= 0;
 
                             return (
-                              <tr key={lot.ma_lo_nong_san} className={isRevoked ? "row-locked" : ""}>
-                                <td style={{ fontWeight: 700 }}>{lot.ma_lo_nong_san}</td>
-                                <td style={{ fontWeight: 600, color: "#1e293b" }}>{lot.ten_san_pham}</td>
-                                <td style={{ color: "#2563eb", fontWeight: 500 }}>
+                              <tr
+                                key={lot.ma_lo_nong_san}
+                                className={isRevoked ? "row-locked" : ""}
+                              >
+                                <td style={{ fontWeight: 700 }}>
+                                  {lot.ma_lo_nong_san}
+                                </td>
+                                <td
+                                  style={{ fontWeight: 600, color: "#1e293b" }}
+                                >
+                                  {lot.ten_san_pham}
+                                </td>
+                                <td
+                                  style={{ color: "#2563eb", fontWeight: 500 }}
+                                >
                                   {lot.vi_tri_luu_kho || "—"}
                                 </td>
-                                <td style={{ fontWeight: 700, color: "#15803d" }}>
-                                  {Number(lot.so_luong_hien_tai).toLocaleString("vi-VN")} {lot.don_vi_tinh}
+                                <td
+                                  style={{ fontWeight: 700, color: "#15803d" }}
+                                >
+                                  {Number(lot.so_luong_hien_tai).toLocaleString(
+                                    "vi-VN",
+                                  )}{" "}
+                                  {lot.don_vi_tinh}
                                 </td>
                                 <td>
                                   {lot.han_luu_kho || "—"}
                                   {isExpiringSoon && (
-                                    <span style={{ display: "block", fontSize: 11, color: "#b45309", fontWeight: 600 }}>
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        fontSize: 11,
+                                        color: "#b45309",
+                                        fontWeight: 600,
+                                      }}
+                                    >
                                       (Cận date: còn {daysLeft} ngày)
                                     </span>
                                   )}
                                   {isExpired && (
-                                    <span style={{ display: "block", fontSize: 11, color: "#b91c1c", fontWeight: 600 }}>
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        fontSize: 11,
+                                        color: "#b91c1c",
+                                        fontWeight: 600,
+                                      }}
+                                    >
                                       (Đã hết hạn lưu kho)
                                     </span>
                                   )}
@@ -838,10 +967,13 @@ const NhaPhanPhoiPage = () => {
                                     </span>
                                   ) : lot.trang_thai_chung_thu === "VALID" ? (
                                     <span className="status-pill success">
-                                      <CheckCircle2 size={14} /> Đã kiểm định đạt
+                                      <CheckCircle2 size={14} /> Đã kiểm định
+                                      đạt
                                     </span>
                                   ) : (
-                                    <span className="status-pill info">Chưa có kiểm định</span>
+                                    <span className="status-pill info">
+                                      Chưa có kiểm định
+                                    </span>
                                   )}
                                 </td>
                                 <td>
@@ -859,13 +991,19 @@ const NhaPhanPhoiPage = () => {
                                         cursor: "not-allowed",
                                       }}
                                     >
-                                      <Lock size={13} style={{ marginRight: 4 }} /> Bị khóa xuất
+                                      <Lock
+                                        size={13}
+                                        style={{ marginRight: 4 }}
+                                      />{" "}
+                                      Bị khóa xuất
                                     </button>
                                   ) : (
                                     <button
                                       type="button"
                                       className="btn-action-view"
-                                      onClick={() => setActiveTab("tab-dispatch")}
+                                      onClick={() =>
+                                        setActiveTab("tab-dispatch")
+                                      }
                                     >
                                       Xuất bán
                                     </button>
@@ -888,12 +1026,18 @@ const NhaPhanPhoiPage = () => {
                     <div className="metric-card">
                       <div className="metric-title">Phiếu chờ xuất kho</div>
                       <div className="metric-number">
-                        {dispatchOrders.filter((o) => o.trang_thai === "CHO_XUAT").length}
+                        {
+                          dispatchOrders.filter(
+                            (o) => o.trang_thai === "CHO_XUAT",
+                          ).length
+                        }
                         <span className="metric-unit">PHIẾU</span>
                       </div>
                     </div>
                     <div className="metric-card">
-                      <div className="metric-title">Phiếu đang trên đường giao</div>
+                      <div className="metric-title">
+                        Phiếu đang trên đường giao
+                      </div>
                       <div className="metric-number">
                         {shippingDispatchCount}
                         <span className="metric-unit">ĐANG GIAO</span>
@@ -902,12 +1046,20 @@ const NhaPhanPhoiPage = () => {
                     <div className="metric-card">
                       <div className="metric-title">Đã giao thành công</div>
                       <div className="metric-number">
-                        {dispatchOrders.filter((o) => o.trang_thai === "DA_GIAO").length}
+                        {
+                          dispatchOrders.filter(
+                            (o) => o.trang_thai === "DA_GIAO",
+                          ).length
+                        }
                         <span className="metric-unit">ĐƠN</span>
                       </div>
                     </div>
                     <div className="actions-box">
-                      <button type="button" className="btn-primary-action" onClick={handleOpenCreateDispatch}>
+                      <button
+                        type="button"
+                        className="btn-primary-action"
+                        onClick={handleOpenCreateDispatch}
+                      >
                         <PlusCircle size={17} /> Lập Phiếu Phân Phối
                       </button>
                     </div>
@@ -919,7 +1071,8 @@ const NhaPhanPhoiPage = () => {
                         Nhật Ký Phiếu Xuất Giao Cho Đại Lý & Siêu Thị
                       </h3>
                       <p className="tab-section-desc">
-                        Theo dõi trạng thái giao nhận hàng và xem chi tiết đơn hàng.
+                        Theo dõi trạng thái giao nhận hàng và xem chi tiết đơn
+                        hàng.
                       </p>
                     </div>
                   </div>
@@ -939,20 +1092,31 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {dispatchOrders.length === 0 ? (
                           <tr>
-                            <td colSpan={6} style={{ padding: 24, color: "#6b7280" }}>
+                            <td
+                              colSpan={6}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
                               Chưa lập phiếu xuất kho nào.
                             </td>
                           </tr>
                         ) : (
                           dispatchOrders.map((order) => (
                             <tr key={order.ma_phieu}>
-                              <td style={{ fontWeight: 700, color: "#1d4ed8" }}>{order.ma_phieu}</td>
-                              <td style={{ fontWeight: 600 }}>{order.ten_dai_ly}</td>
+                              <td style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                                {order.ma_phieu}
+                              </td>
+                              <td style={{ fontWeight: 600 }}>
+                                {order.ten_dai_ly}
+                              </td>
                               <td>
-                                <strong>{order.ma_lo_nong_san}</strong> - {order.ten_san_pham}
+                                <strong>{order.ma_lo_nong_san}</strong> -{" "}
+                                {order.ten_san_pham}
                               </td>
                               <td style={{ fontWeight: 700 }}>
-                                {Number(order.so_luong_xuat).toLocaleString("vi-VN")} {order.don_vi_tinh}
+                                {Number(order.so_luong_xuat).toLocaleString(
+                                  "vi-VN",
+                                )}{" "}
+                                {order.don_vi_tinh}
                               </td>
                               <td>
                                 <span
@@ -970,12 +1134,21 @@ const NhaPhanPhoiPage = () => {
                                 </span>
                               </td>
                               <td>
-                                <div style={{ display: "inline-flex", justifyContent: "center" }}>
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    justifyContent: "center",
+                                  }}
+                                >
                                   <button
                                     type="button"
                                     className="btn-action-view"
                                     title="Xem chi tiết đơn phân phối"
-                                    onClick={() => handleNavigateChiTietPhanPhoi(order.ma_phieu)}
+                                    onClick={() =>
+                                      handleNavigateChiTietPhanPhoi(
+                                        order.ma_phieu,
+                                      )
+                                    }
                                   >
                                     <Eye size={14} />
                                     <span>Xem chi tiết</span>
@@ -1000,7 +1173,8 @@ const NhaPhanPhoiPage = () => {
                         Danh Sách Đại Lý & Kênh Bán Lẻ Hợp Tác
                       </h3>
                       <p className="tab-section-desc">
-                        Quản lý đầu mối nhận hàng, địa chỉ và thông tin hợp tác phân phối.
+                        Quản lý đầu mối nhận hàng, địa chỉ và thông tin hợp tác
+                        phân phối.
                       </p>
                     </div>
                     <div>
@@ -1009,7 +1183,12 @@ const NhaPhanPhoiPage = () => {
                         className="btn-primary-action"
                         onClick={() => {
                           setEditingDealer(null);
-                          setDealerForm({ ten: "", nguoiLienHe: "", sdt: "", diaChi: "" });
+                          setDealerForm({
+                            ten: "",
+                            nguoiLienHe: "",
+                            sdt: "",
+                            diaChi: "",
+                          });
                           setShowDealerModal(true);
                         }}
                       >
@@ -1035,36 +1214,60 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {dealers.length === 0 ? (
                           <tr>
-                            <td colSpan={7} style={{ padding: 24, color: "#6b7280" }}>
-                              Chưa có đại lý nào, bấm "Thêm Đại Lý Mới" để bắt đầu.
+                            <td
+                              colSpan={7}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
+                              Chưa có đại lý nào, bấm "Thêm Đại Lý Mới" để bắt
+                              đầu.
                             </td>
                           </tr>
                         ) : (
                           dealers.map((d) => {
-                            const isDropdownActive = openDropdown === `dealer-${d.ma_dai_ly}`;
+                            const isDropdownActive =
+                              openDropdown === `dealer-${d.ma_dai_ly}`;
 
                             return (
-                              <tr key={d.ma_dai_ly} className={isDropdownActive ? "row-has-open-menu" : ""}>
-                                <td style={{ fontWeight: 700 }}>{d.ma_dai_ly}</td>
+                              <tr
+                                key={d.ma_dai_ly}
+                                className={
+                                  isDropdownActive ? "row-has-open-menu" : ""
+                                }
+                              >
+                                <td style={{ fontWeight: 700 }}>
+                                  {d.ma_dai_ly}
+                                </td>
                                 <td style={{ fontWeight: 600 }}>{d.ten}</td>
                                 <td>{d.nguoi_lien_he}</td>
-                                <td style={{ color: "#2563eb" }}>{d.so_dien_thoai}</td>
+                                <td style={{ color: "#2563eb" }}>
+                                  {d.so_dien_thoai}
+                                </td>
                                 <td>{d.dia_chi}</td>
                                 <td>
                                   {d.trang_thai === "HOAT_DONG" ? (
-                                    <span className="status-pill success">Đang hợp tác</span>
+                                    <span className="status-pill success">
+                                      Đang hợp tác
+                                    </span>
                                   ) : (
-                                    <span className="status-pill gray">Tạm ngưng</span>
+                                    <span className="status-pill gray">
+                                      Tạm ngưng
+                                    </span>
                                   )}
                                 </td>
                                 <td>
                                   <div className="status-icon-cell">
                                     {d.trang_thai === "HOAT_DONG" ? (
-                                      <span className="status-icon-modern success" title="Đang hợp tác">
+                                      <span
+                                        className="status-icon-modern success"
+                                        title="Đang hợp tác"
+                                      >
                                         <CheckCircle2 size={16} />
                                       </span>
                                     ) : (
-                                      <span className="status-icon-modern empty" title="Tạm ngưng hợp tác">
+                                      <span
+                                        className="status-icon-modern empty"
+                                        title="Tạm ngưng hợp tác"
+                                      >
                                         <span className="empty-indicator"></span>
                                       </span>
                                     )}
@@ -1074,7 +1277,12 @@ const NhaPhanPhoiPage = () => {
                                         type="button"
                                         className="btn-more-dots"
                                         title="Thao tác"
-                                        onClick={(e) => handleToggleMenu(e, `dealer-${d.ma_dai_ly}`)}
+                                        onClick={(e) =>
+                                          handleToggleMenu(
+                                            e,
+                                            `dealer-${d.ma_dai_ly}`,
+                                          )
+                                        }
                                       >
                                         <MoreVertical size={18} />
                                       </button>
@@ -1084,15 +1292,27 @@ const NhaPhanPhoiPage = () => {
                                           className={`dropdown-menu dropdown-fixed ${menuPos.up ? "dropdown-up" : ""}`}
                                           style={{
                                             right: menuPos.right,
-                                            ...(menuPos.up ? { bottom: menuPos.bottom } : { top: menuPos.top }),
+                                            ...(menuPos.up
+                                              ? { bottom: menuPos.bottom }
+                                              : { top: menuPos.top }),
                                           }}
                                         >
-                                          <div className="dropdown-item" onClick={() => handleOpenEditDealer(d)}>
+                                          <div
+                                            className="dropdown-item"
+                                            onClick={() =>
+                                              handleOpenEditDealer(d)
+                                            }
+                                          >
                                             <Pencil size={15} />
                                             Sửa thông tin
                                           </div>
 
-                                          <div className="dropdown-item" onClick={() => handleOpenDealerHistory(d)}>
+                                          <div
+                                            className="dropdown-item"
+                                            onClick={() =>
+                                              handleOpenDealerHistory(d)
+                                            }
+                                          >
                                             <History size={15} />
                                             Lịch sử nhận hàng
                                           </div>
@@ -1101,10 +1321,16 @@ const NhaPhanPhoiPage = () => {
 
                                           <div
                                             className={`dropdown-item ${d.trang_thai === "HOAT_DONG" ? "danger" : ""}`}
-                                            onClick={() => handleToggleDealerStatus(d.ma_dai_ly)}
+                                            onClick={() =>
+                                              handleToggleDealerStatus(
+                                                d.ma_dai_ly,
+                                              )
+                                            }
                                           >
                                             <Power size={15} />
-                                            {d.trang_thai === "HOAT_DONG" ? "Tạm ngưng hợp tác" : "Kích hoạt hợp tác"}
+                                            {d.trang_thai === "HOAT_DONG"
+                                              ? "Tạm ngưng hợp tác"
+                                              : "Kích hoạt hợp tác"}
                                           </div>
                                         </div>
                                       )}
@@ -1136,11 +1362,15 @@ const NhaPhanPhoiPage = () => {
               <div className="form-grid-2 readonly-grid">
                 <div className="readonly-item">
                   <label>Mã vận đơn</label>
-                  <span style={{ fontWeight: 700, color: "#1d4ed8" }}>{selectedOrder.ma_van_don}</span>
+                  <span style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                    {selectedOrder.ma_van_don}
+                  </span>
                 </div>
                 <div className="readonly-item">
                   <label>Mã lô nông sản</label>
-                  <span style={{ fontWeight: 700 }}>{selectedOrder.ma_lo_nong_san}</span>
+                  <span style={{ fontWeight: 700 }}>
+                    {selectedOrder.ma_lo_nong_san}
+                  </span>
                 </div>
                 <div className="readonly-item">
                   <label>Tên sản phẩm</label>
@@ -1157,7 +1387,8 @@ const NhaPhanPhoiPage = () => {
                 <div className="readonly-item">
                   <label>Khối lượng</label>
                   <span style={{ fontWeight: 700, color: "#15803d" }}>
-                    {Number(selectedOrder.khoi_luong).toLocaleString("vi-VN")} {selectedOrder.don_vi_tinh}
+                    {Number(selectedOrder.khoi_luong).toLocaleString("vi-VN")}{" "}
+                    {selectedOrder.don_vi_tinh}
                   </span>
                 </div>
                 <div className="readonly-item">
@@ -1175,13 +1406,18 @@ const NhaPhanPhoiPage = () => {
                 <div className="readonly-item">
                   <label>Trạng thái</label>
                   <span style={{ fontWeight: 600 }}>
-                    {INCOMING_STATUS[selectedOrder.trang_thai]?.text || selectedOrder.trang_thai}
+                    {INCOMING_STATUS[selectedOrder.trang_thai]?.text ||
+                      selectedOrder.trang_thai}
                   </span>
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowDetailModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowDetailModal(false)}
+              >
                 Đóng
               </button>
             </div>
@@ -1197,12 +1433,21 @@ const NhaPhanPhoiPage = () => {
               <h3>Biên Bản Kiểm Đếm & Nghiệm Thu Nhập Kho</h3>
             </div>
             <div className="modal-body">
-              <div style={{ backgroundColor: "#f8fafc", padding: "10px 14px", borderRadius: 6, marginBottom: 14, fontSize: 13 }}>
+              <div
+                style={{
+                  backgroundColor: "#f8fafc",
+                  padding: "10px 14px",
+                  borderRadius: 6,
+                  marginBottom: 14,
+                  fontSize: 13,
+                }}
+              >
                 <p>
                   Mã vận đơn: <b>{selectedOrder.ma_van_don}</b>
                 </p>
                 <p>
-                  Lô hàng: <b>{selectedOrder.ma_lo_nong_san}</b> - {selectedOrder.ten_san_pham}
+                  Lô hàng: <b>{selectedOrder.ma_lo_nong_san}</b> -{" "}
+                  {selectedOrder.ten_san_pham}
                 </p>
                 <p>
                   Khối lượng theo lệnh VC:{" "}
@@ -1213,7 +1458,9 @@ const NhaPhanPhoiPage = () => {
               </div>
 
               <div className="form-group">
-                <label>Khối Lượng Cân Thực Nhận ({selectedOrder.don_vi_tinh}) (*)</label>
+                <label>
+                  Khối Lượng Cân Thực Nhận ({selectedOrder.don_vi_tinh}) (*)
+                </label>
                 <input
                   type="number"
                   value={receiveForm.thucNhan}
@@ -1223,7 +1470,9 @@ const NhaPhanPhoiPage = () => {
 
               <div className="form-grid-2">
                 <div className="form-group">
-                  <label>Khối lượng hao hụt ({selectedOrder.don_vi_tinh})</label>
+                  <label>
+                    Khối lượng hao hụt ({selectedOrder.don_vi_tinh})
+                  </label>
                   <input
                     type="number"
                     readOnly
@@ -1237,7 +1486,12 @@ const NhaPhanPhoiPage = () => {
                     type="text"
                     placeholder="VD: Kho Mát A (Kệ Pallet 01)"
                     value={receiveForm.viTriKho}
-                    onChange={(e) => setReceiveForm({ ...receiveForm, viTriKho: e.target.value })}
+                    onChange={(e) =>
+                      setReceiveForm({
+                        ...receiveForm,
+                        viTriKho: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -1247,15 +1501,28 @@ const NhaPhanPhoiPage = () => {
                 <input
                   type="date"
                   value={receiveForm.hanLuuKho}
-                  onChange={(e) => setReceiveForm({ ...receiveForm, hanLuuKho: e.target.value })}
+                  onChange={(e) =>
+                    setReceiveForm({
+                      ...receiveForm,
+                      hanLuuKho: e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowReceiveModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowReceiveModal(false)}
+              >
                 Hủy
               </button>
-              <button type="button" className="btn-save" onClick={handleConfirmReceive}>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleConfirmReceive}
+              >
                 Xác Nhận Lưu Kho
               </button>
             </div>
@@ -1286,10 +1553,18 @@ const NhaPhanPhoiPage = () => {
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowRejectModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowRejectModal(false)}
+              >
                 Đóng
               </button>
-              <button type="button" className="btn-save danger" onClick={handleConfirmReject}>
+              <button
+                type="button"
+                className="btn-save danger"
+                onClick={handleConfirmReject}
+              >
                 Xác Nhận Từ Chối
               </button>
             </div>
@@ -1309,7 +1584,12 @@ const NhaPhanPhoiPage = () => {
                 <label>Chọn Đại Lý Nhận Hàng (*)</label>
                 <select
                   value={dispatchForm.daiLyId}
-                  onChange={(e) => setDispatchForm({ ...dispatchForm, daiLyId: e.target.value })}
+                  onChange={(e) =>
+                    setDispatchForm({
+                      ...dispatchForm,
+                      daiLyId: e.target.value,
+                    })
+                  }
                 >
                   <option value="">-- Chọn đại lý --</option>
                   {dealers
@@ -1327,14 +1607,21 @@ const NhaPhanPhoiPage = () => {
                   <label>Chọn Lô Hàng Xuất (Hạn gần nhất trước) (*)</label>
                   <select
                     value={dispatchForm.maLo}
-                    onChange={(e) => setDispatchForm({ ...dispatchForm, maLo: e.target.value })}
+                    onChange={(e) =>
+                      setDispatchForm({ ...dispatchForm, maLo: e.target.value })
+                    }
                   >
                     <option value="">-- Chọn lô --</option>
                     {inventoryList.map((lot) => {
                       const isRevoked = lot.trang_thai_chung_thu === "REVOKED";
                       return (
-                        <option key={lot.ma_lo_nong_san} value={lot.ma_lo_nong_san} disabled={isRevoked}>
-                          {lot.ma_lo_nong_san} - {lot.ten_san_pham} (Tồn: {lot.so_luong_hien_tai} {lot.don_vi_tinh}
+                        <option
+                          key={lot.ma_lo_nong_san}
+                          value={lot.ma_lo_nong_san}
+                          disabled={isRevoked}
+                        >
+                          {lot.ma_lo_nong_san} - {lot.ten_san_pham} (Tồn:{" "}
+                          {lot.so_luong_hien_tai} {lot.don_vi_tinh}
                           {lot.han_luu_kho ? ` - Hạn: ${lot.han_luu_kho}` : ""})
                           {isRevoked ? " [BỊ THU HỒI - KHÓA]" : ""}
                         </option>
@@ -1349,7 +1636,12 @@ const NhaPhanPhoiPage = () => {
                     type="number"
                     placeholder="VD: 300"
                     value={dispatchForm.soLuongXuat}
-                    onChange={(e) => setDispatchForm({ ...dispatchForm, soLuongXuat: e.target.value })}
+                    onChange={(e) =>
+                      setDispatchForm({
+                        ...dispatchForm,
+                        soLuongXuat: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </div>
@@ -1357,21 +1649,45 @@ const NhaPhanPhoiPage = () => {
               <div className="form-group">
                 <label>Hình Thức Vận Chuyển</label>
                 <div style={{ display: "flex", gap: 20, padding: "6px 0" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                    }}
+                  >
                     <input
                       type="radio"
                       name="hinhThuc"
                       checked={dispatchForm.hinhThuc === "TU_GIAO"}
-                      onChange={() => setDispatchForm({ ...dispatchForm, hinhThuc: "TU_GIAO" })}
+                      onChange={() =>
+                        setDispatchForm({
+                          ...dispatchForm,
+                          hinhThuc: "TU_GIAO",
+                        })
+                      }
                     />
                     Tự giao xe kho
                   </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      cursor: "pointer",
+                    }}
+                  >
                     <input
                       type="radio"
                       name="hinhThuc"
                       checked={dispatchForm.hinhThuc === "DV_VAN_CHUYEN"}
-                      onChange={() => setDispatchForm({ ...dispatchForm, hinhThuc: "DV_VAN_CHUYEN" })}
+                      onChange={() =>
+                        setDispatchForm({
+                          ...dispatchForm,
+                          hinhThuc: "DV_VAN_CHUYEN",
+                        })
+                      }
                     />
                     Đơn vị vận chuyển đối tác
                   </label>
@@ -1385,7 +1701,12 @@ const NhaPhanPhoiPage = () => {
                     <input
                       type="text"
                       value={dispatchForm.taiXe}
-                      onChange={(e) => setDispatchForm({ ...dispatchForm, taiXe: e.target.value })}
+                      onChange={(e) =>
+                        setDispatchForm({
+                          ...dispatchForm,
+                          taiXe: e.target.value,
+                        })
+                      }
                     />
                   </div>
                   <div className="form-group">
@@ -1393,7 +1714,12 @@ const NhaPhanPhoiPage = () => {
                     <input
                       type="text"
                       value={dispatchForm.bienSo}
-                      onChange={(e) => setDispatchForm({ ...dispatchForm, bienSo: e.target.value })}
+                      onChange={(e) =>
+                        setDispatchForm({
+                          ...dispatchForm,
+                          bienSo: e.target.value,
+                        })
+                      }
                     />
                   </div>
                 </div>
@@ -1404,16 +1730,29 @@ const NhaPhanPhoiPage = () => {
                     type="text"
                     placeholder="VD: Giao Hàng Tiết Kiệm / Viettel Post"
                     value={dispatchForm.tenDonViVC}
-                    onChange={(e) => setDispatchForm({ ...dispatchForm, tenDonViVC: e.target.value })}
+                    onChange={(e) =>
+                      setDispatchForm({
+                        ...dispatchForm,
+                        tenDonViVC: e.target.value,
+                      })
+                    }
                   />
                 </div>
               )}
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowCreateDispatchModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowCreateDispatchModal(false)}
+              >
                 Hủy
               </button>
-              <button type="button" className="btn-save" onClick={handleSaveDispatch}>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSaveDispatch}
+              >
                 Tạo Phiếu Xuất Kho
               </button>
             </div>
@@ -1426,7 +1765,11 @@ const NhaPhanPhoiPage = () => {
         <div className="modal-overlay">
           <div className="modal-container">
             <div className="modal-header">
-              <h3>{editingDealer ? "Cập Nhật Thông Tin Đại Lý" : "Thêm Đại Lý Mới"}</h3>
+              <h3>
+                {editingDealer
+                  ? "Cập Nhật Thông Tin Đại Lý"
+                  : "Thêm Đại Lý Mới"}
+              </h3>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -1435,7 +1778,9 @@ const NhaPhanPhoiPage = () => {
                   type="text"
                   placeholder="VD: Siêu thị Co.opMart"
                   value={dealerForm.ten}
-                  onChange={(e) => setDealerForm({ ...dealerForm, ten: e.target.value })}
+                  onChange={(e) =>
+                    setDealerForm({ ...dealerForm, ten: e.target.value })
+                  }
                 />
               </div>
               <div className="form-grid-2">
@@ -1445,7 +1790,12 @@ const NhaPhanPhoiPage = () => {
                     type="text"
                     placeholder="VD: Nguyễn Văn A"
                     value={dealerForm.nguoiLienHe}
-                    onChange={(e) => setDealerForm({ ...dealerForm, nguoiLienHe: e.target.value })}
+                    onChange={(e) =>
+                      setDealerForm({
+                        ...dealerForm,
+                        nguoiLienHe: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div className="form-group">
@@ -1454,7 +1804,9 @@ const NhaPhanPhoiPage = () => {
                     type="text"
                     placeholder="VD: 0908123456"
                     value={dealerForm.sdt}
-                    onChange={(e) => setDealerForm({ ...dealerForm, sdt: e.target.value })}
+                    onChange={(e) =>
+                      setDealerForm({ ...dealerForm, sdt: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -1464,15 +1816,25 @@ const NhaPhanPhoiPage = () => {
                   rows={2}
                   placeholder="Địa chỉ giao hàng..."
                   value={dealerForm.diaChi}
-                  onChange={(e) => setDealerForm({ ...dealerForm, diaChi: e.target.value })}
+                  onChange={(e) =>
+                    setDealerForm({ ...dealerForm, diaChi: e.target.value })
+                  }
                 />
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowDealerModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowDealerModal(false)}
+              >
                 Hủy
               </button>
-              <button type="button" className="btn-save" onClick={handleSaveDealer}>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSaveDealer}
+              >
                 Lưu Đại Lý
               </button>
             </div>
@@ -1489,7 +1851,9 @@ const NhaPhanPhoiPage = () => {
             </div>
             <div className="modal-body">
               {dealerHistory.length === 0 ? (
-                <p style={{ textAlign: "center", padding: 20, color: "#6b7280" }}>
+                <p
+                  style={{ textAlign: "center", padding: 20, color: "#6b7280" }}
+                >
                   Chưa có lịch sử giao hàng nào cho đại lý này.
                 </p>
               ) : (
@@ -1510,12 +1874,17 @@ const NhaPhanPhoiPage = () => {
                           <td style={{ fontWeight: 700 }}>{h.ma_phieu}</td>
                           <td>{h.ma_lo_nong_san}</td>
                           <td>
-                            {Number(h.so_luong_xuat).toLocaleString("vi-VN")} {h.don_vi_tinh}
+                            {Number(h.so_luong_xuat).toLocaleString("vi-VN")}{" "}
+                            {h.don_vi_tinh}
                           </td>
                           <td>
-                            <span className="status-pill success">{h.trang_thai}</span>
+                            <span className="status-pill success">
+                              {h.trang_thai}
+                            </span>
                           </td>
-                          <td>{new Date(h.created_at).toLocaleDateString("vi-VN")}</td>
+                          <td>
+                            {new Date(h.created_at).toLocaleDateString("vi-VN")}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

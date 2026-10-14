@@ -214,232 +214,245 @@ const ChiTietKiemDinh = () => {
     }` || "Chưa có địa chỉ";
 
   return (
-    <div className="detail-layout">
-      {/* 1. HEADER */}
-      <DashboardHeader />
+    <div className="chitietkiemdinh">
+      <div className="detail-layout">
+        {/* 1. HEADER */}
+        <DashboardHeader />
 
-      {/* 2. NỘI DUNG CHI TIẾT */}
-      <div className="detail-content-area">
-        <div className="detail-container">
-          {/* THANH ĐIỀU HƯỚNG QUAY LẠI */}
-          <div className="detail-top-nav">
-            <button onClick={() => navigate(-1)} className="btn-back">
-              <ArrowLeftIcon size={16} />
-              <span>Quay lại danh sách</span>
-            </button>
-            <div className="detail-actions-right">
-              <button
-                onClick={() => alert("Đang in biên bản & chứng thư số...")}
-                className="btn-print"
-              >
-                <DownloadIcon size={16} />
-                <span>Tải Chứng Thư PDF</span>
+        {/* 2. NỘI DUNG CHI TIẾT */}
+        <div className="detail-content-area">
+          <div className="detail-container">
+            {/* THANH ĐIỀU HƯỚNG QUAY LẠI */}
+            <div className="detail-top-nav">
+              <button onClick={() => navigate(-1)} className="btn-back">
+                <ArrowLeftIcon size={16} />
+                <span>Quay lại danh sách</span>
               </button>
-            </div>
-          </div>
-
-          {/* BANNER THÔNG TIN CHỨNG NHẬN */}
-          <div className="cert-header-card">
-            <div className="cert-header-left">
-              <div
-                className={`cert-stamp ${
-                  isDatChuan ? "stamp-pass" : "stamp-fail"
-                }`}
-              >
-                {isDatChuan ? (
-                  <BadgeCheckIcon size={44} />
-                ) : (
-                  <BadgeXIcon size={44} />
-                )}
+              <div className="detail-actions-right">
+                <button
+                  onClick={() => alert("Đang in biên bản & chứng thư số...")}
+                  className="btn-print"
+                >
+                  <DownloadIcon size={16} />
+                  <span>Tải Chứng Thư PDF</span>
+                </button>
               </div>
-              <div className="cert-main-info">
-                <div className="cert-badge-row">
-                  <span
-                    className={isDatChuan ? "badge-tag-pass" : "badge-tag-fail"}
-                  >
-                    {isDatChuan ? "ĐẠT CHUẨN" : "KHÔNG ĐẠT"}
-                  </span>
-                  <span className="badge-tag-code">Số CN: {certCode}</span>
-                  <span style={{ fontSize: 13, color: "#6b7280" }}>
-                    Tiêu chuẩn: <b>{kd.tieu_chuan_dang_ky || "Chưa rõ"}</b>
-                  </span>
+            </div>
+
+            {/* BANNER THÔNG TIN CHỨNG NHẬN */}
+            <div className="cert-header-card">
+              <div className="cert-header-left">
+                <div
+                  className={`cert-stamp ${
+                    isDatChuan ? "stamp-pass" : "stamp-fail"
+                  }`}
+                >
+                  {isDatChuan ? (
+                    <BadgeCheckIcon size={44} />
+                  ) : (
+                    <BadgeXIcon size={44} />
+                  )}
                 </div>
-                <h1 className="cert-title">
-                  Hồ Sơ Chứng Nhận: {kd.ten_san_pham}{" "}
-                  {batchCode && `(${batchCode})`}
-                </h1>
-                <p className="cert-sub">
-                  Nông trại: <b>{kd.ten_nong_trai || "Chưa rõ nông trại"}</b> |
-                  Chủ nông trại:{" "}
-                  <b>{kd.ten_chu_nong_trai || "Chưa cập nhật"}</b>
-                </p>
+                <div className="cert-main-info">
+                  <div className="cert-badge-row">
+                    <span
+                      className={
+                        isDatChuan ? "badge-tag-pass" : "badge-tag-fail"
+                      }
+                    >
+                      {isDatChuan ? "ĐẠT CHUẨN" : "KHÔNG ĐẠT"}
+                    </span>
+                    <span className="badge-tag-code">Số CN: {certCode}</span>
+                    <span style={{ fontSize: 13, color: "#6b7280" }}>
+                      Tiêu chuẩn: <b>{kd.tieu_chuan_dang_ky || "Chưa rõ"}</b>
+                    </span>
+                  </div>
+                  <h1 className="cert-title">
+                    Hồ Sơ Chứng Nhận: {kd.ten_san_pham}{" "}
+                    {batchCode && `(${batchCode})`}
+                  </h1>
+                  <p className="cert-sub">
+                    Nông trại: <b>{kd.ten_nong_trai || "Chưa rõ nông trại"}</b>{" "}
+                    | Chủ nông trại:{" "}
+                    <b>{kd.ten_chu_nong_trai || "Chưa cập nhật"}</b>
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* GRID BẢNG CHỈ SỐ VÀ BLOCKCHAIN TRACE */}
-          <div className="detail-grid">
-            {/* CỘT TRÁI */}
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-            >
-              {/* BẢNG CHỈ SỐ XÉT NGHIỆM */}
-              <div className="info-section-card">
-                <h3 className="section-card-title">
-                  <FileTextIcon size={18} color="#059669" />
-                  <span>Bảng Phân Tích Chỉ Số Kiểm Nghiệm Phòng Lab</span>
-                </h3>
-                <table className="detail-table">
-                  <thead>
-                    <tr>
-                      <th>Hạng mục kiểm nghiệm</th>
-                      <th>Phương pháp thử</th>
-                      <th>Kết quả đo</th>
-                      <th>Ngưỡng tiêu chuẩn</th>
-                      <th>Đánh giá</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {danhSachChiSo.length === 0 ? (
+            {/* GRID BẢNG CHỈ SỐ VÀ BLOCKCHAIN TRACE */}
+            <div className="detail-grid">
+              {/* CỘT TRÁI */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "20px",
+                }}
+              >
+                {/* BẢNG CHỈ SỐ XÉT NGHIỆM */}
+                <div className="info-section-card">
+                  <h3 className="section-card-title">
+                    <FileTextIcon size={18} color="#059669" />
+                    <span>Bảng Phân Tích Chỉ Số Kiểm Nghiệm Phòng Lab</span>
+                  </h3>
+                  <table className="detail-table">
+                    <thead>
                       <tr>
-                        <td
-                          colSpan="5"
-                          style={{ textAlign: "center", padding: "24px" }}
-                        >
-                          Chưa có kết quả xét nghiệm chỉ số phòng Lab.
-                        </td>
+                        <th>Hạng mục kiểm nghiệm</th>
+                        <th>Phương pháp thử</th>
+                        <th>Kết quả đo</th>
+                        <th>Ngưỡng tiêu chuẩn</th>
+                        <th>Đánh giá</th>
                       </tr>
-                    ) : (
-                      danhSachChiSo.map((cs, idx) => (
-                        <tr key={cs.ma_chi_so_kd || idx}>
-                          <td>
-                            <b>{cs.ten_chi_so}</b>
-                          </td>
-                          <td>{cs.phuong_phap_thu}</td>
+                    </thead>
+                    <tbody>
+                      {danhSachChiSo.length === 0 ? (
+                        <tr>
                           <td
-                            className={cs.is_pass ? "val-safe" : "val-danger"}
+                            colSpan="5"
+                            style={{ textAlign: "center", padding: "24px" }}
                           >
-                            {cs.gia_tri}
-                          </td>
-                          <td>{cs.nguong_tieu_chuan}</td>
-                          <td>
-                            <span
-                              className={
-                                cs.is_pass
-                                  ? "status-text-pass"
-                                  : "status-text-fail"
-                              }
-                            >
-                              {cs.danh_gia}
-                            </span>
+                            Chưa có kết quả xét nghiệm chỉ số phòng Lab.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* THÔNG TIN NIÊM PHONG LẤY MẪU */}
-              <div className="info-section-card">
-                <h3 className="section-card-title">
-                  <ShieldCheckIcon size={18} color="#059669" />
-                  <span>Biên Bản Lấy Mẫu & Niêm Phong Thực Địa</span>
-                </h3>
-                <div className="sample-info-grid">
-                  <p>
-                    Mã kiểm định: <b>#{kd.ma_kiem_dinh}</b>
-                  </p>
-                  <p>
-                    Mã Seal niêm phong:{" "}
-                    <b style={{ fontFamily: "monospace" }}>
-                      {kd.ma_niem_phong || "Chưa cấp niêm phong"}
-                    </b>
-                  </p>
-                  <p>
-                    Sản lượng lô:{" "}
-                    <b>
-                      {kd.so_luong_hien_tai} {kd.dvt_lo || "kg"}
-                    </b>
-                  </p>
-                  <p>
-                    Kiểm định viên:{" "}
-                    <b>{kd.kiem_dinh_vien || "Chưa phân công"}</b>
-                  </p>
-                  <p>
-                    Địa điểm lấy mẫu: <b>{sampleAddress}</b>
-                  </p>
-                  <p>
-                    Thời gian lấy mẫu: <b>{sampleTime}</b>
-                  </p>
+                      ) : (
+                        danhSachChiSo.map((cs, idx) => (
+                          <tr key={cs.ma_chi_so_kd || idx}>
+                            <td>
+                              <b>{cs.ten_chi_so}</b>
+                            </td>
+                            <td>{cs.phuong_phap_thu}</td>
+                            <td
+                              className={cs.is_pass ? "val-safe" : "val-danger"}
+                            >
+                              {cs.gia_tri}
+                            </td>
+                            <td>{cs.nguong_tieu_chuan}</td>
+                            <td>
+                              <span
+                                className={
+                                  cs.is_pass
+                                    ? "status-text-pass"
+                                    : "status-text-fail"
+                                }
+                              >
+                                {cs.danh_gia}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
-            </div>
 
-            {/* CỘT PHẢI */}
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "20px" }}
-            >
-              {/* BLOCKCHAIN CERT */}
-              <div className="info-section-card">
-                <h3 className="section-card-title">
-                  <span>Tem Truy Xuất Nguồn Gốc</span>
-                </h3>
-                <div className="qr-preview-box">
-                  <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                      `https://agrichain.vn/verify/\${certCode}`,
-                    )}`}
-                    alt="QR Code"
-                    className="qr-box-img"
-                  />
-                  <p style={{ fontSize: 12, color: "#4b5563" }}>
-                    Quét để xác thực trực tiếp trên AgriChain Mainnet
-                  </p>
-                  <div className="tx-hash-badge">
-                    {latestTx ? shortHash(latestTx) : "Chưa ghi lên chuỗi"}
+                {/* THÔNG TIN NIÊM PHONG LẤY MẪU */}
+                <div className="info-section-card">
+                  <h3 className="section-card-title">
+                    <ShieldCheckIcon size={18} color="#059669" />
+                    <span>Biên Bản Lấy Mẫu & Niêm Phong Thực Địa</span>
+                  </h3>
+                  <div className="sample-info-grid">
+                    <p>
+                      Mã kiểm định: <b>#{kd.ma_kiem_dinh}</b>
+                    </p>
+                    <p>
+                      Mã Seal niêm phong:{" "}
+                      <b style={{ fontFamily: "monospace" }}>
+                        {kd.ma_niem_phong || "Chưa cấp niêm phong"}
+                      </b>
+                    </p>
+                    <p>
+                      Sản lượng lô:{" "}
+                      <b>
+                        {kd.so_luong_hien_tai} {kd.dvt_lo || "kg"}
+                      </b>
+                    </p>
+                    <p>
+                      Kiểm định viên:{" "}
+                      <b>{kd.kiem_dinh_vien || "Chưa phân công"}</b>
+                    </p>
+                    <p>
+                      Địa điểm lấy mẫu: <b>{sampleAddress}</b>
+                    </p>
+                    <p>
+                      Thời gian lấy mẫu: <b>{sampleTime}</b>
+                    </p>
                   </div>
                 </div>
               </div>
 
-              {/* TIMELINE */}
-              <div className="info-section-card">
-                <h3 className="section-card-title">
-                  <ClockIcon size={18} color="#059669" />
-                  <span>Lịch Sử Kiểm Định</span>
-                </h3>
-                <div className="timeline-list">
-                  {timeline.length === 0 ? (
-                    <p className="timeline-item-desc">
-                      Chưa có nhật ký sự kiện chuỗi.
+              {/* CỘT PHẢI */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "20px",
+                }}
+              >
+                {/* BLOCKCHAIN CERT */}
+                <div className="info-section-card">
+                  <h3 className="section-card-title">
+                    <span>Tem Truy Xuất Nguồn Gốc</span>
+                  </h3>
+                  <div className="qr-preview-box">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+                        `https://agrichain.vn/verify/\${certCode}`,
+                      )}`}
+                      alt="QR Code"
+                      className="qr-box-img"
+                    />
+                    <p style={{ fontSize: 12, color: "#4b5563" }}>
+                      Quét để xác thực trực tiếp trên AgriChain Mainnet
                     </p>
-                  ) : (
-                    timeline.map((event, idx) => (
-                      <div
-                        className="timeline-item"
-                        key={event.ma_lich_su || idx}
-                      >
-                        <span className="timeline-dot"></span>
-                        <span className="timeline-item-title">
-                          {event.loai_hoat_dong}
-                        </span>
-                        <span className="timeline-item-time">
-                          {formatDateTime(event.thoi_diem_xay_ra)}
-                        </span>
-                        {event.ma_bam_su_kien_hien_tai && (
-                          <p className="timeline-item-desc timeline-hash">
-                            Mã băm: <code>{event.ma_bam_su_kien_hien_tai}</code>
-                          </p>
-                        )}
-                        {event.ma_giao_dich_blockchain && (
-                          <p className="timeline-item-desc timeline-hash">
-                            Tx Hash:{" "}
-                            <code>{event.ma_giao_dich_blockchain}</code>
-                          </p>
-                        )}
-                      </div>
-                    ))
-                  )}
+                    <div className="tx-hash-badge">
+                      {latestTx ? shortHash(latestTx) : "Chưa ghi lên chuỗi"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* TIMELINE */}
+                <div className="info-section-card">
+                  <h3 className="section-card-title">
+                    <ClockIcon size={18} color="#059669" />
+                    <span>Lịch Sử Kiểm Định</span>
+                  </h3>
+                  <div className="timeline-list">
+                    {timeline.length === 0 ? (
+                      <p className="timeline-item-desc">
+                        Chưa có nhật ký sự kiện chuỗi.
+                      </p>
+                    ) : (
+                      timeline.map((event, idx) => (
+                        <div
+                          className="timeline-item"
+                          key={event.ma_lich_su || idx}
+                        >
+                          <span className="timeline-dot"></span>
+                          <span className="timeline-item-title">
+                            {event.loai_hoat_dong}
+                          </span>
+                          <span className="timeline-item-time">
+                            {formatDateTime(event.thoi_diem_xay_ra)}
+                          </span>
+                          {event.ma_bam_su_kien_hien_tai && (
+                            <p className="timeline-item-desc timeline-hash">
+                              Mã băm:{" "}
+                              <code>{event.ma_bam_su_kien_hien_tai}</code>
+                            </p>
+                          )}
+                          {event.ma_giao_dich_blockchain && (
+                            <p className="timeline-item-desc timeline-hash">
+                              Tx Hash:{" "}
+                              <code>{event.ma_giao_dich_blockchain}</code>
+                            </p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
