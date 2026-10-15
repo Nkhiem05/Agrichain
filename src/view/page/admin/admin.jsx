@@ -106,7 +106,15 @@ const formatDateTime = (value) => {
 const formatQuantity = (value, unit) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
-  return `${n.toLocaleString("vi-VN")} ${unit || ""}`.trim();
+
+  // Lưu trữ luôn theo kg; hiển thị tự quy đổi sang Tấn khi đạt 1.000kg trở lên
+  // cho dễ đọc (vd: 3500 -> "3,5 Tấn"), dưới mức đó vẫn hiện kg (vd: "900 kg").
+  if ((unit || "").toLowerCase() === "kg" && n >= 1000) {
+    const tons = n / 1000;
+    return `${tons.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} Tấn`;
+  }
+
+  return `${n.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`.trim();
 };
 
 export default function AdminDashboard() {

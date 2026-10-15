@@ -95,6 +95,20 @@ const isSampledItem = (item) => {
   );
 };
 
+const formatWeight = (value, unit) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return `- ${unit || ""}`;
+
+  // Lưu trữ luôn theo kg; hiển thị tự quy đổi sang Tấn khi đạt 1.000kg trở lên
+  // cho dễ đọc (vd: 3500 -> "3,5 Tấn"), dưới mức đó vẫn hiện kg (vd: "900 kg").
+  if ((unit || "").toLowerCase() === "kg" && num >= 1000) {
+    const tons = num / 1000;
+    return `${tons.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} Tấn`;
+  }
+
+  return `${num.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`;
+};
+
 const formatGioHen = (g) => {
   if (!g) return "Chưa hẹn giờ";
   const [h, m] = String(g).split(":");
@@ -789,7 +803,7 @@ function Coquankiemdinh() {
                                 Mã lô thu hoạch:{" "}
                                 <span className="text-meta-green">
                                   #{item.ma_lo_nong_san} (
-                                  {item.so_luong_hien_tai} {item.don_vi_tinh})
+                                  {formatWeight(item.so_luong_hien_tai, item.don_vi_tinh)})
                                 </span>
                               </p>
                               <p>

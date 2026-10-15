@@ -64,9 +64,15 @@ const todayText = () => {
   ].join("-");
 };
 
-// "12000.500", "kg" -> "12.000,5 kg"
-const formatQuantity = (value, unit) =>
-  `${Number(value).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`.trim();
+// "12000.500", "kg" -> "12.000,5 kg"; từ 1.000kg trở lên tự quy đổi sang Tấn
+// cho dễ đọc, vd "3500", "kg" -> "3,5 Tấn".
+const formatQuantity = (value, unit) => {
+  const num = Number(value);
+  if ((unit || "").toLowerCase() === "kg" && num >= 1000) {
+    return `${(num / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} Tấn`;
+  }
+  return `${num.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`.trim();
+};
 
 const BATCH_STAGE_LABELS = {
   CREATED: "Mới tạo, chờ xác nhận thu hoạch",

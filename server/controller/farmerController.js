@@ -555,8 +555,11 @@ const createBatch = async (req, res) => {
     ma_nguoi_quan_ly,
     ngay_thu_hoach,
     so_luong_hien_tai,
-    don_vi_tinh,
   } = req.body;
+
+  // Toàn hệ thống chỉ lưu khối lượng theo kg; bỏ qua đơn vị client gửi lên
+  // để tránh lô bị gắn nhầm đơn vị (vd: Tấn) như don_vi_tinh của lothuhoachController.
+  const don_vi_tinh = "kg";
 
   const sql = `
     INSERT INTO lo_nong_san
@@ -600,7 +603,10 @@ const createBatch = async (req, res) => {
 
 const updateBatch = async (req, res) => {
   const { maLo } = req.params;
-  const { ngay_thu_hoach, so_luong_hien_tai, don_vi_tinh } = req.body;
+  const { ngay_thu_hoach, so_luong_hien_tai } = req.body;
+
+  // Toàn hệ thống chỉ lưu khối lượng theo kg; bỏ qua đơn vị client gửi lên.
+  const don_vi_tinh = "kg";
 
   const sql = `
     UPDATE lo_nong_san

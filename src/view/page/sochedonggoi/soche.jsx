@@ -75,7 +75,15 @@ const PROCESSING_STAGE_LABEL = {
 const formatWeight = (value, unit) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return `- ${unit || ""}`;
-  return `${num.toLocaleString("vi-VN")} ${unit || ""}`;
+
+  // Lưu trữ luôn theo kg; hiển thị tự quy đổi sang Tấn khi đạt 1.000kg trở lên
+  // cho dễ đọc (vd: 3500 -> "3,5 Tấn"), dưới mức đó vẫn hiện kg (vd: "900 kg").
+  if ((unit || "").toLowerCase() === "kg" && num >= 1000) {
+    const tons = num / 1000;
+    return `${tons.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} Tấn`;
+  }
+
+  return `${num.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`;
 };
 
 const ProcessingPage = () => {
@@ -346,7 +354,7 @@ const ProcessingPage = () => {
   const handleOpenHandover = (batch) => {
     setHandoverBatch(batch);
     setHandoverForm({
-      ma_don_vi_van_chuyen: transporters[0]?.ma_nguoi_dung || "",
+      ma_don_vi_van_chuyen: "",
       ten_tai_xe: "",
       bien_so_xe: "",
       ma_ben_nhan: "",
@@ -414,6 +422,14 @@ const ProcessingPage = () => {
   const handleOpenGenericHandover = () => {
     if (readyToShip.length === 0) {
       alert("Chưa có lô nào hoàn tất đóng gói để bàn giao!");
+      return;
+    }
+    if (readyToShip.length > 1) {
+      // Có nhiều hơn 1 lô sẵn sàng bàn giao: không được tự ý chọn đại 1 lô,
+      // yêu cầu người dùng chọn đúng lô cần giao ở tab Quản lý sơ chế đóng gói.
+      alert(
+        'Hiện có nhiều hơn 1 lô đã đóng gói sẵn sàng bàn giao. Vui lòng vào tab "Quản lý sơ chế đóng gói", bấm ⋮ trên đúng lô cần giao rồi chọn "Bàn giao" để tránh chọn nhầm lô.',
+      );
       return;
     }
     handleOpenHandover(readyToShip[0]);
@@ -1198,12 +1214,15 @@ const ProcessingPage = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Khối lượng cân thực tế tại trạm cân kho (kg) (*)</label>
+                  <label>
+                    Khối lượng cân thực tế tại trạm cân kho (
+                    {receivingShipment.don_vi_tinh || "đơn vị lô"}) (*)
+                  </label>
                   <input
                     type="number"
                     value={actualWeightInput}
                     onChange={(e) => setActualWeightInput(e.target.value)}
-                    placeholder="Nhập số kg thực tế..."
+                    placeholder={`Nhập số ${receivingShipment.don_vi_tinh || ""} thực tế...`}
                     autoFocus
                   />
                 </div>
@@ -1515,7 +1534,12 @@ const ProcessingPage = () => {
                 </div>
                 <div className="form-grid-2">
                   <div className="form-group">
-                    <label>Khối Lượng Đưa Vào (kg)</label>
+                    <label>
+                      Khối Lượng Đưa Vào (
+                      {availableRawLots.find((b) => b.ma_lo_nong_san === createForm.ma_lo_nguon)
+                        ?.don_vi_tinh || "đơn vị lô nguồn"}
+                      )
+                    </label>
                     <input
                       type="number"
                       value={createForm.khoi_luong_dau_vao}
