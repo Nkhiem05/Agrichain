@@ -780,7 +780,7 @@ export default function AdminDashboard() {
                 className={`nav-item-btn ${activeTab === "farms" ? "active" : ""}`}
               >
                 <ShieldCheck size={18} />
-                <span>Nông trại</span>
+                <span>Chủ thể</span>
               </button>
               <button
                 type="button"

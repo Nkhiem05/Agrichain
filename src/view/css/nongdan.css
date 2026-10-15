@@ -239,7 +239,7 @@
   .metrics-row {
     position: sticky;
     top: 0;
-    z-index: 50;
+    z-index: 20;
     background-color: #f7f9fa;
     padding-top: 24px;
     padding-bottom: 20px;
@@ -491,7 +491,9 @@
     right: 24px;
     display: flex;
     align-items: center;
-    z-index: 30;
+    /* Không đặt z-index ở đây: nó sẽ tạo stacking context riêng và giam menu
+       dropdown (position: fixed, z-index: 9999) bên trong, khiến menu của
+       thẻ mùa vụ này không nổi được lên trên nút ⋮ của thẻ mùa vụ kế tiếp. */
   }
 
   /* ================= NÚT BA CHẤM SANG TRỌNG / TINH TẾ ================= */
@@ -610,6 +612,11 @@
   .status-icon-modern.success {
     background-color: #dcfce7;
     color: #16a34a;
+  }
+
+  .status-icon-modern.danger {
+    background-color: #fee2e2;
+    color: #dc2626;
   }
 
   .status-icon-modern.empty {
@@ -736,8 +743,8 @@
   }
 
   .status-pill.purple {
-    background-color: #ede9fe;
-    color: #6d28d9;
+   background-color: #fef3c7;
+        color: #b45309;
   }
 
   /* NÚT THAO TÁC CỦA LỊCH HẸN VÀ BÀN GIAO */
@@ -1002,6 +1009,8 @@
   .btn-save.btn-danger-solid:hover {
     background-color: #b91c1c;
   }
+
+
 
   @keyframes fadeInDropdown {
     from {

@@ -74,17 +74,6 @@ const formatQuantity = (value, unit) => {
   return `${num.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`.trim();
 };
 
-const BATCH_STAGE_LABELS = {
-  CREATED: "Mới tạo, chờ xác nhận thu hoạch",
-  HARVESTED: "Đã thu hoạch",
-  PROCESSED: "Đã sơ chế",
-  PACKAGED: "Đã đóng gói",
-  IN_TRANSIT: "Đang vận chuyển",
-  RECEIVED: "Đã nhận hàng",
-  DISTRIBUTED: "Đã phân phối",
-  COMPLETED: "Hoàn tất",
-};
-
 // Header gửi kèm token đăng nhập (token được lưu ở trang đăng nhập)
 const authHeaders = () => {
   const token = localStorage.getItem("token");
@@ -1075,6 +1064,29 @@ const DashboardPage = () => {
     }
   };
 
+  const handleMarkSeasonReady = async (maMuaVu) => {
+    setOpenDropdown(null);
+
+    try {
+      const response = await fetch(
+        `${API_URL}/api/mua-vu/${maMuaVu}/danh-dau-san-sang`,
+        { method: "PATCH" },
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        alert(data.message || "Không thể đánh dấu mùa vụ sẵn sàng");
+        return;
+      }
+
+      alert(data.message);
+      await fetchSeasons();
+    } catch (error) {
+      console.error("Lỗi đánh dấu mùa vụ sẵn sàng:", error);
+      alert("Không thể kết nối tới backend");
+    }
+  };
+
   // =========================================================
   // LẤY DANH SÁCH LÔ THU HOẠCH + THỐNG KÊ
   // =========================================================
@@ -1109,10 +1121,11 @@ const DashboardPage = () => {
     }
   };
 
+  // Chỉ tải mùa vụ đã được đánh dấu "sẵn sàng thu hoạch" để chọn khi tạo lô
   const fetchBatchSeasons = async () => {
     try {
       const response = await fetch(
-        `${API_URL}/api/mua-vu/user/${user.ma_nguoi_dung}`,
+        `${API_URL}/api/mua-vu/user/${user.ma_nguoi_dung}?san_sang=1`,
       );
       const data = await response.json();
 
@@ -1212,6 +1225,8 @@ const DashboardPage = () => {
       alert(data.message);
       handleCloseBatchModal();
       await fetchBatches();
+      // Mùa vụ vừa dùng để tạo lô sẽ biến mất khỏi tab Quản lý mùa vụ
+      await fetchSeasons();
     } catch (error) {
       console.error("Lỗi lưu lô thu hoạch:", error);
       alert("Không thể kết nối tới backend");
@@ -1248,7 +1263,9 @@ const DashboardPage = () => {
   };
 
   useEffect(() => {
-    if (activeTab === "inspection") {
+    // Tab "batch" cũng cần dữ liệu kiểm định để hiển thị đúng icon trạng
+    // thái kiểm định trên bảng lô thu hoạch.
+    if (activeTab === "inspection" || activeTab === "batch") {
       fetchInspections();
     }
   }, [activeTab]);
@@ -1926,6 +1943,11 @@ const DashboardPage = () => {
                         <span className="tag-badge green">
                           {season.ten_nong_trai}
                         </span>
+                        {season.trang_thai_thu_hoach === "DA_SAN_SANG" && (
+                          <span className="tag-badge green">
+                            Sẵn sàng thu hoạch
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -1955,13 +1977,25 @@ const DashboardPage = () => {
                       <button
                         className="btn-more-dots"
                         title="Tùy chọn"
-                        onClick={() => handleToggleDropdown(season.ma_mua_vu)}
+                        onClick={(e) =>
+                          handleToggleBatchMenu(e, season.ma_mua_vu)
+                        }
                       >
                         <MoreVertical size={18} />
                       </button>
 
                       {openDropdown === season.ma_mua_vu && (
-                        <div className="dropdown-menu">
+                        <div
+                          className={`dropdown-menu dropdown-fixed ${
+                            batchMenuPos.up ? "dropdown-up" : ""
+                          }`}
+                          style={{
+                            right: batchMenuPos.right,
+                            ...(batchMenuPos.up
+                              ? { bottom: batchMenuPos.bottom }
+                              : { top: batchMenuPos.top }),
+                          }}
+                        >
                           <div
                             className="dropdown-item"
                             onClick={(e) =>
@@ -1979,10 +2013,25 @@ const DashboardPage = () => {
                             Cập nhật mùa vụ
                           </div>
                           <div className="dropdown-divider"></div>
-                          <div className="dropdown-item">
-                            <CheckCircle2 size={15} />
-                            Đánh dấu sẵn sàng
-                          </div>
+                          {season.trang_thai_thu_hoach === "DA_SAN_SANG" ? (
+                            <div
+                              className="dropdown-item"
+                              style={{ color: "#16a34a", cursor: "default" }}
+                            >
+                              <CheckCircle2 size={15} />
+                              Đã sẵn sàng thu hoạch
+                            </div>
+                          ) : (
+                            <div
+                              className="dropdown-item"
+                              onClick={() =>
+                                handleMarkSeasonReady(season.ma_mua_vu)
+                              }
+                            >
+                              <CheckCircle2 size={15} />
+                              Đánh dấu sẵn sàng
+                            </div>
+                          )}
                           <div className="dropdown-divider"></div>
                           <div
                             className="dropdown-item danger"
@@ -2090,29 +2139,55 @@ const DashboardPage = () => {
                           <td>{formatDate(batch.ngay_thu_hoach) || "—"}</td>
                           <td>
                             <div className="status-icon-cell">
-                              {batch.giai_doan_hien_tai === "CREATED" ? (
-                                <span
-                                  className="status-icon-modern empty"
-                                  title={
-                                    BATCH_STAGE_LABELS[
-                                      batch.giai_doan_hien_tai
-                                    ] || batch.giai_doan_hien_tai
-                                  }
-                                >
-                                  <span className="empty-indicator"></span>
-                                </span>
-                              ) : (
-                                <span
-                                  className="status-icon-modern success"
-                                  title={
-                                    BATCH_STAGE_LABELS[
-                                      batch.giai_doan_hien_tai
-                                    ] || batch.giai_doan_hien_tai
-                                  }
-                                >
-                                  <CheckCircle2 size={16} />
-                                </span>
-                              )}
+                              {(() => {
+                                const inspection = inspections.find(
+                                  (i) =>
+                                    i.ma_lo_nong_san === batch.ma_lo_nong_san,
+                                );
+                                const status = inspection?.trang_thai_ho_so;
+
+                                if (
+                                  status === "TU_CHOI" ||
+                                  status === "THU_HOI"
+                                ) {
+                                  return (
+                                    <span
+                                      className="status-icon-modern danger"
+                                      title="Yêu cầu kiểm định bị từ chối"
+                                    >
+                                      <XCircle size={16} />
+                                    </span>
+                                  );
+                                }
+
+                                if (
+                                  status === "DA_HEN_LICH" ||
+                                  status === "DA_LAY_MAU" ||
+                                  status === "DA_CONG_BO"
+                                ) {
+                                  return (
+                                    <span
+                                      className="status-icon-modern success"
+                                      title="Yêu cầu kiểm định đã được chấp nhận"
+                                    >
+                                      <CheckCircle2 size={16} />
+                                    </span>
+                                  );
+                                }
+
+                                return (
+                                  <span
+                                    className="status-icon-modern empty"
+                                    title={
+                                      status === "CHO_TIEP_NHAN"
+                                        ? "Đang chờ cơ quan kiểm định phê duyệt"
+                                        : "Chưa gửi yêu cầu kiểm định"
+                                    }
+                                  >
+                                    <span className="empty-indicator"></span>
+                                  </span>
+                                );
+                              })()}
 
                               <div className="dropdown-container">
                                 <button

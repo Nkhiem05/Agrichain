@@ -71,6 +71,9 @@ router.get("/thong-ke/user/:maNguoiDung", muavuController.getSeasonStats);
 // Danh sách mùa vụ của nông dân (lọc theo ?ma_nong_trai=&keyword=)
 router.get("/user/:maNguoiDung", muavuController.getSeasons);
 
+// Đánh dấu mùa vụ sẵn sàng thu hoạch (bật nút "Đánh dấu sẵn sàng" ở trang Nông dân)
+router.patch("/:maMuaVu/danh-dau-san-sang", muavuController.markSeasonReady);
+
 router.get("/:maMuaVu", muavuController.getSeasonById);
 
 router.post("/", uploadSeasonImage, muavuController.createSeason);

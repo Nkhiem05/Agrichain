@@ -99,6 +99,7 @@ const SEASON_SELECT = `
     DATE_FORMAT(mv.ngay_gieo_trong, '%Y-%m-%d') AS ngay_gieo_trong,
     DATE_FORMAT(mv.ngay_thu_hoach_du_kien, '%Y-%m-%d') AS ngay_thu_hoach_du_kien,
     mv.trang_thai,
+    mv.trang_thai_thu_hoach,
     mv.created_at,
     mv.updated_at
   FROM mua_vu mv
@@ -532,15 +533,22 @@ MÙA VỤ
 
 const getSeasons = async (req, res) => {
   const { maNguoiDung } = req.params;
-  const { ma_nong_trai, keyword } = req.query;
+  const { ma_nong_trai, keyword, san_sang } = req.query;
 
   let sql = `
     ${SEASON_SELECT}
     WHERE nt.ma_nguoi_dung = ?
       AND nt.trang_thai = 1
       AND mv.trang_thai = 1
+      AND mv.trang_thai_thu_hoach <> 'DA_TAO_LO'
   `;
   const params = [maNguoiDung];
+
+  // Dùng cho select "Mùa vụ thu hoạch" ở popup tạo lô: chỉ lấy mùa vụ đã
+  // được nông dân đánh dấu sẵn sàng thu hoạch.
+  if (san_sang === "1") {
+    sql += ` AND mv.trang_thai_thu_hoach = 'DA_SAN_SANG'`;
+  }
 
   if (ma_nong_trai) {
     sql += ` AND mv.ma_nong_trai = ?`;
@@ -563,6 +571,45 @@ const getSeasons = async (req, res) => {
     });
   } catch (err) {
     return sendError(res, err, "Lỗi lấy mùa vụ:", "Không thể lấy mùa vụ");
+  }
+};
+
+// Đánh dấu mùa vụ đã sẵn sàng thu hoạch. Chỉ áp dụng cho mùa vụ đang ở
+// CHUA_SAN_SANG; từ đây mùa vụ mới chọn được ở popup "Tạo lô thu hoạch".
+const markSeasonReady = async (req, res) => {
+  const { maMuaVu } = req.params;
+
+  try {
+    const [result] = await db.execute(
+      `
+      UPDATE mua_vu
+      SET trang_thai_thu_hoach = 'DA_SAN_SANG'
+      WHERE ma_mua_vu = ?
+        AND trang_thai = 1
+        AND trang_thai_thu_hoach = 'CHUA_SAN_SANG'
+      `,
+      [maMuaVu],
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message:
+          "Không tìm thấy mùa vụ hoặc mùa vụ đã được đánh dấu sẵn sàng trước đó",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Đã đánh dấu mùa vụ sẵn sàng thu hoạch",
+    });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi đánh dấu mùa vụ sẵn sàng:",
+      "Không thể đánh dấu mùa vụ sẵn sàng",
+    );
   }
 };
 
@@ -865,6 +912,7 @@ module.exports = {
   getMaterials,
   getSeasonStats,
   getSeasons,
+  markSeasonReady,
   getSeasonById,
   createSeason,
   updateSeason,

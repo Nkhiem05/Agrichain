@@ -887,7 +887,7 @@ const ProcessingPage = () => {
                                           navigate(`/chi-tiet-so-che/${b.ma_so_che}`);
                                         }}
                                       >
-                                        <Eye size={15} color="#2563eb" /> Xem chi tiết
+                                        <Eye size={15} /> Xem chi tiết
                                       </button>
 
                                       {!isPackaged && (
@@ -896,7 +896,7 @@ const ProcessingPage = () => {
                                           className="dropdown-item-btn"
                                           onClick={() => handleOpenStatusModal(b)}
                                         >
-                                          <Edit3 size={15} color="#059669" /> Cập nhật
+                                          <Edit3 size={15} /> Cập nhật
                                         </button>
                                       )}
 
@@ -910,7 +910,7 @@ const ProcessingPage = () => {
                                               handleOpenHandover(b);
                                             }}
                                           >
-                                            <SendHorizontal size={15} color="#0d9488" /> Bàn giao
+                                            <SendHorizontal size={15} /> Bàn giao
                                           </button>
                                         )}
 
@@ -922,7 +922,7 @@ const ProcessingPage = () => {
                                           handleDeleteProcessing(b);
                                         }}
                                       >
-                                        <Trash2 size={15} color="#dc2626" /> Xóa
+                                        <Trash2 size={15} /> Xóa
                                       </button>
                                     </div>
                                   )}

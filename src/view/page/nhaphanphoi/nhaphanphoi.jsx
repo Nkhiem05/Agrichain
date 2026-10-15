@@ -694,7 +694,7 @@ const NhaPhanPhoiPage = () => {
                                   {order.ten_san_pham}
                                 </td>
                                 <td>{order.ten_nguoi_gui}</td>
-                                <td style={{ fontWeight: 700, color: "#15803d" }}>
+                                <td style={{ fontWeight: 700, color: "rgb(31, 41, 55)" }}>
                                   {formatWeight(order.khoi_luong, order.don_vi_tinh)}
                                 </td>
                                 <td style={{ color: "#64748b", fontSize: 12.5 }}>
@@ -833,10 +833,10 @@ const NhaPhanPhoiPage = () => {
                               <tr key={lot.ma_lo_nong_san} className={isRevoked ? "row-locked" : ""}>
                                 <td style={{ fontWeight: 700 }}>{lot.ma_lo_nong_san}</td>
                                 <td style={{ fontWeight: 600, color: "#1e293b" }}>{lot.ten_san_pham}</td>
-                                <td style={{ color: "#2563eb", fontWeight: 500 }}>
+                                <td style={{ color: "#1e293b", fontWeight: 500 }}>
                                   {lot.vi_tri_luu_kho || "—"}
                                 </td>
-                                <td style={{ fontWeight: 700, color: "#15803d" }}>
+                                <td style={{ fontWeight: 700, color: "#1e293b" }}>
                                   {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
                                 </td>
                                 <td>
@@ -1002,7 +1002,7 @@ const NhaPhanPhoiPage = () => {
                                 <div style={{ display: "inline-flex", justifyContent: "center" }}>
                                   <button
                                     type="button"
-                                    className="btn-action-view"
+                                    className="btn-action-view-outline"
                                     title="Xem chi tiết đơn phân phối"
                                     onClick={() => handleNavigateChiTietPhanPhoi(order.ma_phieu)}
                                   >
@@ -1536,7 +1536,7 @@ const NhaPhanPhoiPage = () => {
                     <tbody>
                       {dealerHistory.map((h) => (
                         <tr key={h.ma_phieu}>
-                          <td style={{ fontWeight: 700 }}>{h.ma_phieu}</td>
+                          <td style={{ fontWeight: 700, color: "#1d4ed8" }}>{h.ma_phieu}</td>
                           <td>{h.ma_lo_nong_san}</td>
                           <td>
                             {formatWeight(h.so_luong_xuat, h.don_vi_tinh)}

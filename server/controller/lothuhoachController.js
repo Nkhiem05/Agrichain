@@ -331,11 +331,15 @@ const getBatches = async (req, res) => {
   const { maNguoiDung } = req.params;
   const { ma_nong_trai } = req.query;
 
-  // Lô thuộc nông trại của nông dân, hoặc lô do nông dân quản lý
+  // Lô thuộc nông trại của nông dân, hoặc lô do nông dân quản lý.
+  // Chỉ lấy lô còn ở trang trại (CREATED/HARVESTED): lô đã được bàn giao
+  // vận chuyển (IN_TRANSIT trở đi) không còn hiện ở đây nữa, xem ở tab
+  // "Vận chuyển & Bàn giao".
   let sql = `
     ${BATCH_SELECT}
     WHERE (nt.ma_nguoi_dung = ? OR lo.ma_nguoi_quan_ly = ?)
       AND lo.tinh_trang_su_dung <> 'CANCELLED'
+      AND lo.giai_doan_hien_tai IN ('CREATED', 'HARVESTED')
   `;
   const params = [maNguoiDung, maNguoiDung];
 
@@ -423,14 +427,19 @@ const createBatch = async (req, res) => {
               ON mv.ma_nong_trai = nt.ma_nong_trai
             WHERE mv.ma_mua_vu = ?
               AND mv.trang_thai = 1
+              AND mv.trang_thai_thu_hoach = 'DA_SAN_SANG'
               AND nt.trang_thai = 1
             LIMIT 1
+            FOR UPDATE
             `,
             [ma_mua_vu],
           );
 
           if (seasons.length === 0) {
-            throw new ApiError(404, "Không tìm thấy mùa vụ");
+            throw new ApiError(
+              404,
+              "Không tìm thấy mùa vụ hoặc mùa vụ chưa được đánh dấu sẵn sàng thu hoạch",
+            );
           }
 
           const season = seasons[0];
@@ -477,6 +486,13 @@ const createBatch = async (req, res) => {
               harvest.so_luong,
               DON_VI_TINH,
             ],
+          );
+
+          // Mùa vụ đã được dùng để tạo lô: chuyển sang DA_TAO_LO để biến mất
+          // khỏi danh sách "Quản lý mùa vụ" và khỏi select "sẵn sàng thu hoạch".
+          await connection.execute(
+            `UPDATE mua_vu SET trang_thai_thu_hoach = 'DA_TAO_LO' WHERE ma_mua_vu = ?`,
+            [ma_mua_vu],
           );
 
           return newCode;
