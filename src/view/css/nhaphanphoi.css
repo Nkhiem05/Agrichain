@@ -623,6 +623,7 @@
   display: flex;
   flex-direction: column;
   max-height: 90vh;
+  overflow: hidden;
 }
 
 .nhaphanphoi .modal-container.modal-lg {
@@ -644,6 +645,7 @@
 .nhaphanphoi .modal-body {
   padding: 18px 22px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .nhaphanphoi .form-group {
@@ -662,6 +664,8 @@
 .nhaphanphoi .form-group input,
 .nhaphanphoi .form-group select,
 .nhaphanphoi .form-group textarea {
+  width: 100%;
+  max-width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 6px;
   padding: 8px 12px;

@@ -420,6 +420,7 @@ const createBatch = async (req, res) => {
             `
             SELECT
               mv.loai_cay_trong,
+              mv.ma_lo_du_kien,
               DATE_FORMAT(mv.ngay_gieo_trong, '%Y-%m-%d') AS ngay_gieo_trong,
               nt.ma_nguoi_dung
             FROM mua_vu mv
@@ -455,12 +456,27 @@ const createBatch = async (req, res) => {
             season.loai_cay_trong,
           );
 
-          const newCode = await generateCode(
-            connection,
-            "lo_nong_san",
-            "ma_lo_nong_san",
-            "LO",
-          );
+          // Dùng đúng mã lô dự kiến đã gán cho mùa vụ khi tạo mùa vụ;
+          // mùa vụ cũ chưa có mã (hoặc mã đã bị dùng) thì sinh mã mới như trước.
+          let newCode = season.ma_lo_du_kien;
+
+          if (newCode) {
+            const [used] = await connection.execute(
+              `SELECT ma_lo_nong_san FROM lo_nong_san WHERE ma_lo_nong_san = ? LIMIT 1`,
+              [newCode],
+            );
+
+            if (used.length > 0) newCode = null;
+          }
+
+          if (!newCode) {
+            newCode = await generateCode(
+              connection,
+              "lo_nong_san",
+              "ma_lo_nong_san",
+              "LO",
+            );
+          }
 
           await connection.execute(
             `

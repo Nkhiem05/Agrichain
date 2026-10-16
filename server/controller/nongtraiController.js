@@ -327,12 +327,7 @@ const createPlot = async (req, res) => {
       data: result,
     });
   } catch (err) {
-    return sendError(
-      res,
-      err,
-      "Lỗi thêm thửa đất:",
-      "Không thể thêm thửa đất",
-    );
+    return sendError(res, err, "Lỗi thêm thửa đất:", "Không thể thêm thửa đất");
   }
 };
 
@@ -384,7 +379,10 @@ const updatePlot = async (req, res) => {
     const trang_thai = cleanText(req.body?.trang_thai);
 
     if (trang_thai && !["DAT_TRONG", "TAM_NGUNG"].includes(trang_thai)) {
-      throw new ApiError(400, "Trạng thái chỉ có thể là Đất trống hoặc Tạm ngưng");
+      throw new ApiError(
+        400,
+        "Trạng thái chỉ có thể là Đất trống hoặc Tạm ngưng",
+      );
     }
 
     await withTransaction(async (connection) => {

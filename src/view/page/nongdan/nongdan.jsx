@@ -568,13 +568,13 @@ const DashboardPage = () => {
   const handleAddFarm = async (e) => {
     e.preventDefault();
 
-    if (
-      !farmForm.ma_nong_trai.trim() ||
-      !farmForm.ma_nguoi_dung ||
-      !farmForm.ten_nong_trai.trim() ||
-      !farmForm.dia_diem_nong_trai.trim()
-    ) {
-      alert("Vui lòng nhập đầy đủ mã, tên, người quản lý và địa chỉ");
+    if (!farmForm.ma_nguoi_dung) {
+      alert("Không xác định được tài khoản đăng nhập, vui lòng đăng nhập lại");
+      return;
+    }
+
+    if (!farmForm.ten_nong_trai.trim() || !farmForm.dia_diem_nong_trai.trim()) {
+      alert("Vui lòng nhập đầy đủ tên và địa chỉ nông trại");
       return;
     }
 
@@ -582,7 +582,6 @@ const DashboardPage = () => {
 
     try {
       const formData = new FormData();
-      formData.append("ma_nong_trai", farmForm.ma_nong_trai.trim());
       formData.append("ma_nguoi_dung", farmForm.ma_nguoi_dung);
       formData.append("ten_nong_trai", farmForm.ten_nong_trai.trim());
       formData.append("dia_diem_nong_trai", farmForm.dia_diem_nong_trai.trim());
@@ -1607,7 +1606,12 @@ const DashboardPage = () => {
               <img
                 src={`http://localhost:3000${user.anh_dai_dien}`}
                 alt="avatar"
-                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                }}
               />
             ) : (
               (user?.ho_ten || "ND").slice(0, 2).toUpperCase()
@@ -2096,7 +2100,7 @@ const DashboardPage = () => {
                 <table className="batch-table">
                   <thead>
                     <tr>
-                      <th>Mã lô</th>
+                      <th>Mã mùa vụ</th>
                       <th>Mã nông trại</th>
                       <th>Mùa vụ</th>
                       <th>Thửa đất</th>
@@ -2126,7 +2130,7 @@ const DashboardPage = () => {
                             isDropdownActive ? "row-has-open-menu" : ""
                           }
                         >
-                          <td>{batch.ma_lo_nong_san}</td>
+                          <td>{batch.ma_mua_vu || "—"}</td>
                           <td>{batch.ma_nong_trai || "—"}</td>
                           <td>{batch.loai_cay_trong || "—"}</td>
                           <td>{batch.ten_thua_dat || "—"}</td>
@@ -2568,17 +2572,19 @@ const DashboardPage = () => {
             </div>
 
             <div className="modal-body">
-              <div className="form-group">
-                <label>Mã nông trại</label>
-                <input
-                  type="text"
-                  name="ma_nong_trai"
-                  value={farmForm.ma_nong_trai}
-                  onChange={handleFarmInputChange}
-                  placeholder="VD: NT002"
-                  readOnly={!!editingFarm}
-                />
-              </div>
+              {editingFarm && (
+                <div className="form-group">
+                  <label>Mã nông trại</label>
+                  <input
+                    type="text"
+                    name="ma_nong_trai"
+                    value={farmForm.ma_nong_trai}
+                    onChange={handleFarmInputChange}
+                    placeholder="VD: NT002"
+                    readOnly
+                  />
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Tên nông trại</label>
@@ -2591,24 +2597,26 @@ const DashboardPage = () => {
                 />
               </div>
 
-              <div className="form-group">
-                <label>Người quản lý</label>
-                <select
-                  name="ma_nguoi_dung"
-                  value={farmForm.ma_nguoi_dung}
-                  onChange={handleFarmInputChange}
-                >
-                  <option value="">-- Chọn người quản lý --</option>
-                  {managers.map((manager) => (
-                    <option
-                      key={manager.ma_nguoi_dung}
-                      value={manager.ma_nguoi_dung}
-                    >
-                      {manager.ho_ten}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {editingFarm && (
+                <div className="form-group">
+                  <label>Người quản lý</label>
+                  <select
+                    name="ma_nguoi_dung"
+                    value={farmForm.ma_nguoi_dung}
+                    onChange={handleFarmInputChange}
+                  >
+                    <option value="">-- Chọn người quản lý --</option>
+                    {managers.map((manager) => (
+                      <option
+                        key={manager.ma_nguoi_dung}
+                        value={manager.ma_nguoi_dung}
+                      >
+                        {manager.ho_ten}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="form-group">
                 <label>Địa chỉ</label>

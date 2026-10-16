@@ -65,7 +65,8 @@ const ChiTietPhanPhoiPage = () => {
   }, [maPhieu]);
 
   const handleMarkShipped = async () => {
-    if (!window.confirm(`Xác nhận đã xuất kho phiếu ${orderDetail.ma_phieu}?`)) return;
+    if (!window.confirm(`Xác nhận đã xuất kho phiếu ${orderDetail.ma_phieu}?`))
+      return;
     setActing(true);
     try {
       await markDispatchShipped(orderDetail.ma_phieu);
@@ -78,7 +79,12 @@ const ChiTietPhanPhoiPage = () => {
   };
 
   const handleMarkDelivered = async () => {
-    if (!window.confirm(`Xác nhận đại lý đã nhận đủ hàng cho phiếu ${orderDetail.ma_phieu}?`)) return;
+    if (
+      !window.confirm(
+        `Xác nhận đại lý đã nhận đủ hàng cho phiếu ${orderDetail.ma_phieu}?`,
+      )
+    )
+      return;
     setActing(true);
     try {
       await markDispatchDelivered(orderDetail.ma_phieu);
@@ -93,7 +99,9 @@ const ChiTietPhanPhoiPage = () => {
   if (loading) {
     return (
       <div className="ctpp-page">
-        <div style={{ padding: 60, textAlign: "center", color: "#6b7280" }}>Đang tải...</div>
+        <div style={{ padding: 60, textAlign: "center", color: "#6b7280" }}>
+          Đang tải...
+        </div>
       </div>
     );
   }
@@ -102,7 +110,11 @@ const ChiTietPhanPhoiPage = () => {
     return (
       <div className="ctpp-page">
         <main className="ctpp-main">
-          <button type="button" className="ctpp-btn-back" onClick={() => navigate(-1)}>
+          <button
+            type="button"
+            className="ctpp-btn-back"
+            onClick={() => navigate(-1)}
+          >
             <ArrowLeft size={16} />
             Quay lại danh sách
           </button>
@@ -114,14 +126,19 @@ const ChiTietPhanPhoiPage = () => {
     );
   }
 
-  const statusInfo = STATUS_LABEL[orderDetail.trang_thai] || { text: orderDetail.trang_thai, tone: "info" };
+  const statusInfo = STATUS_LABEL[orderDetail.trang_thai] || {
+    text: orderDetail.trang_thai,
+    tone: "info",
+  };
 
   // Dòng thời gian thật, chỉ dựng từ các mốc đã thực sự xảy ra (không có bên
   // thứ 2 xác nhận số liệu vì đại lý không có tài khoản trong hệ thống).
   const timeline = [
     {
       tieuDe: "Lập phiếu xuất kho",
-      thoiGian: orderDetail.created_at ? new Date(orderDetail.created_at).toLocaleString("vi-VN") : null,
+      thoiGian: orderDetail.created_at
+        ? new Date(orderDetail.created_at).toLocaleString("vi-VN")
+        : null,
       moTa: `Xuất ${orderDetail.so_luong_xuat} ${orderDetail.don_vi_tinh} lô ${orderDetail.ma_lo_nong_san} cho đại lý ${orderDetail.ten_dai_ly}.`,
       hoanThanh: true,
     },
@@ -157,12 +174,20 @@ const ChiTietPhanPhoiPage = () => {
 
       <main className="ctpp-main">
         <div className="ctpp-topbar">
-          <button type="button" className="ctpp-btn-back" onClick={() => navigate(-1)}>
+          <button
+            type="button"
+            className="ctpp-btn-back"
+            onClick={() => navigate(-1)}
+          >
             <ArrowLeft size={16} />
             Quay lại danh sách
           </button>
           <div className="ctpp-topbar-actions">
-            <button type="button" className="ctpp-btn-print" onClick={() => window.print()}>
+            <button
+              type="button"
+              className="ctpp-btn-print"
+              onClick={() => window.print()}
+            >
               <Printer size={15} />
               In Phiếu Giao Nhận
             </button>
@@ -171,25 +196,41 @@ const ChiTietPhanPhoiPage = () => {
 
         <div className="ctpp-hero-card">
           <div className="ctpp-hero-left">
-            <div className={`ctpp-status-pill ${statusInfo.tone}`} style={{ marginBottom: 10 }}>
+            <div
+              className={`ctpp-status-pill ${statusInfo.tone}`}
+              style={{ marginBottom: 10 }}
+            >
               <CheckCircle2 size={13} />
               {statusInfo.text}
             </div>
-            <h2 className="ctpp-hero-title">Phiếu Phân Phối: {orderDetail.ma_phieu}</h2>
+            <h2 className="ctpp-hero-title">
+              Phiếu Phân Phối: {orderDetail.ma_phieu}
+            </h2>
             <p className="ctpp-hero-sub">
-              Lập lệnh lúc: <b>{new Date(orderDetail.created_at).toLocaleString("vi-VN")}</b>
+              Lập lệnh lúc:{" "}
+              <b>{new Date(orderDetail.created_at).toLocaleString("vi-VN")}</b>
             </p>
           </div>
 
           <div className="ctpp-hero-right">
             {orderDetail.trang_thai === "CHO_XUAT" && (
-              <button type="button" className="ctpp-btn-print" disabled={acting} onClick={handleMarkShipped}>
+              <button
+                type="button"
+                className="ctpp-btn-print"
+                disabled={acting}
+                onClick={handleMarkShipped}
+              >
                 <Truck size={15} />
                 Xác Nhận Đã Xuất Kho
               </button>
             )}
             {orderDetail.trang_thai === "DANG_GIAO" && (
-              <button type="button" className="ctpp-btn-print" disabled={acting} onClick={handleMarkDelivered}>
+              <button
+                type="button"
+                className="ctpp-btn-print"
+                disabled={acting}
+                onClick={handleMarkDelivered}
+              >
                 <CheckCircle2 size={15} />
                 Xác Nhận Đã Giao Hàng
               </button>
@@ -201,7 +242,9 @@ const ChiTietPhanPhoiPage = () => {
           <div className="ctpp-stat-box">
             <span className="ctpp-stat-label">Khối lượng xuất kho</span>
             <div>
-              <span className="ctpp-stat-value">{orderDetail.so_luong_xuat}</span>
+              <span className="ctpp-stat-value">
+                {orderDetail.so_luong_xuat}
+              </span>
               <span className="ctpp-stat-unit"> {orderDetail.don_vi_tinh}</span>
             </div>
             <span className="ctpp-stat-badge info">
@@ -214,7 +257,9 @@ const ChiTietPhanPhoiPage = () => {
             <span className="ctpp-stat-label">Hình thức giao hàng</span>
             <div>
               <span className="ctpp-stat-value" style={{ fontSize: 17 }}>
-                {orderDetail.hinh_thuc === "TU_GIAO" ? "Tự giao xe kho" : "Đơn vị vận chuyển đối tác"}
+                {orderDetail.hinh_thuc === "TU_GIAO"
+                  ? "Tự giao xe kho"
+                  : "Đơn vị vận chuyển đối tác"}
               </span>
             </div>
             <span className="ctpp-stat-badge info">
@@ -235,31 +280,51 @@ const ChiTietPhanPhoiPage = () => {
             <div className="ctpp-field-list">
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">
-                  <Building2 size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
+                  <Building2
+                    size={12}
+                    style={{ marginRight: 4, verticalAlign: "middle" }}
+                  />
                   Tên đại lý:
                 </span>
-                <span className="ctpp-field-value">{orderDetail.ten_dai_ly}</span>
+                <span className="ctpp-field-value">
+                  {orderDetail.ten_dai_ly}
+                </span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">
-                  <User size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
+                  <User
+                    size={12}
+                    style={{ marginRight: 4, verticalAlign: "middle" }}
+                  />
                   Người đại diện:
                 </span>
-                <span className="ctpp-field-value muted">{orderDetail.dai_ly?.nguoi_lien_he || "—"}</span>
+                <span className="ctpp-field-value muted">
+                  {orderDetail.dai_ly?.nguoi_lien_he || "—"}
+                </span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">
-                  <Phone size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
+                  <Phone
+                    size={12}
+                    style={{ marginRight: 4, verticalAlign: "middle" }}
+                  />
                   Số điện thoại:
                 </span>
-                <span className="ctpp-field-value blue">{orderDetail.dai_ly?.so_dien_thoai || "—"}</span>
+                <span className="ctpp-field-value blue">
+                  {orderDetail.dai_ly?.so_dien_thoai || "—"}
+                </span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">
-                  <MapPin size={12} style={{ marginRight: 4, verticalAlign: "middle" }} />
+                  <MapPin
+                    size={12}
+                    style={{ marginRight: 4, verticalAlign: "middle" }}
+                  />
                   Địa chỉ giao hàng:
                 </span>
-                <span className="ctpp-field-value muted">{orderDetail.dai_ly?.dia_chi || "—"}</span>
+                <span className="ctpp-field-value muted">
+                  {orderDetail.dai_ly?.dia_chi || "—"}
+                </span>
               </div>
             </div>
           </div>
@@ -302,28 +367,38 @@ const ChiTietPhanPhoiPage = () => {
                 <>
                   <div className="ctpp-field-row">
                     <span className="ctpp-field-label">Tài xế phụ trách:</span>
-                    <span className="ctpp-field-value">{orderDetail.ten_tai_xe || "—"}</span>
+                    <span className="ctpp-field-value">
+                      {orderDetail.ten_tai_xe || "—"}
+                    </span>
                   </div>
                   <div className="ctpp-field-row">
                     <span className="ctpp-field-label">Biển số xe:</span>
                     <span className="ctpp-field-value muted">
-                      <span className="ctpp-tag">{orderDetail.bien_so_xe || "—"}</span>
+                      <span className="ctpp-tag">
+                        {orderDetail.bien_so_xe || "—"}
+                      </span>
                     </span>
                   </div>
                 </>
               ) : (
                 <div className="ctpp-field-row">
                   <span className="ctpp-field-label">Đơn vị vận chuyển:</span>
-                  <span className="ctpp-field-value">{orderDetail.ten_don_vi_van_chuyen || "—"}</span>
+                  <span className="ctpp-field-value">
+                    {orderDetail.ten_don_vi_van_chuyen || "—"}
+                  </span>
                 </div>
               )}
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">Giờ xuất kho:</span>
-                <span className="ctpp-field-value muted">{orderDetail.thoi_gian_xuat || "Chưa xuất kho"}</span>
+                <span className="ctpp-field-value muted">
+                  {orderDetail.thoi_gian_xuat || "Chưa xuất kho"}
+                </span>
               </div>
               <div className="ctpp-field-row">
                 <span className="ctpp-field-label">Giờ bàn giao:</span>
-                <span className="ctpp-field-value muted">{orderDetail.thoi_gian_giao || "Chưa bàn giao"}</span>
+                <span className="ctpp-field-value muted">
+                  {orderDetail.thoi_gian_giao || "Chưa bàn giao"}
+                </span>
               </div>
             </div>
           </div>
@@ -347,7 +422,14 @@ const ChiTietPhanPhoiPage = () => {
                   lineHeight: 1.65,
                 }}
               >
-                <AlertTriangle size={14} style={{ marginRight: 6, verticalAlign: "middle", color: "#b45309" }} />
+                <AlertTriangle
+                  size={14}
+                  style={{
+                    marginRight: 6,
+                    verticalAlign: "middle",
+                    color: "#b45309",
+                  }}
+                />
                 {orderDetail.ghi_chu}
               </div>
             </div>
@@ -366,13 +448,18 @@ const ChiTietPhanPhoiPage = () => {
             <div className="ctpp-timeline-line" />
             {timeline.map((step, idx) => (
               <div className="ctpp-timeline-item" key={idx}>
-                <div className={`ctpp-timeline-dot${step.hoanThanh ? "" : " pending"}`} />
+                <div
+                  className={`ctpp-timeline-dot${step.hoanThanh ? "" : " pending"}`}
+                />
                 <div>
                   <div className="ctpp-timeline-header">
                     <span className="ctpp-timeline-title">{step.tieuDe}</span>
                     <span className="ctpp-timeline-time">{step.thoiGian}</span>
                     {step.hoanThanh && (
-                      <span className="ctpp-status-pill success" style={{ fontSize: 11 }}>
+                      <span
+                        className="ctpp-status-pill success"
+                        style={{ fontSize: 11 }}
+                      >
                         <CheckCircle2 size={11} /> Hoàn tất
                       </span>
                     )}

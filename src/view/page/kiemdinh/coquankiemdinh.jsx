@@ -589,7 +589,12 @@ function Coquankiemdinh() {
                 <img
                   src={`http://localhost:3000${user.anh_dai_dien}`}
                   alt="avatar"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    borderRadius: "50%",
+                  }}
                 />
               ) : (
                 (user?.ho_ten || "KD").slice(0, 2).toUpperCase()
@@ -803,7 +808,11 @@ function Coquankiemdinh() {
                                 Mã lô thu hoạch:{" "}
                                 <span className="text-meta-green">
                                   #{item.ma_lo_nong_san} (
-                                  {formatWeight(item.so_luong_hien_tai, item.don_vi_tinh)})
+                                  {formatWeight(
+                                    item.so_luong_hien_tai,
+                                    item.don_vi_tinh,
+                                  )}
+                                  )
                                 </span>
                               </p>
                               <p>
@@ -1483,7 +1492,7 @@ function Coquankiemdinh() {
                   <label>Ghi Chú Gửi Nông Dân Chuẩn Bị</label>
                   <textarea
                     rows="2"
-                    defaultValue="Giữ nguyên hiện trạng lô quả, xuất trình sổ nhật ký bón phân thuốc ngày lấy mẫu."
+                    placeholder="Nhập ghi chú"
                     className="form-control-textarea"
                   ></textarea>
                 </div>

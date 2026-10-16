@@ -12,6 +12,7 @@ import {
   X,
   Camera,
   LogOut,
+  ArrowLeft,
 } from "lucide-react";
 import "../css/trangcanhan.css";
 
@@ -157,33 +158,63 @@ const ProfilePage = () => {
       <header className="dashboard-header">
         <div className="header-left">
           <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
-          <span className="header-brand-title">AGRICHAIN PROFILE</span>
+          <span className="header-brand-title">AGRICHAIN</span>
         </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 14px",
-            border: "1px solid #fecaca",
-            background: "#fef2f2",
-            color: "#dc2626",
-            borderRadius: 8,
-            fontSize: 13.5,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          <LogOut size={16} />
-          Đăng xuất
-        </button>
+
+        <div className="header-right-actions">
+          <div
+            className="header-profile"
+            style={{ cursor: "pointer" }}
+            onClick={() => navigate("/trang-ca-nhan")}
+            title="Xem hồ sơ cá nhân"
+          >
+            <div className="avatar-circle">
+              {profile?.anh_dai_dien ? (
+                <img
+                  src={avatarUrl(profile.anh_dai_dien)}
+                  alt="avatar"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    borderRadius: "50%",
+                  }}
+                />
+              ) : (
+                <span className="avatar-initials">
+                  {(profile?.ho_ten || "ND").slice(0, 2).toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="profile-meta">
+              <span className="profile-name">
+                {profile?.ho_ten || "Nông Dân"}
+              </span>
+              <span className="profile-role">
+                {profile?.vai_tro_label || "Nông dân"}
+              </span>
+            </div>
+          </div>
+        </div>
       </header>
 
       {/* NỘI DUNG PROFILE */}
       <div className="profile-content-wrap">
-        {loading && <p style={{ padding: 24, color: "#6b7280" }}>Đang tải...</p>}
+        {/* Nút quay lại trang trước */}
+        <div className="back-navigation-container">
+          <button
+            type="button"
+            className="btn-back"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft size={16} />
+            Quay lại trang trước
+          </button>
+        </div>
+
+        {loading && (
+          <p style={{ padding: 24, color: "#6b7280" }}>Đang tải...</p>
+        )}
 
         {!loading && loadError && (
           <p style={{ padding: 24, color: "#dc2626" }}>{loadError}</p>
@@ -192,7 +223,9 @@ const ProfilePage = () => {
         {!loading && !loadError && profile && (
           <div className="profile-main-card">
             <div className="profile-header-banner">
-              <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "20px" }}
+              >
                 <div className="profile-avatar-wrap">
                   {profile.anh_dai_dien ? (
                     <img
@@ -218,7 +251,11 @@ const ProfilePage = () => {
                     className={`online-status-dot ${
                       profile.trang_thai === 1 ? "" : "offline"
                     }`}
-                    title={profile.trang_thai === 1 ? "Đang hoạt động" : "Tài khoản bị khóa"}
+                    title={
+                      profile.trang_thai === 1
+                        ? "Đang hoạt động"
+                        : "Tài khoản bị khóa"
+                    }
                     style={
                       profile.trang_thai === 1
                         ? undefined
@@ -348,7 +385,9 @@ const ProfilePage = () => {
                   <p className="profile-field-label">Trạng thái tài khoản</p>
                   <p
                     className="profile-field-value"
-                    style={{ color: profile.trang_thai === 1 ? "#16a34a" : "#dc2626" }}
+                    style={{
+                      color: profile.trang_thai === 1 ? "#16a34a" : "#dc2626",
+                    }}
                   >
                     {profile.trang_thai === 1 ? "Đang hoạt động" : "Đã bị khóa"}
                   </p>
@@ -368,7 +407,9 @@ const ProfilePage = () => {
                 </div>
                 <div>
                   <p className="profile-field-label">Địa chỉ</p>
-                  <p className="profile-field-value">{profile.dia_chi || "—"}</p>
+                  <p className="profile-field-value">
+                    {profile.dia_chi || "—"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -498,7 +539,10 @@ const ProfilePage = () => {
                     type="text"
                     value={editForm.so_dien_thoai}
                     onChange={(e) =>
-                      setEditForm({ ...editForm, so_dien_thoai: e.target.value })
+                      setEditForm({
+                        ...editForm,
+                        so_dien_thoai: e.target.value,
+                      })
                     }
                   />
                 </div>

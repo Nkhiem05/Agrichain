@@ -21,7 +21,8 @@ const LOAI_VAT_TU = ["PHAN_BON", "THUOC_BVTV"];
 const UPLOAD_DIR = path.join(__dirname, "../upload");
 
 // Đường dẫn ảnh lưu trong DB, ví dụ: /uploads/seasons/abc.jpg
-const toImagePath = (file) => (file ? `/uploads/seasons/${file.filename}` : null);
+const toImagePath = (file) =>
+  file ? `/uploads/seasons/${file.filename}` : null;
 
 // Xóa file ảnh trên đĩa (bỏ qua nếu không có hoặc nằm ngoài thư mục upload)
 const removeImageFile = async (imagePath) => {
@@ -33,7 +34,8 @@ const removeImageFile = async (imagePath) => {
   try {
     await fs.promises.unlink(fullPath);
   } catch (err) {
-    if (err.code !== "ENOENT") console.error("Không xóa được ảnh:", err.message);
+    if (err.code !== "ENOENT")
+      console.error("Không xóa được ảnh:", err.message);
   }
 };
 
@@ -815,9 +817,10 @@ const updateSeason = async (req, res) => {
       );
 
       // Danh sách vật tư gửi lên là danh sách đầy đủ -> thay thế toàn bộ
-      await connection.execute(`DELETE FROM mua_vu_vat_tu WHERE ma_mua_vu = ?`, [
-        maMuaVu,
-      ]);
+      await connection.execute(
+        `DELETE FROM mua_vu_vat_tu WHERE ma_mua_vu = ?`,
+        [maMuaVu],
+      );
       await insertMaterials(connection, maMuaVu, season.vat_tu);
 
       if (season.ma_thua_dat) {

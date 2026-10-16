@@ -205,9 +205,8 @@ export default function AdminDashboard() {
   const [newActor, setNewActor] = useState({
     vai_tro: "FARMER_COOP",
     ho_ten: "",
-    so_dien_thoai: "",
-    ten_nong_trai: "",
-    dia_diem_nong_trai: "",
+    ma_nguoi_dung: "",
+    ma_nong_trai: "",
   });
 
   const [newUser, setNewUser] = useState({
@@ -425,7 +424,8 @@ export default function AdminDashboard() {
         { method: "PUT", headers: authHeaders() },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể đổi trạng thái");
+      if (!data.success)
+        return alert(data.message || "Không thể đổi trạng thái");
       refreshAll();
     } catch (err) {
       alert("Không thể kết nối tới máy chủ");
@@ -439,7 +439,8 @@ export default function AdminDashboard() {
         { method: "PUT", headers: authHeaders() },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể đổi trạng thái");
+      if (!data.success)
+        return alert(data.message || "Không thể đổi trạng thái");
       refreshAll();
     } catch (err) {
       alert("Không thể kết nối tới máy chủ");
@@ -458,7 +459,8 @@ export default function AdminDashboard() {
         { method: "PUT", headers: authHeaders() },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể duyệt yêu cầu");
+      if (!data.success)
+        return alert(data.message || "Không thể duyệt yêu cầu");
       alert(
         `Đã duyệt! Tên đăng nhập: ${data.data.ten_dang_nhap} — Mật khẩu tạm: ${data.data.mat_khau_tam}\nHãy gửi thông tin này cho đơn vị đăng ký.`,
       );
@@ -481,7 +483,8 @@ export default function AdminDashboard() {
         },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể từ chối yêu cầu");
+      if (!data.success)
+        return alert(data.message || "Không thể từ chối yêu cầu");
       refreshAll();
     } catch (err) {
       alert("Không thể kết nối tới máy chủ");
@@ -490,16 +493,16 @@ export default function AdminDashboard() {
 
   const handleAddActor = async (e) => {
     e.preventDefault();
-    if (!newActor.ho_ten) return alert("Vui lòng điền tên đơn vị / đại diện");
-    if (
-      newActor.vai_tro === "FARMER_COOP" &&
-      (!newActor.ten_nong_trai || !newActor.dia_diem_nong_trai)
-    ) {
-      return alert("Vui lòng nhập tên nông trại và địa điểm");
+    if (!newActor.ma_nguoi_dung)
+      return alert("Vui lòng chọn tài khoản liên kết");
+    if (newActor.vai_tro === "FARMER_COOP") {
+      if (!newActor.ma_nong_trai) return alert("Vui lòng chọn nông trại");
+    } else if (!newActor.ho_ten) {
+      return alert("Vui lòng điền tên đơn vị / đại diện");
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/admin/tai-khoan`, {
+      const res = await fetch(`${API_URL}/api/admin/nong-trai`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify(newActor),
@@ -507,16 +510,13 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (!data.success) return alert(data.message || "Không thể tạo đơn vị");
 
-      alert(
-        `Đã tạo! Tên đăng nhập: ${data.data.ten_dang_nhap} — Mật khẩu tạm: ${data.data.mat_khau_tam}\nHãy gửi thông tin này cho đơn vị.`,
-      );
+      alert(data.message || "Đã tạo chủ thể và liên kết với tài khoản");
       setShowActorModal(false);
       setNewActor({
         vai_tro: "FARMER_COOP",
         ho_ten: "",
-        so_dien_thoai: "",
-        ten_nong_trai: "",
-        dia_diem_nong_trai: "",
+        ma_nguoi_dung: "",
+        ma_nong_trai: "",
       });
       refreshAll();
     } catch (err) {
@@ -544,7 +544,8 @@ export default function AdminDashboard() {
         body: JSON.stringify(newUser),
       });
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể tạo tài khoản");
+      if (!data.success)
+        return alert(data.message || "Không thể tạo tài khoản");
 
       alert(
         newUser.mat_khau
@@ -606,7 +607,8 @@ export default function AdminDashboard() {
         },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể cập nhật thông tin");
+      if (!data.success)
+        return alert(data.message || "Không thể cập nhật thông tin");
       setEditInfoUser(null);
       refreshAll();
     } catch (err) {
@@ -629,8 +631,11 @@ export default function AdminDashboard() {
         },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể đặt lại mật khẩu");
-      alert(`Đã đặt lại mật khẩu cho ${resetPasswordUser.ten_dang_nhap}!\nMật khẩu mới: ${data.data.mat_khau_moi}`);
+      if (!data.success)
+        return alert(data.message || "Không thể đặt lại mật khẩu");
+      alert(
+        `Đã đặt lại mật khẩu cho ${resetPasswordUser.ten_dang_nhap}!\nMật khẩu mới: ${data.data.mat_khau_moi}`,
+      );
       setResetPasswordUser(null);
       setResetPasswordValue("");
     } catch (err) {
@@ -661,7 +666,8 @@ export default function AdminDashboard() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể thêm danh mục");
+      if (!data.success)
+        return alert(data.message || "Không thể thêm danh mục");
 
       setShowCatModal(false);
       setNewCat({
@@ -683,7 +689,8 @@ export default function AdminDashboard() {
         { method: "PUT", headers: authHeaders() },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể đổi trạng thái");
+      if (!data.success)
+        return alert(data.message || "Không thể đổi trạng thái");
       fetchCatalog();
     } catch (err) {
       alert("Không thể kết nối tới máy chủ");
@@ -697,7 +704,8 @@ export default function AdminDashboard() {
         { method: "PUT", headers: authHeaders() },
       );
       const data = await res.json();
-      if (!data.success) return alert(data.message || "Không thể đổi trạng thái");
+      if (!data.success)
+        return alert(data.message || "Không thể đổi trạng thái");
       fetchCatalog();
     } catch (err) {
       alert("Không thể kết nối tới máy chủ");
@@ -744,7 +752,12 @@ export default function AdminDashboard() {
               <img
                 src={`http://localhost:3000${loggedInUser.anh_dai_dien}`}
                 alt="avatar"
-                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                }}
               />
             ) : (
               (loggedInUser?.ho_ten || "AD").slice(0, 2).toUpperCase()
@@ -884,28 +897,30 @@ export default function AdminDashboard() {
                       Nông trại đang canh tác
                     </span>
                     <div className="metric-number">
-                      {loadingOverview ? "…" : overview?.so_nong_trai ?? 0}{" "}
+                      {loadingOverview ? "…" : (overview?.so_nong_trai ?? 0)}{" "}
                       <span className="metric-unit">NÔNG TRẠI</span>
                     </div>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Mùa vụ đang chạy</span>
                     <div className="metric-number">
-                      {loadingOverview ? "…" : overview?.so_mua_vu ?? 0}{" "}
+                      {loadingOverview ? "…" : (overview?.so_mua_vu ?? 0)}{" "}
                       <span className="metric-unit">MÙA VỤ</span>
                     </div>
                   </div>
                   <div className="metric-card">
                     <span className="metric-title">Lô đang lưu thông</span>
                     <div className="metric-number">
-                      {loadingOverview ? "…" : overview?.so_lo_dang_luu_thong ?? 0}{" "}
+                      {loadingOverview
+                        ? "…"
+                        : (overview?.so_lo_dang_luu_thong ?? 0)}{" "}
                       <span className="metric-unit">LÔ</span>
                     </div>
                   </div>
                   <div className="metric-card warn">
                     <span className="metric-title">Cảnh báo cần xử lý</span>
                     <div className="metric-number">
-                      {loadingOverview ? "…" : overview?.so_canh_bao ?? 0}{" "}
+                      {loadingOverview ? "…" : (overview?.so_canh_bao ?? 0)}{" "}
                       <span className="metric-unit">MỤC</span>
                     </div>
                   </div>
@@ -1003,7 +1018,8 @@ export default function AdminDashboard() {
                     }}
                   >
                     {!loadingOverview &&
-                      Object.keys(overview?.lo_theo_chang || {}).length === 0 && (
+                      Object.keys(overview?.lo_theo_chang || {}).length ===
+                        0 && (
                         <p style={{ fontSize: 13, color: "#6b7280" }}>
                           Chưa có lô nào.
                         </p>
@@ -1072,7 +1088,8 @@ export default function AdminDashboard() {
                           Tổng số nông trại & đối tác
                         </span>
                         <div className="metric-number">
-                          {totalActors} <span className="metric-unit">ĐƠN VỊ</span>
+                          {totalActors}{" "}
+                          <span className="metric-unit">ĐƠN VỊ</span>
                         </div>
                       </div>
                       <div className="metric-card">
@@ -1080,7 +1097,9 @@ export default function AdminDashboard() {
                         <div className="metric-number">{activeActors}</div>
                       </div>
                       <div className="metric-card warn">
-                        <span className="metric-title">Đang bị vô hiệu hóa</span>
+                        <span className="metric-title">
+                          Đang bị vô hiệu hóa
+                        </span>
                         <div className="metric-number">
                           {totalActors - activeActors}{" "}
                           <span className="metric-unit">CHỦ THỂ</span>
@@ -1122,7 +1141,13 @@ export default function AdminDashboard() {
                       {accountRequests.length} hồ sơ
                     </span>
                   </h3>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                    }}
+                  >
                     {accountRequests.map((r) => (
                       <div
                         key={r.ma_yeu_cau}
@@ -1137,11 +1162,20 @@ export default function AdminDashboard() {
                         <div>
                           <strong style={{ fontSize: 13.5 }}>
                             {r.ten_co_so}{" "}
-                            <span className="status-pill gray" style={{ marginLeft: 6 }}>
+                            <span
+                              className="status-pill gray"
+                              style={{ marginLeft: 6 }}
+                            >
                               {r.vai_tro_label}
                             </span>
                           </strong>
-                          <p style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                          <p
+                            style={{
+                              fontSize: 12,
+                              color: "#6b7280",
+                              marginTop: 2,
+                            }}
+                          >
                             Đại diện: {r.ho_ten} · {r.so_dien_thoai} · {r.email}
                             <br />
                             Địa chỉ: {r.dia_chi}
@@ -1199,7 +1233,8 @@ export default function AdminDashboard() {
                           Đại diện: <strong>{farm.nguoi_dai_dien}</strong>
                         </span>
                         <span>
-                          Điện thoại: <strong>{farm.so_dien_thoai || "—"}</strong>
+                          Điện thoại:{" "}
+                          <strong>{farm.so_dien_thoai || "—"}</strong>
                         </span>
                         <span>
                           Địa điểm: <strong>{farm.dia_diem_nong_trai}</strong>
@@ -1207,23 +1242,29 @@ export default function AdminDashboard() {
                         <span>
                           Trạng thái:{" "}
                           <strong
-                            style={{ color: farm.trang_thai ? "#15803d" : "#dc2626" }}
+                            style={{
+                              color: farm.trang_thai ? "#15803d" : "#dc2626",
+                            }}
                           >
-                            {farm.trang_thai ? "Đang hoạt động" : "Đã vô hiệu hóa"}
+                            {farm.trang_thai
+                              ? "Đang hoạt động"
+                              : "Đã vô hiệu hóa"}
                           </strong>
                         </span>
                       </div>
 
                       <div className="card-desc-box">
-                        <strong>Hiện trạng:</strong> {farm.so_thua_dat} thửa đất ·{" "}
-                        {farm.so_mua_vu_dang_chay} mùa vụ đang canh tác
+                        <strong>Hiện trạng:</strong> {farm.so_thua_dat} thửa đất
+                        · {farm.so_mua_vu_dang_chay} mùa vụ đang canh tác
                       </div>
                     </div>
 
                     <div className="card-actions-col">
                       <button
                         className={
-                          farm.trang_thai ? "btn-action-retry" : "btn-action-view"
+                          farm.trang_thai
+                            ? "btn-action-retry"
+                            : "btn-action-view"
                         }
                         onClick={() => toggleFarmLock(farm.ma_nong_trai)}
                       >
@@ -1276,14 +1317,19 @@ export default function AdminDashboard() {
 
                       <div className="card-grid-info">
                         <span>
-                          Điện thoại: <strong>{org.so_dien_thoai || "—"}</strong>
+                          Điện thoại:{" "}
+                          <strong>{org.so_dien_thoai || "—"}</strong>
                         </span>
                         <span>
                           Trạng thái:{" "}
                           <strong
-                            style={{ color: org.trang_thai ? "#15803d" : "#dc2626" }}
+                            style={{
+                              color: org.trang_thai ? "#15803d" : "#dc2626",
+                            }}
                           >
-                            {org.trang_thai ? "Đang hoạt động" : "Đã vô hiệu hóa"}
+                            {org.trang_thai
+                              ? "Đang hoạt động"
+                              : "Đã vô hiệu hóa"}
                           </strong>
                         </span>
                       </div>
@@ -1292,7 +1338,9 @@ export default function AdminDashboard() {
                     <div className="card-actions-col">
                       <button
                         className={
-                          org.trang_thai ? "btn-action-retry" : "btn-action-view"
+                          org.trang_thai
+                            ? "btn-action-retry"
+                            : "btn-action-view"
                         }
                         onClick={() => toggleOrgLock(org.ma_nguoi_dung)}
                       >
@@ -1398,7 +1446,10 @@ export default function AdminDashboard() {
                             </span>
                           </td>
                           <td
-                            style={{ textAlign: "center", position: "relative" }}
+                            style={{
+                              textAlign: "center",
+                              position: "relative",
+                            }}
                           >
                             <div
                               className="dropdown-wrapper"
@@ -1491,7 +1542,9 @@ export default function AdminDashboard() {
                                   <button
                                     type="button"
                                     className={`dropdown-item ${
-                                      user.trang_thai === 1 ? "danger" : "success"
+                                      user.trang_thai === 1
+                                        ? "danger"
+                                        : "success"
                                     }`}
                                     onClick={() =>
                                       toggleUserStatus(user.ma_nguoi_dung)
@@ -1542,13 +1595,16 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {loadingCatalog && <p style={{ color: "#6b7280" }}>Đang tải...</p>}
+              {loadingCatalog && (
+                <p style={{ color: "#6b7280" }}>Đang tải...</p>
+              )}
 
               {!loadingCatalog && (
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(320px, 1fr))",
                     gap: 16,
                   }}
                 >
@@ -1577,7 +1633,13 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       {catalogProducts.length === 0 && (
-                        <div style={{ padding: "10px 16px", fontSize: 13, color: "#6b7280" }}>
+                        <div
+                          style={{
+                            padding: "10px 16px",
+                            fontSize: 13,
+                            color: "#6b7280",
+                          }}
+                        >
                           Chưa có giống cây trồng nào.
                         </div>
                       )}
@@ -1600,7 +1662,8 @@ export default function AdminDashboard() {
                           <span>
                             {item.ten_san_pham}
                             <small style={{ color: "#9ca3af", marginLeft: 6 }}>
-                              ({item.loai_san_pham} · {item.don_vi_tinh_mac_dinh})
+                              ({item.loai_san_pham} ·{" "}
+                              {item.don_vi_tinh_mac_dinh})
                             </small>
                           </span>
                           <button
@@ -1611,7 +1674,9 @@ export default function AdminDashboard() {
                               cursor: "pointer",
                               fontSize: 12,
                             }}
-                            onClick={() => toggleProductCatalog(item.ma_san_pham)}
+                            onClick={() =>
+                              toggleProductCatalog(item.ma_san_pham)
+                            }
                           >
                             {item.trang_thai ? "Ẩn" : "Hiện"}
                           </button>
@@ -1645,7 +1710,13 @@ export default function AdminDashboard() {
                     </div>
                     <div>
                       {catalogMaterials.length === 0 && (
-                        <div style={{ padding: "10px 16px", fontSize: 13, color: "#6b7280" }}>
+                        <div
+                          style={{
+                            padding: "10px 16px",
+                            fontSize: 13,
+                            color: "#6b7280",
+                          }}
+                        >
                           Chưa có vật tư nào.
                         </div>
                       )}
@@ -1683,7 +1754,9 @@ export default function AdminDashboard() {
                               cursor: "pointer",
                               fontSize: 12,
                             }}
-                            onClick={() => toggleMaterialCatalog(item.ma_vat_tu)}
+                            onClick={() =>
+                              toggleMaterialCatalog(item.ma_vat_tu)
+                            }
                           >
                             {item.trang_thai ? "Ẩn" : "Hiện"}
                           </button>
@@ -1732,7 +1805,9 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {loadingBatches && <p style={{ color: "#6b7280" }}>Đang tải...</p>}
+              {loadingBatches && (
+                <p style={{ color: "#6b7280" }}>Đang tải...</p>
+              )}
 
               {!loadingBatches && (
                 <div className="table-container">
@@ -1761,7 +1836,9 @@ export default function AdminDashboard() {
                           <td>{b.ten_san_pham}</td>
                           <td>
                             {b.ten_nong_trai || "—"}
-                            <small style={{ display: "block", color: "#6b7280" }}>
+                            <small
+                              style={{ display: "block", color: "#6b7280" }}
+                            >
                               {b.nguoi_quan_ly}
                             </small>
                           </td>
@@ -1867,7 +1944,9 @@ export default function AdminDashboard() {
                           </td>
                           <td>
                             {kd.ten_san_pham}
-                            <small style={{ display: "block", color: "#6b7280" }}>
+                            <small
+                              style={{ display: "block", color: "#6b7280" }}
+                            >
                               {kd.ma_lo_nong_san}
                             </small>
                           </td>
@@ -1928,7 +2007,9 @@ export default function AdminDashboard() {
               <div className="sticky-top-section">
                 <div className="metrics-row">
                   <div className="metric-card">
-                    <span className="metric-title">Chờ chấp nhận / lấy hàng</span>
+                    <span className="metric-title">
+                      Chờ chấp nhận / lấy hàng
+                    </span>
                     <div className="metric-number">
                       {(shipmentStatusCounts.CHO_CHAP_NHAN || 0) +
                         (shipmentStatusCounts.CHO_LAY_HANG || 0)}
@@ -1999,7 +2080,9 @@ export default function AdminDashboard() {
                           </td>
                           <td>
                             {vc.ten_san_pham}
-                            <small style={{ display: "block", color: "#6b7280" }}>
+                            <small
+                              style={{ display: "block", color: "#6b7280" }}
+                            >
                               {vc.ma_lo_nong_san}
                             </small>
                           </td>
@@ -2017,7 +2100,9 @@ export default function AdminDashboard() {
                               </small>
                             )}
                           </td>
-                          <td>{formatQuantity(vc.khoi_luong, vc.don_vi_tinh)}</td>
+                          <td>
+                            {formatQuantity(vc.khoi_luong, vc.don_vi_tinh)}
+                          </td>
                           <td>{formatDateTime(vc.thoi_gian_xuat)}</td>
                           <td>
                             <span
@@ -2248,7 +2333,9 @@ export default function AdminDashboard() {
                       selectedUserDetail.trang_thai === 1 ? "success" : "danger"
                     }`}
                   >
-                    {selectedUserDetail.trang_thai === 1 ? "Hoạt động" : "Bị khóa"}
+                    {selectedUserDetail.trang_thai === 1
+                      ? "Hoạt động"
+                      : "Bị khóa"}
                   </span>
                 </div>
               </div>
@@ -2359,7 +2446,10 @@ export default function AdminDashboard() {
                   type="text"
                   value={editInfoForm.ten_dang_nhap}
                   onChange={(e) =>
-                    setEditInfoForm({ ...editInfoForm, ten_dang_nhap: e.target.value })
+                    setEditInfoForm({
+                      ...editInfoForm,
+                      ten_dang_nhap: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -2380,7 +2470,10 @@ export default function AdminDashboard() {
                   type="text"
                   value={editInfoForm.so_dien_thoai}
                   onChange={(e) =>
-                    setEditInfoForm({ ...editInfoForm, so_dien_thoai: e.target.value })
+                    setEditInfoForm({
+                      ...editInfoForm,
+                      so_dien_thoai: e.target.value,
+                    })
                   }
                 />
               </div>
@@ -2434,7 +2527,8 @@ export default function AdminDashboard() {
                   onChange={(e) => setResetPasswordValue(e.target.value)}
                 />
                 <small style={{ color: "#6b7280", marginTop: 6, fontSize: 12 }}>
-                  Tối thiểu 6 ký tự nếu tự đặt. Mật khẩu cũ sẽ không còn dùng được.
+                  Tối thiểu 6 ký tự nếu tự đặt. Mật khẩu cũ sẽ không còn dùng
+                  được.
                 </small>
               </div>
             </div>
@@ -2474,7 +2568,13 @@ export default function AdminDashboard() {
                 <select
                   value={newActor.vai_tro}
                   onChange={(e) =>
-                    setNewActor({ ...newActor, vai_tro: e.target.value })
+                    setNewActor({
+                      ...newActor,
+                      vai_tro: e.target.value,
+                      ma_nguoi_dung: "",
+                      ma_nong_trai: "",
+                      ho_ten: "",
+                    })
                   }
                 >
                   {ROLE_OPTIONS.map((r) => (
@@ -2487,68 +2587,72 @@ export default function AdminDashboard() {
               <div className="form-group">
                 <label>
                   {newActor.vai_tro === "FARMER_COOP"
-                    ? "Họ tên đại diện (*)"
+                    ? "Nông trại (*)"
                     : "Tên đơn vị (*)"}
                 </label>
-                <input
-                  type="text"
-                  placeholder={
-                    newActor.vai_tro === "FARMER_COOP"
-                      ? "Nguyễn Văn A"
-                      : "Ví dụ: HTX Sơ Chế & Chế Biến Mekong"
-                  }
-                  value={newActor.ho_ten}
-                  onChange={(e) =>
-                    setNewActor({ ...newActor, ho_ten: e.target.value })
-                  }
-                  required
-                />
+                {newActor.vai_tro === "FARMER_COOP" ? (
+                  <select
+                    value={newActor.ma_nong_trai}
+                    onChange={(e) =>
+                      setNewActor({ ...newActor, ma_nong_trai: e.target.value })
+                    }
+                    required
+                  >
+                    <option value="">-- Chọn nông trại --</option>
+                    {farms
+                      .filter((f) => f.ma_nguoi_dung !== newActor.ma_nguoi_dung)
+                      .map((f) => (
+                        <option key={f.ma_nong_trai} value={f.ma_nong_trai}>
+                          {f.ten_nong_trai} ({f.ma_nong_trai}) — hiện thuộc:{" "}
+                          {f.nguoi_dai_dien}
+                        </option>
+                      ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Ví dụ: HTX Sơ Chế & Chế Biến Mekong"
+                    value={newActor.ho_ten}
+                    onChange={(e) =>
+                      setNewActor({ ...newActor, ho_ten: e.target.value })
+                    }
+                    required
+                  />
+                )}
               </div>
               <div className="form-group">
-                <label>Số điện thoại</label>
-                <input
-                  type="text"
-                  placeholder="09xxxxxxxx"
-                  value={newActor.so_dien_thoai}
-                  onChange={(e) =>
-                    setNewActor({ ...newActor, so_dien_thoai: e.target.value })
-                  }
-                />
+                <label>Tài khoản liên kết (*)</label>
+                <select
+                  value={newActor.ma_nguoi_dung}
+                  onChange={(e) => {
+                    const acc = users.find(
+                      (u) => u.ma_nguoi_dung === e.target.value,
+                    );
+                    setNewActor({
+                      ...newActor,
+                      ma_nguoi_dung: e.target.value,
+                      ho_ten: acc ? acc.ho_ten : "",
+                    });
+                  }}
+                  required
+                >
+                  <option value="">-- Chọn tài khoản --</option>
+                  {users
+                    .filter(
+                      (u) => u.vai_tro === newActor.vai_tro && u.trang_thai,
+                    )
+                    .map((u) => (
+                      <option key={u.ma_nguoi_dung} value={u.ma_nguoi_dung}>
+                        {u.ho_ten} ({u.ten_dang_nhap})
+                      </option>
+                    ))}
+                </select>
+                <small style={{ color: "#6b7280", marginTop: 6, fontSize: 12 }}>
+                  {newActor.vai_tro === "FARMER_COOP"
+                    ? "Một tài khoản nông dân có thể sở hữu nhiều nông trại."
+                    : "Mỗi tài khoản chỉ có một chủ thể duy nhất."}
+                </small>
               </div>
-              {newActor.vai_tro === "FARMER_COOP" && (
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label>Tên nông trại (*)</label>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: Vườn Trái Cây Hữu Cơ Nam Bộ"
-                      value={newActor.ten_nong_trai}
-                      onChange={(e) =>
-                        setNewActor({
-                          ...newActor,
-                          ten_nong_trai: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Địa điểm nông trại (*)</label>
-                    <input
-                      type="text"
-                      placeholder="Ví dụ: Cần Thơ"
-                      value={newActor.dia_diem_nong_trai}
-                      onChange={(e) =>
-                        setNewActor({
-                          ...newActor,
-                          dia_diem_nong_trai: e.target.value,
-                        })
-                      }
-                      required
-                    />
-                  </div>
-                </div>
-              )}
             </div>
             <div className="modal-footer">
               <button
@@ -2797,7 +2901,8 @@ export default function AdminDashboard() {
                   gap: 8,
                 }}
               >
-                <AlertTriangle size={18} /> Thu hồi hồ sơ {recallTarget.ma_kiem_dinh}
+                <AlertTriangle size={18} /> Thu hồi hồ sơ{" "}
+                {recallTarget.ma_kiem_dinh}
               </h3>
               <button
                 type="button"
