@@ -1,4 +1,5 @@
 const db = require("../../server/config/db");
+const { generateUniqueCode } = require("../utils/generateCode");
 
 /*
 ==================================================
@@ -152,19 +153,13 @@ const getFarmDetail = async (req, res) => {
 
 const createFarm = async (req, res) => {
   const {
-    ma_nong_trai,
     ma_nguoi_dung,
     ten_nong_trai,
     dia_diem_nong_trai,
     dien_tich_nong_trai,
   } = req.body;
 
-  if (
-    !ma_nong_trai ||
-    !ma_nguoi_dung ||
-    !ten_nong_trai ||
-    !dia_diem_nong_trai
-  ) {
+  if (!ma_nguoi_dung || !ten_nong_trai || !dia_diem_nong_trai) {
     return res.status(400).json({
       success: false,
       message: "Vui lòng nhập đầy đủ thông tin nông trại",
@@ -190,18 +185,57 @@ const createFarm = async (req, res) => {
   `;
 
   try {
-    await db.execute(sql, [
-      ma_nong_trai,
-      ma_nguoi_dung,
-      ten_nong_trai,
-      dia_diem_nong_trai,
-      dien_tich_nong_trai || null,
-      anh_nong_trai,
-    ]);
+    // Người quản lý chính là tài khoản đang đăng nhập (không chọn tay trên giao diện)
+    const [accounts] = await db.execute(
+      `
+      SELECT ma_nguoi_dung
+      FROM nguoi_dung
+      WHERE ma_nguoi_dung = ?
+        AND vai_tro = 'FARMER_COOP'
+        AND trang_thai = 1
+      LIMIT 1
+      `,
+      [ma_nguoi_dung],
+    );
+
+    if (accounts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Tài khoản không hợp lệ hoặc không phải nông dân",
+      });
+    }
+
+    // Mã nông trại do server sinh (NT001, NT002, ...); thử lại nếu 2 request cùng lúc sinh trùng mã
+    let ma_nong_trai;
+
+    for (let attempt = 1; ; attempt++) {
+      ma_nong_trai = await generateUniqueCode(
+        db,
+        "nong_trai",
+        "ma_nong_trai",
+        "NT",
+      );
+
+      try {
+        await db.execute(sql, [
+          ma_nong_trai,
+          ma_nguoi_dung,
+          ten_nong_trai,
+          dia_diem_nong_trai,
+          dien_tich_nong_trai || null,
+          anh_nong_trai,
+        ]);
+        break;
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY" && attempt < 3) continue;
+        throw err;
+      }
+    }
 
     return res.status(201).json({
       success: true,
       message: "Thêm nông trại thành công",
+      data: { ma_nong_trai },
     });
   } catch (err) {
     console.error("Lỗi thêm nông trại:", err);
@@ -333,6 +367,7 @@ const getPlots = async (req, res) => {
     LEFT JOIN mua_vu mv
       ON td.ma_thua_dat = mv.ma_thua_dat
       AND mv.trang_thai = 1
+      AND mv.trang_thai_thu_hoach <> 'DA_TAO_LO'
     WHERE td.ma_nong_trai = ?
     ORDER BY td.created_at DESC
   `;

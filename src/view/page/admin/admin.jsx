@@ -203,10 +203,9 @@ export default function AdminDashboard() {
 
   // ================= FORM STATES =================
   const [newActor, setNewActor] = useState({
-    vai_tro: "FARMER_COOP",
-    ho_ten: "",
     ma_nguoi_dung: "",
-    ma_nong_trai: "",
+    ten_nong_trai: "",
+    dia_diem_nong_trai: "",
   });
 
   const [newUser, setNewUser] = useState({
@@ -495,10 +494,8 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!newActor.ma_nguoi_dung)
       return alert("Vui lòng chọn tài khoản liên kết");
-    if (newActor.vai_tro === "FARMER_COOP") {
-      if (!newActor.ma_nong_trai) return alert("Vui lòng chọn nông trại");
-    } else if (!newActor.ho_ten) {
-      return alert("Vui lòng điền tên đơn vị / đại diện");
+    if (!newActor.ten_nong_trai.trim() || !newActor.dia_diem_nong_trai.trim()) {
+      return alert("Vui lòng nhập tên nông trại và địa điểm");
     }
 
     try {
@@ -510,13 +507,12 @@ export default function AdminDashboard() {
       const data = await res.json();
       if (!data.success) return alert(data.message || "Không thể tạo đơn vị");
 
-      alert(data.message || "Đã tạo chủ thể và liên kết với tài khoản");
+      alert(data.message || "Đã tạo nông trại và gắn vào tài khoản");
       setShowActorModal(false);
       setNewActor({
-        vai_tro: "FARMER_COOP",
-        ho_ten: "",
         ma_nguoi_dung: "",
-        ma_nong_trai: "",
+        ten_nong_trai: "",
+        dia_diem_nong_trai: "",
       });
       refreshAll();
     } catch (err) {
@@ -2564,83 +2560,29 @@ export default function AdminDashboard() {
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>Loại hình (*)</label>
-                <select
-                  value={newActor.vai_tro}
+                <label>Tên nông trại (*)</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Vườn Trái Cây Hữu Cơ Nam Bộ"
+                  value={newActor.ten_nong_trai}
                   onChange={(e) =>
-                    setNewActor({
-                      ...newActor,
-                      vai_tro: e.target.value,
-                      ma_nguoi_dung: "",
-                      ma_nong_trai: "",
-                      ho_ten: "",
-                    })
+                    setNewActor({ ...newActor, ten_nong_trai: e.target.value })
                   }
-                >
-                  {ROLE_OPTIONS.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>
-                  {newActor.vai_tro === "FARMER_COOP"
-                    ? "Nông trại (*)"
-                    : "Tên đơn vị (*)"}
-                </label>
-                {newActor.vai_tro === "FARMER_COOP" ? (
-                  <select
-                    value={newActor.ma_nong_trai}
-                    onChange={(e) =>
-                      setNewActor({ ...newActor, ma_nong_trai: e.target.value })
-                    }
-                    required
-                  >
-                    <option value="">-- Chọn nông trại --</option>
-                    {farms
-                      .filter((f) => f.ma_nguoi_dung !== newActor.ma_nguoi_dung)
-                      .map((f) => (
-                        <option key={f.ma_nong_trai} value={f.ma_nong_trai}>
-                          {f.ten_nong_trai} ({f.ma_nong_trai}) — hiện thuộc:{" "}
-                          {f.nguoi_dai_dien}
-                        </option>
-                      ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="Ví dụ: HTX Sơ Chế & Chế Biến Mekong"
-                    value={newActor.ho_ten}
-                    onChange={(e) =>
-                      setNewActor({ ...newActor, ho_ten: e.target.value })
-                    }
-                    required
-                  />
-                )}
+                  required
+                />
               </div>
               <div className="form-group">
                 <label>Tài khoản liên kết (*)</label>
                 <select
                   value={newActor.ma_nguoi_dung}
-                  onChange={(e) => {
-                    const acc = users.find(
-                      (u) => u.ma_nguoi_dung === e.target.value,
-                    );
-                    setNewActor({
-                      ...newActor,
-                      ma_nguoi_dung: e.target.value,
-                      ho_ten: acc ? acc.ho_ten : "",
-                    });
-                  }}
+                  onChange={(e) =>
+                    setNewActor({ ...newActor, ma_nguoi_dung: e.target.value })
+                  }
                   required
                 >
-                  <option value="">-- Chọn tài khoản --</option>
+                  <option value="">-- Chọn tài khoản nông dân --</option>
                   {users
-                    .filter(
-                      (u) => u.vai_tro === newActor.vai_tro && u.trang_thai,
-                    )
+                    .filter((u) => u.vai_tro === "FARMER_COOP" && u.trang_thai)
                     .map((u) => (
                       <option key={u.ma_nguoi_dung} value={u.ma_nguoi_dung}>
                         {u.ho_ten} ({u.ten_dang_nhap})
@@ -2648,10 +2590,23 @@ export default function AdminDashboard() {
                     ))}
                 </select>
                 <small style={{ color: "#6b7280", marginTop: 6, fontSize: 12 }}>
-                  {newActor.vai_tro === "FARMER_COOP"
-                    ? "Một tài khoản nông dân có thể sở hữu nhiều nông trại."
-                    : "Mỗi tài khoản chỉ có một chủ thể duy nhất."}
+                  Một tài khoản nông dân có thể sở hữu nhiều nông trại.
                 </small>
+              </div>
+              <div className="form-group">
+                <label>Địa điểm nông trại (*)</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: Cần Thơ"
+                  value={newActor.dia_diem_nong_trai}
+                  onChange={(e) =>
+                    setNewActor({
+                      ...newActor,
+                      dia_diem_nong_trai: e.target.value,
+                    })
+                  }
+                  required
+                />
               </div>
             </div>
             <div className="modal-footer">

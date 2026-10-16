@@ -328,6 +328,7 @@ const assertPlotAvailable = async (
     FROM mua_vu
     WHERE ma_thua_dat = ?
       AND trang_thai = 1
+      AND trang_thai_thu_hoach <> 'DA_TAO_LO'
       AND ma_mua_vu <> ?
     LIMIT 1
     `,
@@ -396,6 +397,7 @@ const releasePlotIfIdle = async (connection, maThuaDat) => {
     FROM mua_vu
     WHERE ma_thua_dat = ?
       AND trang_thai = 1
+      AND trang_thai_thu_hoach <> 'DA_TAO_LO'
     LIMIT 1
     `,
     [maThuaDat],

@@ -161,6 +161,7 @@ const getFarmDetail = async (req, res) => {
       LEFT JOIN mua_vu mv
         ON mv.ma_thua_dat = td.ma_thua_dat
         AND mv.trang_thai = 1
+        AND mv.trang_thai_thu_hoach <> 'DA_TAO_LO'
       WHERE td.ma_nong_trai = ?
       ORDER BY td.created_at ASC, td.ma_thua_dat ASC
       `,

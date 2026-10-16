@@ -1163,7 +1163,7 @@ const DashboardPage = () => {
     setEditingBatch(batch);
     setBatchForm({
       ma_mua_vu: batch.ma_mua_vu || "",
-      so_luong: batch.so_luong_hien_tai,
+      so_luong: batch.so_luong_hien_tai ?? "",
       ngay_thu_hoach: batch.ngay_thu_hoach || "",
     });
     fetchBatchSeasons();
@@ -1174,7 +1174,7 @@ const DashboardPage = () => {
     const { name, value } = e.target;
     setBatchForm((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: value ?? "",
     }));
   };
 
@@ -2977,7 +2977,7 @@ const DashboardPage = () => {
                       <label>Mùa vụ thu hoạch</label>
                       <select
                         name="ma_mua_vu"
-                        value={batchForm.ma_mua_vu}
+                        value={batchForm.ma_mua_vu ?? ""}
                         onChange={handleBatchInputChange}
                         disabled={!!editingBatch}
                       >
@@ -3034,7 +3034,7 @@ const DashboardPage = () => {
                     name="so_luong"
                     min="0"
                     step="any"
-                    value={batchForm.so_luong}
+                    value={batchForm.so_luong ?? ""}
                     onChange={handleBatchInputChange}
                   />
                 </div>
@@ -3044,7 +3044,7 @@ const DashboardPage = () => {
                   <input
                     type="date"
                     name="ngay_thu_hoach"
-                    value={batchForm.ngay_thu_hoach}
+                    value={batchForm.ngay_thu_hoach ?? ""}
                     onChange={handleBatchInputChange}
                   />
                 </div>

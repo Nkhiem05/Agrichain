@@ -420,7 +420,7 @@ const createBatch = async (req, res) => {
             `
             SELECT
               mv.loai_cay_trong,
-              mv.ma_lo_du_kien,
+              mv.ma_thua_dat,
               DATE_FORMAT(mv.ngay_gieo_trong, '%Y-%m-%d') AS ngay_gieo_trong,
               nt.ma_nguoi_dung
             FROM mua_vu mv
@@ -456,27 +456,12 @@ const createBatch = async (req, res) => {
             season.loai_cay_trong,
           );
 
-          // Dùng đúng mã lô dự kiến đã gán cho mùa vụ khi tạo mùa vụ;
-          // mùa vụ cũ chưa có mã (hoặc mã đã bị dùng) thì sinh mã mới như trước.
-          let newCode = season.ma_lo_du_kien;
-
-          if (newCode) {
-            const [used] = await connection.execute(
-              `SELECT ma_lo_nong_san FROM lo_nong_san WHERE ma_lo_nong_san = ? LIMIT 1`,
-              [newCode],
-            );
-
-            if (used.length > 0) newCode = null;
-          }
-
-          if (!newCode) {
-            newCode = await generateCode(
-              connection,
-              "lo_nong_san",
-              "ma_lo_nong_san",
-              "LO",
-            );
-          }
+          const newCode = await generateCode(
+            connection,
+            "lo_nong_san",
+            "ma_lo_nong_san",
+            "LO",
+          );
 
           await connection.execute(
             `
@@ -510,6 +495,29 @@ const createBatch = async (req, res) => {
             `UPDATE mua_vu SET trang_thai_thu_hoach = 'DA_TAO_LO' WHERE ma_mua_vu = ?`,
             [ma_mua_vu],
           );
+
+          // Đã thu hoạch xong: thửa đất trở về đất trống để tạo mùa vụ mới trên đó
+          // (trừ khi thửa còn mùa vụ khác chưa thu hoạch).
+          if (season.ma_thua_dat) {
+            const [stillUsed] = await connection.execute(
+              `
+              SELECT ma_mua_vu
+              FROM mua_vu
+              WHERE ma_thua_dat = ?
+                AND trang_thai = 1
+                AND trang_thai_thu_hoach <> 'DA_TAO_LO'
+              LIMIT 1
+              `,
+              [season.ma_thua_dat],
+            );
+
+            if (stillUsed.length === 0) {
+              await connection.execute(
+                `UPDATE thua_dat SET trang_thai = 'DAT_TRONG' WHERE ma_thua_dat = ?`,
+                [season.ma_thua_dat],
+              );
+            }
+          }
 
           return newCode;
         });

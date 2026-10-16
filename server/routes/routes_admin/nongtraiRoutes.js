@@ -7,6 +7,7 @@ const { checkAuth, requireRole } = require("../../midlewere/authMiddleware");
 router.use(checkAuth, requireRole("ADMIN"));
 
 router.get("/", nongtraiController.getFarms);
+router.post("/", nongtraiController.createActor);
 router.put("/:maNongTrai/khoa", nongtraiController.toggleFarmLock);
 
 module.exports = router;

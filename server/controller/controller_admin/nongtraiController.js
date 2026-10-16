@@ -1,4 +1,5 @@
 const db = require("../../config/db");
+const { generateUniqueCode } = require("../../utils/generateCode");
 
 /*
 ==================================================
@@ -26,6 +27,12 @@ const sendError = (res, err, logMessage, fallbackMessage) => {
     success: false,
     message: fallbackMessage,
   });
+};
+
+const cleanText = (value) => {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text === "" ? null : text;
 };
 
 const ROLE_LABELS = {
@@ -109,10 +116,10 @@ const toggleFarmLock = async (req, res) => {
 
     const next = farms[0].trang_thai ? 0 : 1;
 
-    await db.execute(`UPDATE nong_trai SET trang_thai = ? WHERE ma_nong_trai = ?`, [
-      next,
-      maNongTrai,
-    ]);
+    await db.execute(
+      `UPDATE nong_trai SET trang_thai = ? WHERE ma_nong_trai = ?`,
+      [next, maNongTrai],
+    );
 
     return res.json({
       success: true,
@@ -131,4 +138,75 @@ const toggleFarmLock = async (req, res) => {
   }
 };
 
-module.exports = { getFarms, toggleFarmLock };
+// Admin tạo nông trại mới và gắn luôn vào một tài khoản nông dân có sẵn:
+// một tài khoản nông dân có thể có nhiều nông trại, chủ tài khoản không cần tự tạo.
+const createActor = async (req, res) => {
+  try {
+    const ma_nguoi_dung = cleanText(req.body?.ma_nguoi_dung);
+    const ten_nong_trai = cleanText(req.body?.ten_nong_trai);
+    const dia_diem_nong_trai = cleanText(req.body?.dia_diem_nong_trai);
+
+    if (!ma_nguoi_dung)
+      throw new ApiError(400, "Vui lòng chọn tài khoản liên kết");
+    if (!ten_nong_trai || !dia_diem_nong_trai) {
+      throw new ApiError(400, "Vui lòng nhập tên nông trại và địa điểm");
+    }
+
+    const [accounts] = await db.execute(
+      `SELECT vai_tro, trang_thai FROM nguoi_dung WHERE ma_nguoi_dung = ? LIMIT 1`,
+      [ma_nguoi_dung],
+    );
+
+    if (accounts.length === 0)
+      throw new ApiError(404, "Không tìm thấy tài khoản");
+    if (accounts[0].vai_tro !== "FARMER_COOP") {
+      throw new ApiError(
+        400,
+        "Chỉ tài khoản nông dân mới có thể sở hữu nông trại",
+      );
+    }
+    if (!accounts[0].trang_thai) {
+      throw new ApiError(
+        400,
+        "Tài khoản đang bị khóa, không thể gắn nông trại",
+      );
+    }
+
+    // Mã nông trại do server sinh (NT001, NT002, ...); thử lại nếu 2 request cùng lúc sinh trùng mã
+    let ma_nong_trai;
+
+    for (let attempt = 1; ; attempt++) {
+      ma_nong_trai = await generateUniqueCode(
+        db,
+        "nong_trai",
+        "ma_nong_trai",
+        "NT",
+      );
+
+      try {
+        await db.execute(
+          `
+          INSERT INTO nong_trai
+          (ma_nong_trai, ma_nguoi_dung, ten_nong_trai, dia_diem_nong_trai, trang_thai)
+          VALUES (?, ?, ?, ?, 1)
+          `,
+          [ma_nong_trai, ma_nguoi_dung, ten_nong_trai, dia_diem_nong_trai],
+        );
+        break;
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY" && attempt < 3) continue;
+        throw err;
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Đã tạo nông trại và gắn vào tài khoản",
+      data: { ma_nguoi_dung, ma_nong_trai },
+    });
+  } catch (err) {
+    return sendError(res, err, "Lỗi tạo nông trại:", "Không thể tạo nông trại");
+  }
+};
+
+module.exports = { getFarms, toggleFarmLock, createActor };
