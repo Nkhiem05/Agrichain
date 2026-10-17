@@ -76,6 +76,15 @@ export const updateProcessingStage = async (maSoChe, giaiDoan) => {
   return parseJson(res);
 };
 
+export const updateProcessingBatch = async (maSoChe, payload) => {
+  const res = await fetch(`${API_URL}/so-che/${maSoChe}`, {
+    method: "PUT",
+    headers: jsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return parseJson(res);
+};
+
 export const deleteProcessingBatch = async (maSoChe) => {
   const res = await fetch(`${API_URL}/so-che/${maSoChe}`, {
     method: "DELETE",

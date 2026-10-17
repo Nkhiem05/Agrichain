@@ -150,10 +150,34 @@ const TraceDetailPage = ({ onBack }) => {
                   `${batch?.loai_san_pham} tiêu chuẩn kiểm định`}
               </p>
 
-              <div className="cert-status-badge">
-                <ShieldCheck size={16} /> Đạt Chứng Nhận{" "}
-                {audit?.tieu_chuan_dang_ky || "VietGAP"}
-              </div>
+              {(() => {
+                const revoked =
+                  audit?.trang_thai_ho_so === "THU_HOI" ||
+                  audit?.ket_luan === "REVOKED";
+                const passed = !revoked && audit?.ket_luan === "PASSED";
+                const failed = !revoked && audit?.ket_luan === "FAILED";
+                const label = passed
+                  ? `Đạt chứng nhận ${audit.tieu_chuan_dang_ky}`
+                  : failed
+                    ? `Không đạt kiểm định ${audit.tieu_chuan_dang_ky}`
+                    : revoked
+                      ? "Chứng nhận đã bị thu hồi"
+                      : "Chưa có kết quả kiểm định";
+                return (
+                  <div
+                    className="cert-status-badge"
+                    style={
+                      passed
+                        ? undefined
+                        : {
+                            color: failed || revoked ? "#dc2626" : "#6b7280",
+                          }
+                    }
+                  >
+                    <ShieldCheck size={16} /> {label}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="blockchain-card">
@@ -235,6 +259,27 @@ const TraceDetailPage = ({ onBack }) => {
                   <p className="audit-info-highlight">
                     {audit.ten_co_quan} - Mã hồ sơ: {audit.ma_ho_so}
                   </p>
+                  <p
+                    className={
+                      audit.ket_luan === "PASSED"
+                        ? "table-status-pass"
+                        : "table-status-fail"
+                    }
+                    style={{ margin: "4px 0 8px", fontWeight: 700 }}
+                  >
+                    Kết luận:{" "}
+                    {audit.ket_luan === "PASSED"
+                      ? "ĐẠT CHUẨN"
+                      : audit.ket_luan === "FAILED"
+                        ? "KHÔNG ĐẠT CHUẨN"
+                        : audit.trang_thai_ho_so === "THU_HOI" ||
+                            audit.ket_luan === "REVOKED"
+                          ? "CHỨNG THƯ ĐÃ BỊ THU HỒI"
+                          : audit.ket_luan}
+                    {audit.so_chung_nhan
+                      ? ` · Số chứng nhận ${audit.so_chung_nhan}`
+                      : ""}
+                  </p>
                   <div className="step-card-box bg-audit">
                     {audit.indicators && audit.indicators.length > 0 ? (
                       <table className="table-compact">
@@ -250,14 +295,22 @@ const TraceDetailPage = ({ onBack }) => {
                             <tr key={idx}>
                               <td>{ind.ten_chi_so}</td>
                               <td>{ind.gia_tri}</td>
-                              <td className="table-status-pass">Đạt chuẩn</td>
+                              <td
+                                className={
+                                  ind.dat
+                                    ? "table-status-pass"
+                                    : "table-status-fail"
+                                }
+                              >
+                                {ind.dat ? "Đạt chuẩn" : "Không đạt"}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     ) : (
                       <p className="empty-subtext">
-                        Đã công bố kết quả ({audit.ket_luan}).
+                        Cơ quan kiểm định đã công bố kết quả.
                       </p>
                     )}
                   </div>

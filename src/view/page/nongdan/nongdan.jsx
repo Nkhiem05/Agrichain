@@ -2150,14 +2150,23 @@ const DashboardPage = () => {
                                 );
                                 const status = inspection?.trang_thai_ho_so;
 
+                                const isFailed =
+                                  status === "DA_CONG_BO" &&
+                                  inspection?.ket_luan === "FAILED";
+
                                 if (
                                   status === "TU_CHOI" ||
-                                  status === "THU_HOI"
+                                  status === "THU_HOI" ||
+                                  isFailed
                                 ) {
                                   return (
                                     <span
                                       className="status-icon-modern danger"
-                                      title="Yêu cầu kiểm định bị từ chối"
+                                      title={
+                                        isFailed
+                                          ? "Kết luận kiểm định: không đạt chuẩn"
+                                          : "Yêu cầu kiểm định bị từ chối"
+                                      }
                                     >
                                       <XCircle size={16} />
                                     </span>
@@ -3211,8 +3220,9 @@ const DashboardPage = () => {
                 </select>
                 {!partnerError && readyBatches.length === 0 && (
                   <p style={{ color: "#6b7280", fontSize: 12, marginTop: 6 }}>
-                    Chưa có lô nào sẵn sàng. Lô phải còn ở nông trại, chưa có
-                    lệnh vận chuyển và không chờ kiểm định.
+                    Chưa có lô nào sẵn sàng. Lô phải còn ở nông trại, đã được
+                    kiểm định đạt chuẩn (chứng thư còn hiệu lực) và chưa có
+                    lệnh vận chuyển.
                   </p>
                 )}
               </div>

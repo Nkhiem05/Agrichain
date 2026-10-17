@@ -17,6 +17,7 @@ router.get("/so-che", sochedonggoiController.getProcessingBatches);
 router.post("/so-che", sochedonggoiController.createProcessingBatch);
 router.get("/so-che/:maSoChe/chi-tiet", sochedonggoiController.getBatchDetail);
 router.put("/so-che/:maSoChe/giai-doan", sochedonggoiController.updateProcessingStage);
+router.put("/so-che/:maSoChe", sochedonggoiController.updateProcessingBatch);
 router.delete("/so-che/:maSoChe", sochedonggoiController.deleteProcessingBatch);
 
 // 3. Tách / gộp lô

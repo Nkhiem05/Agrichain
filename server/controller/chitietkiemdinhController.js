@@ -130,11 +130,14 @@ const getChiTietKiemDinh = async (req, res) => {
        LEFT JOIN nguong_kiem_dinh_chuan n 
           ON cs.loai_chi_so = 'CO_DINH' 
           AND cs.ma_chi_so = n.ma_chi_so
+          AND cs.ten_chi_so = n.ten_chi_tiet_chat
           AND (n.tieu_chuan_ap_dung = ? OR n.tieu_chuan_ap_dung = 'TAT_CA')
           AND (n.ma_san_pham IS NULL OR n.ma_san_pham = ?)
           AND n.trang_thai = 1
        WHERE cs.ma_kiem_dinh = ?
-       ORDER BY cs.thu_tu ASC, cs.ma_chi_so_kd ASC`,
+       ORDER BY cs.thu_tu ASC, cs.ma_chi_so_kd ASC,
+                CASE WHEN n.tieu_chuan_ap_dung = 'TAT_CA' THEN 1 ELSE 0 END ASC,
+                n.ma_nguong ASC`,
       [data.tieu_chuan_dang_ky, data.ma_san_pham, data.ma_kiem_dinh],
     ); //[cite: 6]
 
@@ -209,4 +212,5 @@ const getChiTietKiemDinh = async (req, res) => {
 
 module.exports = {
   getChiTietKiemDinh,
+  evaluateResult,
 };

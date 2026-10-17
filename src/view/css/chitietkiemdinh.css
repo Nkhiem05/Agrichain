@@ -484,6 +484,32 @@
     margin-top: 16px;
   }
 
+  /* In / lưu PDF: bỏ thanh điều hướng, cho nội dung chảy qua nhiều trang */
+  @media print {
+    .dashboard-header,
+    .detail-top-nav {
+      display: none !important;
+    }
+
+    .detail-layout,
+    .detail-content-area,
+    .detail-container {
+      height: auto !important;
+      overflow: visible !important;
+    }
+
+    .info-section-card,
+    .cert-header-card,
+    .detail-table tr {
+      break-inside: avoid;
+    }
+
+    * {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+  }
+
   @media (max-width: 1024px) {
     .detail-grid {
       grid-template-columns: 1fr;

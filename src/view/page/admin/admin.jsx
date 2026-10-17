@@ -79,6 +79,7 @@ const INSPECTION_STATUS_LABELS = {
   DA_HEN_LICH: "Đã hẹn lịch",
   DA_LAY_MAU: "Đã lấy mẫu",
   DA_CONG_BO: "Đã công bố",
+  KHONG_DAT: "Không đạt",
   TU_CHOI: "Bị từ chối",
   THU_HOI: "Đã thu hồi",
 };
@@ -1883,10 +1884,13 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                   <div className="metric-card warn">
-                    <span className="metric-title">Đã thu hồi / từ chối</span>
+                    <span className="metric-title">
+                      Thu hồi / từ chối / không đạt
+                    </span>
                     <div className="metric-number">
                       {(inspectionStatusCounts.THU_HOI || 0) +
-                        (inspectionStatusCounts.TU_CHOI || 0)}{" "}
+                        (inspectionStatusCounts.TU_CHOI || 0) +
+                        (inspectionStatusCounts.KHONG_DAT || 0)}{" "}
                       <span className="metric-unit">HỒ SƠ</span>
                     </div>
                   </div>
@@ -1951,16 +1955,23 @@ export default function AdminDashboard() {
                           <td>
                             <span
                               className={`status-pill ${
-                                kd.trang_thai_ho_so === "DA_CONG_BO"
-                                  ? "success"
-                                  : kd.trang_thai_ho_so === "TU_CHOI" ||
-                                      kd.trang_thai_ho_so === "THU_HOI"
-                                    ? "danger"
-                                    : "warning"
+                                kd.trang_thai_ho_so === "DA_CONG_BO" &&
+                                kd.ket_luan === "FAILED"
+                                  ? "danger"
+                                  : kd.trang_thai_ho_so === "DA_CONG_BO"
+                                    ? "success"
+                                    : kd.trang_thai_ho_so === "TU_CHOI" ||
+                                        kd.trang_thai_ho_so === "THU_HOI"
+                                      ? "danger"
+                                      : "warning"
                               }`}
                             >
-                              {INSPECTION_STATUS_LABELS[kd.trang_thai_ho_so] ||
-                                kd.trang_thai_ho_so}
+                              {kd.trang_thai_ho_so === "DA_CONG_BO" &&
+                              kd.ket_luan === "FAILED"
+                                ? INSPECTION_STATUS_LABELS.KHONG_DAT
+                                : INSPECTION_STATUS_LABELS[
+                                    kd.trang_thai_ho_so
+                                  ] || kd.trang_thai_ho_so}
                             </span>
                             {kd.trang_thai_ho_so === "THU_HOI" &&
                               kd.ly_do_thu_hoi && (
@@ -1972,7 +1983,8 @@ export default function AdminDashboard() {
                               )}
                           </td>
                           <td style={{ textAlign: "center" }}>
-                            {kd.trang_thai_ho_so === "DA_CONG_BO" ? (
+                            {kd.trang_thai_ho_so === "DA_CONG_BO" &&
+                            kd.ket_luan === "PASSED" ? (
                               <button
                                 className="btn-action-retry"
                                 onClick={() => {

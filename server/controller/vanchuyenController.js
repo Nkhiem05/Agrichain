@@ -171,6 +171,32 @@ const getLotsInInspection = async (executor, lotCodes) => {
   }
 };
 
+// Những lô (trong danh sách) đã được cơ quan kiểm định công bố ĐẠT chuẩn và
+// chứng thư còn hiệu lực (chưa bị thu hồi, chưa hết hạn). Chỉ những lô này mới
+// được tạo lệnh vận chuyển. Bảng kiểm định chưa có -> không lô nào đủ điều kiện.
+const getCertifiedLots = async (executor, lotCodes) => {
+  if (lotCodes.length === 0) return new Set();
+
+  try {
+    const [rows] = await executor.query(
+      `
+      SELECT DISTINCT ma_lo_nong_san
+      FROM kiem_dinh_lo_hang
+      WHERE ma_lo_nong_san IN (?)
+        AND trang_thai_ho_so = 'DA_CONG_BO'
+        AND ket_luan = 'PASSED'
+        AND (hieu_luc_den IS NULL OR hieu_luc_den >= CURDATE())
+      `,
+      [lotCodes],
+    );
+
+    return new Set(rows.map((row) => row.ma_lo_nong_san));
+  } catch (err) {
+    if (err.code === "ER_NO_SUCH_TABLE") return new Set();
+    throw err;
+  }
+};
+
 const ORDER_SELECT = `
   SELECT
     v.ma_van_don,
@@ -295,9 +321,19 @@ const getReadyBatches = async (req, res) => {
       rows.map((row) => row.ma_lo_nong_san),
     );
 
+    // Chỉ lô đã kiểm định đạt chuẩn mới được vận chuyển
+    const certified = await getCertifiedLots(
+      db,
+      rows.map((row) => row.ma_lo_nong_san),
+    );
+
     return res.json({
       success: true,
-      data: rows.filter((row) => !inInspection.has(row.ma_lo_nong_san)),
+      data: rows.filter(
+        (row) =>
+          !inInspection.has(row.ma_lo_nong_san) &&
+          certified.has(row.ma_lo_nong_san),
+      ),
     });
   } catch (err) {
     return sendError(
@@ -425,6 +461,13 @@ const createOrder = async (req, res) => {
             throw new ApiError(
               409,
               "Lô đang có hồ sơ kiểm định chưa hoàn tất, chưa thể vận chuyển",
+            );
+          }
+
+          if (!(await getCertifiedLots(connection, [ma_lo_nong_san])).size) {
+            throw new ApiError(
+              409,
+              "Lô chưa được kiểm định đạt chuẩn (hoặc chứng thư đã bị thu hồi/hết hạn), chưa thể tạo lệnh vận chuyển",
             );
           }
 

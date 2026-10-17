@@ -68,7 +68,11 @@ const getInspections = async (req, res) => {
     `;
     const values = [];
 
-    if (trangThai) {
+    if (trangThai === "KHONG_DAT") {
+      sql += ` AND kd.trang_thai_ho_so = 'DA_CONG_BO' AND kd.ket_luan = 'FAILED'`;
+    } else if (trangThai === "DA_CONG_BO") {
+      sql += ` AND kd.trang_thai_ho_so = 'DA_CONG_BO' AND kd.ket_luan = 'PASSED'`;
+    } else if (trangThai) {
       sql += ` AND kd.trang_thai_ho_so = ?`;
       values.push(trangThai);
     }
@@ -78,7 +82,12 @@ const getInspections = async (req, res) => {
     const [rows] = await db.query(sql, values);
 
     const [statRows] = await db.query(
-      `SELECT trang_thai_ho_so, COUNT(*) AS n FROM kiem_dinh_lo_hang GROUP BY trang_thai_ho_so`,
+      `SELECT
+         CASE WHEN trang_thai_ho_so = 'DA_CONG_BO' AND ket_luan = 'FAILED'
+              THEN 'KHONG_DAT' ELSE trang_thai_ho_so END AS trang_thai_ho_so,
+         COUNT(*) AS n
+       FROM kiem_dinh_lo_hang
+       GROUP BY 1`,
     );
 
     return res.json({
@@ -101,7 +110,7 @@ const getInspections = async (req, res) => {
   }
 };
 
-// Chỉ thu hồi được hồ sơ đã công bố chứng nhận (DA_CONG_BO)
+// Chỉ thu hồi được hồ sơ đã công bố chứng nhận ĐẠT (DA_CONG_BO + PASSED)
 const recallInspection = async (req, res) => {
   const { maKiemDinh } = req.params;
   const ly_do = cleanText(req.body?.ly_do_thu_hoi);
@@ -112,7 +121,7 @@ const recallInspection = async (req, res) => {
     }
 
     const [rows] = await db.execute(
-      `SELECT trang_thai_ho_so FROM kiem_dinh_lo_hang WHERE ma_kiem_dinh = ? LIMIT 1`,
+      `SELECT trang_thai_ho_so, ket_luan FROM kiem_dinh_lo_hang WHERE ma_kiem_dinh = ? LIMIT 1`,
       [maKiemDinh],
     );
 
@@ -120,10 +129,10 @@ const recallInspection = async (req, res) => {
       throw new ApiError(404, "Không tìm thấy hồ sơ kiểm định");
     }
 
-    if (rows[0].trang_thai_ho_so !== "DA_CONG_BO") {
+    if (rows[0].trang_thai_ho_so !== "DA_CONG_BO" || rows[0].ket_luan !== "PASSED") {
       throw new ApiError(
         409,
-        "Chỉ thu hồi được hồ sơ đã công bố chứng nhận (DA_CONG_BO)",
+        "Chỉ thu hồi được hồ sơ đã công bố chứng nhận đạt chuẩn",
       );
     }
 

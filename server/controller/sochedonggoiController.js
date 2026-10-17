@@ -507,6 +507,80 @@ const updateProcessingStage = async (req, res) => {
   }
 };
 
+// Sửa thông tin mô tả của lô sơ chế (tên gọi, khu vực, quy cách). Không sửa khối lượng:
+// khối lượng gắn với lô nguồn và liên kết nguồn gốc, muốn đổi thì xóa lô rồi tạo lại.
+const MAX_TIEU_DE = 255;
+const MAX_KHU_VUC = 150;
+const MAX_QUY_CACH = 2000;
+
+const updateProcessingBatch = async (req, res) => {
+  const { maSoChe } = req.params;
+
+  try {
+    const maCoSo = getProcessorId(req);
+    const tieu_de = cleanText(req.body?.tieu_de);
+    const khu_vuc_so_che = cleanText(req.body?.khu_vuc_so_che);
+    const quy_cach_tieu_chuan = cleanText(req.body?.quy_cach_tieu_chuan);
+
+    if (!tieu_de) throw new ApiError(400, "Vui lòng nhập tên gọi lô sơ chế");
+    if (tieu_de.length > MAX_TIEU_DE) {
+      throw new ApiError(400, `Tên gọi tối đa ${MAX_TIEU_DE} ký tự`);
+    }
+    if (khu_vuc_so_che && khu_vuc_so_che.length > MAX_KHU_VUC) {
+      throw new ApiError(400, `Khu vực sơ chế tối đa ${MAX_KHU_VUC} ký tự`);
+    }
+    if (quy_cach_tieu_chuan && quy_cach_tieu_chuan.length > MAX_QUY_CACH) {
+      throw new ApiError(400, `Quy cách tối đa ${MAX_QUY_CACH} ký tự`);
+    }
+
+    await withTransaction(async (connection) => {
+      const [rows] = await connection.execute(
+        `
+        SELECT sc.ma_lo_moi, lo.tinh_trang_su_dung
+        FROM so_che_lo_hang sc
+        JOIN lo_nong_san lo ON sc.ma_lo_moi = lo.ma_lo_nong_san
+        WHERE sc.ma_so_che = ? AND sc.ma_co_so = ?
+        LIMIT 1
+        FOR UPDATE
+        `,
+        [maSoChe, maCoSo],
+      );
+
+      if (rows.length === 0) {
+        throw new ApiError(404, "Không tìm thấy lô sơ chế");
+      }
+
+      // Lô đã bị tách/gộp/hủy thì thông tin gốc đã nằm trong truy vết, không sửa nữa
+      if (rows[0].tinh_trang_su_dung !== "ACTIVE") {
+        throw new ApiError(409, "Lô đã được tách/gộp hoặc không còn khả dụng, không thể sửa thông tin");
+      }
+
+      // Đã bàn giao vận chuyển thì các bên khác đã nhìn thấy thông tin này
+      const [shipped] = await connection.execute(
+        `SELECT ma_van_don FROM lenh_van_chuyen WHERE ma_lo_nong_san = ? AND trang_thai NOT IN ('TU_CHOI', 'DA_HUY') LIMIT 1`,
+        [rows[0].ma_lo_moi],
+      );
+
+      if (shipped.length > 0) {
+        throw new ApiError(409, "Lô đã có lệnh bàn giao vận chuyển, không thể sửa thông tin");
+      }
+
+      await connection.execute(
+        `
+        UPDATE so_che_lo_hang
+        SET tieu_de = ?, khu_vuc_so_che = ?, quy_cach_tieu_chuan = ?
+        WHERE ma_so_che = ?
+        `,
+        [tieu_de, khu_vuc_so_che, quy_cach_tieu_chuan, maSoChe],
+      );
+    });
+
+    return res.json({ success: true, message: "Đã cập nhật thông tin lô sơ chế" });
+  } catch (err) {
+    return sendError(res, err, "Lỗi sửa thông tin lô sơ chế:", "Không thể sửa thông tin lô sơ chế");
+  }
+};
+
 const deleteProcessingBatch = async (req, res) => {
   const { maSoChe } = req.params;
 
@@ -1195,6 +1269,7 @@ module.exports = {
   getProcessingBatches,
   createProcessingBatch,
   updateProcessingStage,
+  updateProcessingBatch,
   deleteProcessingBatch,
   getSplitMergeLots,
   getSplitMergeLog,

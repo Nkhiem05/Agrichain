@@ -39,6 +39,7 @@ import {
   fetchProcessingBatches,
   createProcessingBatch,
   updateProcessingStage,
+  updateProcessingBatch,
   deleteProcessingBatch,
   fetchSplitMergeLots,
   fetchSplitMergeLog,
@@ -115,6 +116,7 @@ const ProcessingPage = () => {
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showSplitModal, setShowSplitModal] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
 
@@ -146,6 +148,15 @@ const ProcessingPage = () => {
     tieu_de: "",
     khoi_luong_dau_vao: "",
     khu_vuc_so_che: "Dây chuyền rửa Ozon A",
+    quy_cach_tieu_chuan: "",
+  });
+
+  // Sửa thông tin lô sơ chế (tên gọi, khu vực, quy cách)
+  const [editForm, setEditForm] = useState({
+    ma_so_che: "",
+    ma_lo_moi: "",
+    tieu_de: "",
+    khu_vuc_so_che: "",
     quy_cach_tieu_chuan: "",
   });
 
@@ -320,6 +331,35 @@ const ProcessingPage = () => {
       alert("Đã tạo lô sơ chế thành công!");
     } catch (err) {
       alert(err.message || "Không thể tạo lô sơ chế");
+    }
+  };
+
+  const handleOpenEditModal = (batch) => {
+    setEditForm({
+      ma_so_che: batch.ma_so_che,
+      ma_lo_moi: batch.ma_lo_moi,
+      tieu_de: batch.tieu_de || "",
+      khu_vuc_so_che: batch.khu_vuc_so_che || "",
+      quy_cach_tieu_chuan: batch.quy_cach_tieu_chuan || "",
+    });
+    setShowEditModal(true);
+    setOpenDropdownId(null);
+  };
+
+  const handleSubmitEdit = async () => {
+    if (!editForm.tieu_de.trim()) return alert("Vui lòng nhập tên gọi lô sơ chế!");
+
+    try {
+      await updateProcessingBatch(editForm.ma_so_che, {
+        tieu_de: editForm.tieu_de.trim(),
+        khu_vuc_so_che: editForm.khu_vuc_so_che.trim(),
+        quy_cach_tieu_chuan: editForm.quy_cach_tieu_chuan.trim(),
+      });
+      setShowEditModal(false);
+      await loadAll();
+      alert("Đã cập nhật thông tin lô sơ chế!");
+    } catch (err) {
+      alert(err.message || "Không thể cập nhật thông tin lô sơ chế");
     }
   };
 
@@ -889,6 +929,19 @@ const ProcessingPage = () => {
                                       >
                                         <Eye size={15} /> Xem chi tiết
                                       </button>
+
+                                      {/* Lô đã đóng gói mà không còn trong danh sách sẵn sàng bàn giao
+                                          (đã bàn giao) thì không sửa thông tin nữa */}
+                                      {(!isPackaged ||
+                                        readyToShip.some((r) => r.ma_so_che === b.ma_so_che)) && (
+                                        <button
+                                          type="button"
+                                          className="dropdown-item-btn"
+                                          onClick={() => handleOpenEditModal(b)}
+                                        >
+                                          <FileText size={15} /> Sửa thông tin
+                                        </button>
+                                      )}
 
                                       {!isPackaged && (
                                         <button
@@ -1573,6 +1626,70 @@ const ProcessingPage = () => {
                 </button>
                 <button className="btn-save" onClick={handleSubmitCreate}>
                   Xác Nhận Tạo Lô
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ================= MODAL: SỬA THÔNG TIN LÔ SƠ CHẾ ================= */}
+        {showEditModal && (
+          <div className="modal-overlay">
+            <div className="modal-container">
+              <div className="modal-header">
+                <h3>
+                  <Edit3 size={18} color="#2e8b57" /> Sửa Thông Tin Lô Sơ Chế
+                </h3>
+                <button className="modal-close-btn" onClick={() => setShowEditModal(false)}>
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="modal-body">
+                <p style={{ color: "#4b5563", marginBottom: "12px" }}>
+                  Lô sơ chế <strong style={{ color: "#2e8b57" }}>{editForm.ma_so_che}</strong> (mã lô{" "}
+                  {editForm.ma_lo_moi}). Khối lượng không sửa được ở đây; nếu nhập sai, hãy xóa lô và tạo lại.
+                </p>
+                <div className="form-group">
+                  <label>Tên Gọi Lô Sơ Chế (*)</label>
+                  <input
+                    type="text"
+                    maxLength={255}
+                    value={editForm.tieu_de}
+                    onChange={(e) => setEditForm({ ...editForm, tieu_de: e.target.value })}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Khu Vực Sơ Chế</label>
+                  <input
+                    type="text"
+                    list="danh-sach-khu-vuc-so-che"
+                    maxLength={150}
+                    placeholder="Dây chuyền rửa Ozon A"
+                    value={editForm.khu_vuc_so_che}
+                    onChange={(e) => setEditForm({ ...editForm, khu_vuc_so_che: e.target.value })}
+                  />
+                  <datalist id="danh-sach-khu-vuc-so-che">
+                    <option value="Dây chuyền rửa Ozon A" />
+                    <option value="Khu đóng thùng lạnh B" />
+                  </datalist>
+                </div>
+                <div className="form-group">
+                  <label>Quy Cách & Tiêu Chuẩn</label>
+                  <textarea
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Phân loại kích thước > 250g, khử khuẩn ozon..."
+                    value={editForm.quy_cach_tieu_chuan}
+                    onChange={(e) => setEditForm({ ...editForm, quy_cach_tieu_chuan: e.target.value })}
+                  ></textarea>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-cancel" onClick={() => setShowEditModal(false)}>
+                  Hủy
+                </button>
+                <button className="btn-save" onClick={handleSubmitEdit}>
+                  Lưu Thay Đổi
                 </button>
               </div>
             </div>

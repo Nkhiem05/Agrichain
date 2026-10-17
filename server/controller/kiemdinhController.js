@@ -14,7 +14,13 @@ const taidlyeucaukiemdinh = async (req, res) => {
         kd.tieu_chuan_dang_ky,
         kd.noi_dung_de_nghi,
         kd.trang_thai_ho_so,
+        kd.ket_luan,
+        kd.so_chung_nhan,
+        DATE_FORMAT(kd.hieu_luc_tu, '%Y-%m-%d') AS hieu_luc_tu,
+        DATE_FORMAT(kd.hieu_luc_den, '%Y-%m-%d') AS hieu_luc_den,
+        kd.updated_at AS ngay_cong_bo,
         kd.created_at AS ngay_nop_don,
+        co_quan.ho_ten AS ten_co_quan,
         lo.so_luong_hien_tai,
         lo.don_vi_tinh,
         sp.ten_san_pham,
@@ -31,6 +37,7 @@ const taidlyeucaukiemdinh = async (req, res) => {
       LEFT JOIN nong_trai nt ON mv.ma_nong_trai = nt.ma_nong_trai
       LEFT JOIN thua_dat td ON mv.ma_thua_dat = td.ma_thua_dat
       LEFT JOIN nguoi_dung nd ON lo.ma_nguoi_quan_ly = nd.ma_nguoi_dung
+      LEFT JOIN nguoi_dung co_quan ON kd.ma_co_quan = co_quan.ma_nguoi_dung
       WHERE 1=1
     `;
 
@@ -351,18 +358,78 @@ const saveTestIndicators = async (req, res) => {
   }
 };
 
-// Cập nhật trạng thái công bố hoặc thu hồi
+// Sinh số chứng nhận dạng CN-2026-000001 (tăng dần theo năm, không trùng)
+const generateCertificateNumber = async (executor) => {
+  const year = new Date().getFullYear();
+  return generateUniqueCode(
+    executor,
+    "kiem_dinh_lo_hang",
+    "so_chung_nhan",
+    `CN-${year}-`,
+    6,
+  );
+};
+
+// Cập nhật trạng thái công bố (đạt / không đạt) hoặc thu hồi
+//   status = "accept" : công bố ĐẠT  -> cấp số chứng nhận, hiệu lực 12 tháng
+//   status = "fail"   : công bố KHÔNG ĐẠT -> lưu kết luận FAILED, không cấp chứng thư
+//   status khác       : yêu cầu thu hồi (kèm lý do)
 const updateInspectionStatus = async (req, res) => {
   const { code } = req.query;
   const { status, message } = req.body;
 
   try {
+    if (!code) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Thiếu mã kiểm định" });
+    }
+
+    if (status === "accept" || status === "fail") {
+      // Chỉ công bố khi hồ sơ đã lấy mẫu và nhập chỉ số (DA_LAY_MAU)
+      const [rows] = await db.query(
+        `SELECT trang_thai_ho_so FROM kiem_dinh_lo_hang WHERE ma_kiem_dinh = ?`,
+        [code],
+      );
+      if (rows.length === 0) {
+        return res
+          .status(404)
+          .json({ status: false, message: "Không tìm thấy hồ sơ kiểm định" });
+      }
+      if (rows[0].trang_thai_ho_so !== "DA_LAY_MAU") {
+        return res.status(409).json({
+          status: false,
+          message:
+            "Chỉ công bố được hồ sơ đã lấy mẫu và nhập chỉ số kiểm định",
+        });
+      }
+    }
+
     if (status === "accept") {
-      const sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so = 'DA_CONG_BO', ket_luan = 'PASSED', updated_at = CURRENT_TIMESTAMP WHERE ma_kiem_dinh = ?;`;
+      const soChungNhan = await generateCertificateNumber(db);
+      const sql = `UPDATE kiem_dinh_lo_hang
+        SET trang_thai_ho_so = 'DA_CONG_BO', ket_luan = 'PASSED',
+            so_chung_nhan = ?, hieu_luc_tu = CURDATE(),
+            hieu_luc_den = DATE_ADD(CURDATE(), INTERVAL 12 MONTH),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE ma_kiem_dinh = ? AND trang_thai_ho_so = 'DA_LAY_MAU'`;
+      const [result] = await db.query(sql, [soChungNhan, code]);
+      if (result.affectedRows > 0) {
+        return res.status(200).json({
+          message: `Công bố chứng nhận thành công (số chứng nhận ${soChungNhan})`,
+          status: true,
+          so_chung_nhan: soChungNhan,
+        });
+      }
+    } else if (status === "fail") {
+      const sql = `UPDATE kiem_dinh_lo_hang
+        SET trang_thai_ho_so = 'DA_CONG_BO', ket_luan = 'FAILED',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE ma_kiem_dinh = ? AND trang_thai_ho_so = 'DA_LAY_MAU'`;
       const [result] = await db.query(sql, [code]);
       if (result.affectedRows > 0) {
         return res.status(200).json({
-          message: "Công bố chứng nhận thành công",
+          message: "Đã công bố kết luận KHÔNG ĐẠT cho lô hàng",
           status: true,
         });
       }
@@ -376,6 +443,11 @@ const updateInspectionStatus = async (req, res) => {
         });
       }
     }
+
+    return res.status(409).json({
+      status: false,
+      message: "Không cập nhật được hồ sơ, vui lòng tải lại danh sách",
+    });
   } catch (error) {
     console.error("Lỗi cập nhật trạng thái kiểm định:", error);
     return res.status(500).json({ status: false, message: "Lỗi hệ thống" });
@@ -406,7 +478,7 @@ const getPublishedCertificates = async (req, res) => {
       LEFT JOIN mua_vu mv ON lo.ma_mua_vu = mv.ma_mua_vu
       LEFT JOIN nong_trai nt ON mv.ma_nong_trai = nt.ma_nong_trai
       LEFT JOIN nguoi_dung nd ON lo.ma_nguoi_quan_ly = nd.ma_nguoi_dung
-      WHERE kd.trang_thai_ho_so = 'DA_CONG_BO'
+      WHERE kd.trang_thai_ho_so = 'DA_CONG_BO' AND kd.ket_luan = 'PASSED'
     `;
 
     const values = [];

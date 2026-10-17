@@ -183,9 +183,23 @@ const fetchRevokedCertificatesApi = async (maCoQuan) => {
   }
 };
 
+const formatDateVN = (value) => {
+  if (!value) return "";
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("vi-VN");
+};
+
 const exportInspectionCertificateWord = async (item) => {
   if (!item) {
     alert("Không tìm thấy thông tin lô hàng để xuất báo cáo!");
+    return;
+  }
+
+  // Chỉ lô đã công bố ĐẠT mới có chứng thư để xuất
+  if (item.ket_luan !== "PASSED" || !item.so_chung_nhan) {
+    alert("Chỉ xuất được chứng thư cho lô đã được công bố đạt chuẩn.");
     return;
   }
 
@@ -330,7 +344,7 @@ const exportInspectionCertificateWord = async (item) => {
                   new TableCell({
                     width: { size: 65, type: WidthType.PERCENTAGE },
                     children: [
-                      new Paragraph(item.so_chung_nhan || "VG-2026-8812"),
+                      new Paragraph(item.so_chung_nhan),
                     ],
                   }),
                 ],
@@ -379,7 +393,7 @@ const exportInspectionCertificateWord = async (item) => {
                     children: [
                       new Paragraph(
                         item.hieu_luc_tu && item.hieu_luc_den
-                          ? `${new Date(item.hieu_luc_tu).toLocaleDateString("vi-VN")} - ${new Date(item.hieu_luc_den).toLocaleDateString("vi-VN")}`
+                          ? `${formatDateVN(item.hieu_luc_tu)} - ${formatDateVN(item.hieu_luc_den)}`
                           : "12 tháng kể từ ngày cấp",
                       ),
                     ],
@@ -438,7 +452,9 @@ const exportInspectionCertificateWord = async (item) => {
                         alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({
-                            text: "TRUNG TÂM GIÁM ĐỊNH",
+                            text: (
+                              item.ten_co_quan || "CƠ QUAN KIỂM ĐỊNH"
+                            ).toUpperCase(),
                             bold: true,
                           }),
                         ],
@@ -447,7 +463,11 @@ const exportInspectionCertificateWord = async (item) => {
                         alignment: AlignmentType.CENTER,
                         children: [
                           new TextRun({
-                            text: "(Đã ký số điện tử trên AgriChain)",
+                            text: `(Chứng thư điện tử cấp trên hệ thống AgriChain${
+                              item.ngay_cong_bo
+                                ? `, ngày ${formatDateVN(item.ngay_cong_bo)}`
+                                : ""
+                            })`,
                             italics: true,
                             size: 20,
                           }),

@@ -275,11 +275,12 @@ const getInventory = async (req, res) => {
         lo.so_luong_hien_tai,
         lo.don_vi_tinh,
         DATE_FORMAT(lo.han_luu_kho, '%Y-%m-%d') AS han_luu_kho,
-        kd.trang_thai_ho_so AS kiem_dinh_trang_thai
+        kd.trang_thai_ho_so AS kiem_dinh_trang_thai,
+        kd.ket_luan AS kiem_dinh_ket_luan
       FROM lo_nong_san lo
       JOIN san_pham_nong_san sp ON lo.ma_san_pham = sp.ma_san_pham
       LEFT JOIN (
-        SELECT k1.ma_lo_nong_san, k1.trang_thai_ho_so
+        SELECT k1.ma_lo_nong_san, k1.trang_thai_ho_so, k1.ket_luan
         FROM kiem_dinh_lo_hang k1
         INNER JOIN (
           SELECT ma_lo_nong_san, MAX(updated_at) AS max_updated
@@ -300,7 +301,8 @@ const getInventory = async (req, res) => {
       trang_thai_chung_thu:
         r.kiem_dinh_trang_thai === "THU_HOI"
           ? "REVOKED"
-          : r.kiem_dinh_trang_thai === "DA_CONG_BO"
+          : r.kiem_dinh_trang_thai === "DA_CONG_BO" &&
+              r.kiem_dinh_ket_luan === "PASSED"
             ? "VALID"
             : "NONE",
     }));

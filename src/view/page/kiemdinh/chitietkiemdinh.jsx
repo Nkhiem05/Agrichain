@@ -194,8 +194,16 @@ const ChiTietKiemDinh = () => {
     ).values(),
   );
 
-  const isDatChuan = kd.tong_ket_lab === "DAT";
-  const certCode = kd.ma_ho_so || kd.ma_kiem_dinh;
+  // Kết luận đã công bố (PASSED/FAILED/REVOKED) được ưu tiên hơn kết quả tính tạm từ chỉ số
+  const isRevoked = kd.ket_luan === "REVOKED";
+  const isDatChuan =
+    kd.ket_luan === "PASSED"
+      ? true
+      : kd.ket_luan === "FAILED" || isRevoked
+        ? false
+        : kd.tong_ket_lab === "DAT";
+  const hasCertificate = kd.ket_luan === "PASSED" && Boolean(kd.so_chung_nhan);
+  const certCode = kd.so_chung_nhan || "Chưa cấp chứng thư";
   const batchCode = kd.ma_lo_nong_san ? `#${kd.ma_lo_nong_san}` : "";
 
   // Tx hash mới nhất có trên chuỗi (dùng cho khối QR)
@@ -209,9 +217,21 @@ const ChiTietKiemDinh = () => {
     "Chưa lấy mẫu";
 
   const sampleAddress =
-    `${kd.ten_thua_dat ? `\${kd.ten_thua_dat}, ` : ""}${
+    `${kd.ten_thua_dat ? `${kd.ten_thua_dat}, ` : ""}${
       kd.dia_diem_nong_trai || ""
     }` || "Chưa có địa chỉ";
+
+  // Mã QR dẫn tới trang truy xuất của lô hàng (người dùng quét để xem hành trình)
+  const traceUrl = kd.ma_lo_nong_san
+    ? `${window.location.origin}/chi-tiet-user?malohang=${encodeURIComponent(
+        kd.ma_lo_nong_san,
+      )}`
+    : "";
+
+  const validityText =
+    kd.hieu_luc_tu && kd.hieu_luc_den
+      ? `${formatDate(kd.hieu_luc_tu)} - ${formatDate(kd.hieu_luc_den)}`
+      : "";
 
   return (
     <div className="chitietkiemdinh">
@@ -229,12 +249,12 @@ const ChiTietKiemDinh = () => {
                 <span>Quay lại danh sách</span>
               </button>
               <div className="detail-actions-right">
-                <button
-                  onClick={() => alert("Đang in biên bản & chứng thư số...")}
-                  className="btn-print"
-                >
+                {/* Mở hộp thoại in của trình duyệt: chọn "Lưu dưới dạng PDF" để tải file */}
+                <button onClick={() => window.print()} className="btn-print">
                   <DownloadIcon size={16} />
-                  <span>Tải Chứng Thư PDF</span>
+                  <span>
+                    {hasCertificate ? "Tải Chứng Thư PDF" : "Tải Biên Bản PDF"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -260,9 +280,21 @@ const ChiTietKiemDinh = () => {
                         isDatChuan ? "badge-tag-pass" : "badge-tag-fail"
                       }
                     >
-                      {isDatChuan ? "ĐẠT CHUẨN" : "KHÔNG ĐẠT"}
+                      {isRevoked
+                        ? "ĐÃ THU HỒI"
+                        : isDatChuan
+                          ? "ĐẠT CHUẨN"
+                          : "KHÔNG ĐẠT"}
                     </span>
                     <span className="badge-tag-code">Số CN: {certCode}</span>
+                    {validityText && (
+                      <span style={{ fontSize: 13, color: "#6b7280" }}>
+                        Hiệu lực: <b>{validityText}</b>
+                      </span>
+                    )}
+                    <span style={{ fontSize: 13, color: "#6b7280" }}>
+                      Mã hồ sơ: <b>{kd.ma_ho_so}</b>
+                    </span>
                     <span style={{ fontSize: 13, color: "#6b7280" }}>
                       Tiêu chuẩn: <b>{kd.tieu_chuan_dang_ky || "Chưa rõ"}</b>
                     </span>
@@ -397,15 +429,18 @@ const ChiTietKiemDinh = () => {
                     <span>Tem Truy Xuất Nguồn Gốc</span>
                   </h3>
                   <div className="qr-preview-box">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-                        `https://agrichain.vn/verify/\${certCode}`,
-                      )}`}
-                      alt="QR Code"
-                      className="qr-box-img"
-                    />
+                    {traceUrl && (
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+                          traceUrl,
+                        )}`}
+                        alt="QR Code"
+                        className="qr-box-img"
+                      />
+                    )}
                     <p style={{ fontSize: 12, color: "#4b5563" }}>
-                      Quét để xác thực trực tiếp trên AgriChain Mainnet
+                      Quét để xem hành trình và kết quả kiểm định của lô{" "}
+                      {kd.ma_lo_nong_san} trên AgriChain
                     </p>
                     <div className="tx-hash-badge">
                       {latestTx ? shortHash(latestTx) : "Chưa ghi lên chuỗi"}

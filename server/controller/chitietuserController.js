@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { evaluateResult } = require("./chitietkiemdinhController");
 
 const getTraceDetail = async (req, res) => {
   try {
@@ -90,14 +91,18 @@ const getTraceDetail = async (req, res) => {
         kd.ma_ho_so,
         kd.tieu_chuan_dang_ky,
         kd.ket_luan,
+        kd.trang_thai_ho_so,
         kd.so_chung_nhan,
+        DATE_FORMAT(kd.hieu_luc_tu, '%Y-%m-%d') AS hieu_luc_tu,
+        DATE_FORMAT(kd.hieu_luc_den, '%Y-%m-%d') AS hieu_luc_den,
         kd.kiem_dinh_vien,
         kd.thoi_gian_lay_mau,
         cq.ho_ten AS ten_co_quan
       FROM kiem_dinh_lo_hang kd
       JOIN nguoi_dung cq ON kd.ma_co_quan = cq.ma_nguoi_dung
       WHERE kd.ma_lo_nong_san IN (?, ?)
-      ORDER BY kd.created_at DESC LIMIT 1`,
+        AND kd.trang_thai_ho_so IN ('DA_CONG_BO', 'THU_HOI')
+      ORDER BY kd.updated_at DESC LIMIT 1`,
       [cleanBatchCode, sourceBatchCode],
     );
 
@@ -105,11 +110,40 @@ const getTraceDetail = async (req, res) => {
     let auditIndicators = [];
     if (auditRows.length > 0) {
       auditData = auditRows[0];
+      // Chỉ số kèm ngưỡng chuẩn để đánh giá từng chỉ tiêu Đạt / Không đạt
       const [indicators] = await db.query(
-        `SELECT ten_chi_so, gia_tri FROM chi_so_kiem_dinh WHERE ma_kiem_dinh = ? ORDER BY thu_tu ASC`,
+        `SELECT cs.ma_chi_so_kd, cs.ten_chi_so, cs.gia_tri, cs.loai_chi_so,
+                n.toan_tu_so_sanh, n.nguong_toi_da, n.mo_ta_nguong
+         FROM chi_so_kiem_dinh cs
+         LEFT JOIN nguong_kiem_dinh_chuan n
+           ON cs.loai_chi_so = 'CO_DINH'
+          AND cs.ma_chi_so = n.ma_chi_so
+          AND cs.ten_chi_so = n.ten_chi_tiet_chat
+          AND n.trang_thai = 1
+         WHERE cs.ma_kiem_dinh = ?
+         ORDER BY cs.thu_tu ASC, cs.ma_chi_so_kd ASC,
+                  CASE WHEN n.tieu_chuan_ap_dung = 'TAT_CA' THEN 1 ELSE 0 END ASC,
+                  n.ma_nguong ASC`,
         [auditData.ma_kiem_dinh],
       );
-      auditIndicators = indicators;
+      const seenIndicators = new Set();
+      auditIndicators = indicators
+        .filter((row) => {
+          if (seenIndicators.has(row.ma_chi_so_kd)) return false;
+          seenIndicators.add(row.ma_chi_so_kd);
+          return true;
+        })
+        .map((row) => ({
+          ten_chi_so: row.ten_chi_so,
+          gia_tri: row.gia_tri,
+          nguong: row.toan_tu_so_sanh ? row.mo_ta_nguong : null,
+          dat: row.toan_tu_so_sanh
+            ? evaluateResult(row.gia_tri, {
+                toan_tu_so_sanh: row.toan_tu_so_sanh,
+                nguong_toi_da: row.nguong_toi_da,
+              })
+            : true,
+        }));
     }
 
     // 4. Sơ chế & Đóng gói

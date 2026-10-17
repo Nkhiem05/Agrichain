@@ -214,6 +214,8 @@ function Coquankiemdinh() {
   const [modalPublishOpen, setModalPublishOpen] = useState(false);
   const [modalRevokeOpen, setModalRevokeOpen] = useState(false);
   const [modalConfirmPublishOpen, setModalConfirmPublishOpen] = useState(false);
+  const [modalFailOpen, setModalFailOpen] = useState(false);
+  const [failItem, setFailItem] = useState(null);
 
   const [acceptData, setAcceptData] = useState({ code: "", farm: "" });
 
@@ -360,13 +362,19 @@ function Coquankiemdinh() {
   const handleConfirmPublish = async () => {
     if (!selectedPublishItem) return;
     try {
-      await updateInspectionStatus(
+      const result = await updateInspectionStatus(
         selectedPublishItem.ma_kiem_dinh,
         "accept",
         null,
       );
+      if (!result?.status) {
+        alert(result?.message || "Công bố kết quả thất bại!");
+        return;
+      }
       alert(
-        `Đã công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!`,
+        `Đã công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!${
+          result.so_chung_nhan ? ` Số chứng nhận: ${result.so_chung_nhan}` : ""
+        }`,
       );
       setModalConfirmPublishOpen(false);
       fetchSamplingRequests();
@@ -374,6 +382,36 @@ function Coquankiemdinh() {
     } catch (err) {
       console.error("Lỗi khi công bố chứng nhận:", err);
       alert("Công bố kết quả thất bại!");
+    }
+  };
+
+  const handleOpenFailModal = (item) => {
+    setFailItem(item);
+    setCode(item.ma_kiem_dinh);
+    setModalFailOpen(true);
+  };
+
+  const handleConfirmFail = async () => {
+    if (!failItem) return;
+    try {
+      const result = await updateInspectionStatus(
+        failItem.ma_kiem_dinh,
+        "fail",
+        null,
+      );
+      if (!result?.status) {
+        alert(result?.message || "Công bố kết luận không đạt thất bại!");
+        return;
+      }
+      alert(
+        `Đã công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.`,
+      );
+      setModalFailOpen(false);
+      fetchSamplingRequests();
+      fetchPublishedCertificates();
+    } catch (err) {
+      console.error("Lỗi khi công bố không đạt:", err);
+      alert("Công bố kết luận không đạt thất bại!");
     }
   };
 
@@ -473,7 +511,8 @@ function Coquankiemdinh() {
   };
 
   useEffect(() => {
-    if (currentTab === "results") {
+    // Tab "requests" cũng cần danh sách này để đếm số chứng nhận đã cấp
+    if (currentTab === "results" || currentTab === "requests") {
       fetchPublishedCertificates();
     }
   }, [currentTab]);
@@ -727,7 +766,18 @@ function Coquankiemdinh() {
                         Đã cấp chứng nhận tháng này
                       </span>
                       <p className="metric-val">
-                        {publishedList.length || 24}{" "}
+                        {
+                          publishedList.filter((p) => {
+                            if (p.ket_luan !== "PASSED" || !p.ngay_cong_bo)
+                              return false;
+                            const d = new Date(p.ngay_cong_bo);
+                            const now = new Date();
+                            return (
+                              d.getMonth() === now.getMonth() &&
+                              d.getFullYear() === now.getFullYear()
+                            );
+                          }).length
+                        }{" "}
                         <span className="metric-unit">Lô đạt chuẩn</span>
                       </p>
                     </div>
@@ -1146,6 +1196,22 @@ function Coquankiemdinh() {
                                 </button>
                               )}
 
+                              {/* NÚT CÔNG BỐ KHÔNG ĐẠT: CHỈ KHI CÓ CHỈ SỐ VƯỢT NGƯỠNG */}
+                              {!allPassed &&
+                                (item.danh_sach_chi_so || []).length > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleOpenFailModal(item);
+                                    }}
+                                    className="btn-action-revoke"
+                                  >
+                                    <XCircle size={15} />
+                                    <span>Công bố không đạt</span>
+                                  </button>
+                                )}
+
                               {/* Nút Yêu Cầu Thu Hồi */}
                               <button
                                 type="button"
@@ -1241,10 +1307,11 @@ function Coquankiemdinh() {
             {currentTab === "results" && (
               <main className="view-panel view-panel-clean">
                 <div className="tab-banner-box">
-                  <h2>Danh Sách Lô Hàng Đã Công Bố Chứng Nhận</h2>
+                  <h2>Danh Sách Lô Hàng Đã Có Kết Luận Kiểm Định</h2>
                   <p>
-                    Kết quả được ký số điện tử và băm trực tiếp lên Blockchain
-                    để người tiêu dùng quét QR kiểm chứng.
+                    Lô đạt chuẩn được cấp số chứng nhận và chứng thư; lô không
+                    đạt được lưu kết luận để nông dân và người tiêu dùng tra
+                    cứu qua mã QR.
                   </p>
                 </div>
 
@@ -1257,12 +1324,14 @@ function Coquankiemdinh() {
 
                   {!publishedLoading && publishedList.length === 0 && (
                     <p className="state-msg">
-                      Chưa có lô hàng nào được công bố chứng nhận.
+                      Chưa có lô hàng nào được công bố kết luận.
                     </p>
                   )}
 
                   {!publishedLoading &&
-                    publishedList.map((item) => (
+                    publishedList.map((item) => {
+                      const isPassed = item.ket_luan !== "FAILED";
+                      return (
                       <div
                         className="item-card"
                         key={item.ma_kiem_dinh}
@@ -1272,20 +1341,39 @@ function Coquankiemdinh() {
                         }}
                       >
                         <div className="card-left-group">
-                          <div className="card-icon-bubble icon-emerald">
-                            <BadgeCheck size={32} />
+                          <div
+                            className={`card-icon-bubble ${
+                              isPassed ? "icon-emerald" : "icon-rose"
+                            }`}
+                          >
+                            {isPassed ? (
+                              <BadgeCheck size={32} />
+                            ) : (
+                              <XCircle size={32} />
+                            )}
                           </div>
 
                           <div className="card-content-stack">
                             <div className="card-header-line">
                               <h3 className="card-title">
-                                {item.ten_san_pham} Đạt Chuẩn{" "}
+                                {item.ten_san_pham}{" "}
+                                {isPassed ? "Đạt Chuẩn" : "Không Đạt Chuẩn"}{" "}
                                 {item.tieu_chuan_dang_ky}
                               </h3>
-                              <span className="pill-cert-pass">ĐẠT CHUẨN</span>
-                              <span className="pill-blue-cert">
-                                Số CN: {item.so_chung_nhan || "VG-2026-8812"}
-                              </span>
+                              {isPassed ? (
+                                <span className="pill-cert-pass">
+                                  ĐẠT CHUẨN
+                                </span>
+                              ) : (
+                                <span className="pill-cert-fail">
+                                  KHÔNG ĐẠT
+                                </span>
+                              )}
+                              {isPassed && (
+                                <span className="pill-blue-cert">
+                                  Số CN: {item.so_chung_nhan || "Chưa cấp"}
+                                </span>
+                              )}
                             </div>
 
                             <div className="card-meta-wrap">
@@ -1311,34 +1399,49 @@ function Coquankiemdinh() {
                                 Ngày công bố:{" "}
                                 <span className="text-meta-regular">
                                   {new Date(
-                                    item.ngay_nop_don,
+                                    item.ngay_cong_bo || item.ngay_nop_don,
                                   ).toLocaleDateString("vi-VN")}
                                 </span>
                               </p>
-                            </div>
-
-                            <div className="contract-hash">
-                              Smart Contract Hash: 0x7c49f821...a381e9b2 (Đã xác
-                              thực lên AgriChain)
+                              {isPassed && item.hieu_luc_tu && (
+                                <p>
+                                  Hiệu lực:{" "}
+                                  <span className="text-meta-regular">
+                                    {item.hieu_luc_tu
+                                      .split("-")
+                                      .reverse()
+                                      .join("/")}
+                                    {item.hieu_luc_den
+                                      ? ` - ${item.hieu_luc_den
+                                          .split("-")
+                                          .reverse()
+                                          .join("/")}`
+                                      : ""}
+                                  </span>
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
 
                         <div className="card-actions-row">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              exportInspectionCertificateWord(item);
-                            }}
-                            className="btn-light"
-                          >
-                            <Download size={16} />
-                            <span>Tải Chứng Thư</span>
-                          </button>
+                          {isPassed && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                exportInspectionCertificateWord(item);
+                              }}
+                              className="btn-light"
+                            >
+                              <Download size={16} />
+                              <span>Tải Chứng Thư</span>
+                            </button>
+                          )}
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                 </div>
               </main>
             )}
@@ -1820,6 +1923,72 @@ function Coquankiemdinh() {
                 >
                   <ShieldAlert size={16} />
                   <span>Xác Nhận Kích Hoạt Thu Hồi</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL 6: XÁC NHẬN CÔNG BỐ KẾT LUẬN KHÔNG ĐẠT */}
+        {modalFailOpen && failItem && (
+          <div className="modal-overlay">
+            <div className="modal-dialog modal-max-md">
+              <div className="modal-header">
+                <h3 className="modal-title">
+                  <XCircle size={20} color="#be123c" />
+                  Công Bố Kết Luận Không Đạt
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setModalFailOpen(false)}
+                  className="btn-close-modal"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <div className="publish-confirm-info-box">
+                  <p>
+                    Lô hàng <b>#{failItem.ma_lo_nong_san}</b> có chỉ số vượt
+                    ngưỡng tiêu chuẩn. Sau khi công bố, hồ sơ được kết luận{" "}
+                    <b>KHÔNG ĐẠT</b>, không cấp chứng thư và lô không thể tạo
+                    lệnh vận chuyển. Nông dân có thể gửi lại yêu cầu kiểm định
+                    mới.
+                  </p>
+                  <div className="inherited-info-card">
+                    <div className="grid-col-full">
+                      Sản phẩm:{" "}
+                      <b className="modal-highlight-dark">
+                        {failItem.ten_san_pham} (
+                        {failItem.ten_nong_trai || "Nông trại"})
+                      </b>
+                    </div>
+                    <div className="grid-col-full">
+                      Mã niêm phong:{" "}
+                      <b className="modal-highlight-dark font-code">
+                        {failItem.ma_niem_phong || "Chưa cấp seal"}
+                      </b>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  onClick={() => setModalFailOpen(false)}
+                  className="btn-cancel"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmFail}
+                  className="btn-confirm-revoke"
+                >
+                  <XCircle size={16} />
+                  <span>Công bố không đạt</span>
                 </button>
               </div>
             </div>
