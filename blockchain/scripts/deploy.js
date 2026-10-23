@@ -13,15 +13,15 @@ if (!deployer) {
 const chainId = String((await ethers.provider.getNetwork()).chainId);
 console.log("chainId:", chainId, "| ví deploy:", deployer.address);
 
-const nhatKy = await ethers.deployContract("NhatKy");
-await nhatKy.waitForDeployment();
-const address = await nhatKy.getAddress();
+const agriChain = await ethers.deployContract("AgriChain");
+await agriChain.waitForDeployment();
+const address = await agriChain.getAddress();
 
-// deployed.json lưu địa chỉ contract theo từng mạng: { "31337": "0x...", "10143": "0x..." }
-const file = "deployed.json";
+// deployed-agrichain.json lưu địa chỉ contract theo từng mạng: { "31337": "0x...", "10143": "0x..." }
+const file = "deployed-agrichain.json";
 const daDeploy = fs.existsSync(file)
   ? JSON.parse(fs.readFileSync(file, "utf8"))
   : {};
 daDeploy[chainId] = address;
 fs.writeFileSync(file, JSON.stringify(daDeploy, null, 2));
-console.log("Đã deploy NhatKy tại:", address);
+console.log("Đã deploy AgriChain tại:", address);
