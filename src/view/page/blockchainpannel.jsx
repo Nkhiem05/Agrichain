@@ -11,9 +11,9 @@ import {
   fetchViChoDuyet,
   duyetVi,
   tuChoiVi,
-} from "../api/blockchainApi";
+} from "../../api/blockchainApi";
 import { TEN_SU_KIEN, rutGon } from "./xacthucblockchain";
-import "../view/css/blockchain.css";
+import "../css/blockchain.css";
 
 const TRANG_THAI_DUYET = {
   CHO_DUYET: "Đang chờ quản trị viên duyệt",

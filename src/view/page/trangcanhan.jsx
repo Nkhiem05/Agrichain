@@ -15,6 +15,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import "../css/trangcanhan.css";
+import BlockchainPanel from "./blockchainpannel"; // MỚI: khối ví blockchain
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
@@ -415,6 +416,9 @@ const ProfilePage = () => {
             </div>
           </div>
         )}
+
+        {/* MỚI: Ví blockchain: liên kết ví, ký sự kiện truy xuất, admin duyệt ví */}
+        <BlockchainPanel />
       </div>
 
       {/* MODAL SỬA PROFILE */}

@@ -1,5 +1,6 @@
 require("dotenv").config();
 const express = require("express");
+const blockchainRoutes = require("./routes/blockchainRoutes");
 
 const configApp = require("./config/configApp");
 require("./config/db"); // nạp file để kết nối MySQL khi khởi động
@@ -84,6 +85,9 @@ app.use("/api/don-vi-van-chuyen", donvivanchuyenRoutes);
 app.use("/api/chi-tiet-user", chitietuser);
 // Nhà phân phối (tiếp nhận, kho hàng, phân phối cho đại lý, quản lý đại lý)
 app.use("/api/nha-phan-phoi", nhaphanphoiRoutes);
+
+// Blockchain: liên kết ví, ký sự kiện truy xuất, xác thực lô hàng
+app.use("/api/blockchain", blockchainRoutes);
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);
 });

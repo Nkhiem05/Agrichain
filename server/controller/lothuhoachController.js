@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { baoDamSuKienGoc } = require("../services/blockchain/traceEvent");
 
 /*
 ==================================================
@@ -518,7 +519,8 @@ const createBatch = async (req, res) => {
               );
             }
           }
-
+          // Ghi sự kiện thu hoạch vào hàng chờ blockchain (kèm snapshot mùa vụ và vật tư)
+          await baoDamSuKienGoc(connection, newCode);
           return newCode;
         });
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { CheckCircle2, AlertCircle, ShieldCheck } from "lucide-react";
-import { fetchXacThuc } from "../api/blockchainApi";
-import "../view/css/blockchain.css";
+import { fetchXacThuc } from "../../api/blockchainApi";
+import "../css/blockchain.css";
 
 // Tên sự kiện hiển thị cho người tiêu dùng
 export const TEN_SU_KIEN = {
