@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agrichain - Nhật ký on-chain</title>
+    <style>
+      :root {
+        --bg: #f4f7f2;
+        --card: #ffffff;
+        --text: #1f2a1f;
+        --muted: #6b776b;
+        --line: #dfe6dc;
+        --brand: #2e7d32;
+        --brand-d: #1b5e20;
+        --mine: #e8f5e9;
+        --err: #c62828;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #121812;
+          --card: #1b241b;
+          --text: #e6efe6;
+          --muted: #9fb09f;
+          --line: #2c3a2c;
+          --brand: #66bb6a;
+          --brand-d: #81c784;
+          --mine: #213a23;
+          --err: #ef9a9a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, "Segoe UI", sans-serif;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+      h1 {
+        font-size: 22px;
+        margin: 0 0 4px;
+      }
+      h2 {
+        font-size: 16px;
+        margin: 0 0 12px;
+      }
+      .sub {
+        color: var(--muted);
+        margin: 0 0 20px;
+        font-size: 14px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+        margin-bottom: 16px;
+      }
+      label {
+        display: block;
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 4px;
+      }
+      input[type="text"],
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--bg);
+        color: var(--text);
+        font: inherit;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 72px;
+      }
+      button {
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 8px;
+        background: var(--brand);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) {
+        button {
+          color: #0d1a0d;
+        }
+      }
+      button:hover:not(:disabled) {
+        background: var(--brand-d);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      button.ghost {
+        background: transparent;
+        color: var(--brand);
+        border: 1px solid var(--line);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-top: 12px;
+      }
+      .info {
+        font-size: 14px;
+        margin: 12px 0 0;
+        word-break: break-all;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        background: var(--mine);
+        color: var(--brand-d);
+      }
+      .badge.warn {
+        background: #fff3e0;
+        color: #e65100;
+      }
+      .status {
+        min-height: 22px;
+        font-size: 14px;
+        margin: 10px 0 0;
+        word-break: break-all;
+      }
+      .status.err {
+        color: var(--err);
+      }
+      .note {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 10px 0 0;
+      }
+      ul {
+        list-style: none;
+        margin: 12px 0 0;
+        padding: 0;
+      }
+      li {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        word-break: break-word;
+      }
+      li.mine {
+        background: var(--mine);
+        border-color: var(--brand);
+      }
+      li small {
+        display: block;
+        color: var(--muted);
+        margin-top: 4px;
+        word-break: break-all;
+      }
+      .empty {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      a {
+        color: var(--brand);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Nhật ký on-chain</h1>
+      <p class="sub">
+        Ghi một dòng lên blockchain. Đã ghi thì không sửa hay xóa được.
+      </p>
+
+      <section class="card">
+        <h2>1. Kết nối ví</h2>
+        <div class="row" style="margin-top: 0">
+          <button id="btnVi">Kết nối ví MetaMask</button>
+          <button id="btnMonad" class="ghost">
+            Thêm mạng Monad Testnet vào MetaMask
+          </button>
+        </div>
+        <p class="info" id="viInfo">Chưa kết nối.</p>
+        <p class="status" id="ketNoiStatus"></p>
+        <label for="diaChi" style="margin-top: 12px"
+          >Địa chỉ contract (để trống = tự lấy từ deployed.json theo
+          mạng)</label
+        >
+        <input id="diaChi" type="text" placeholder="0x..." autocomplete="off" />
+      </section>
+
+      <section class="card">
+        <h2>2. Ghi nhật ký</h2>
+        <label for="noiDung">Nội dung</label>
+        <textarea
+          id="noiDung"
+          placeholder="Ví dụ: Tưới nước lô A lúc 7h"
+          maxlength="500"
+          disabled
+        ></textarea>
+        <div class="row">
+          <button id="btnGhi" disabled>Ghi lên block</button>
+        </div>
+        <p class="note">
+          Chỉ ghi dữ liệu, không chuyển tiền cho ai. MetaMask chỉ tính một khoản
+          phí gas nhỏ (MON testnet, miễn phí từ faucet).
+        </p>
+        <p class="status" id="trangThai"></p>
+      </section>
+
+      <section class="card">
+        <h2>3. Các mục đã ghi</h2>
+        <div class="row" style="margin-top: 0">
+          <label style="margin: 0"
+            ><input id="chiCuaToi" type="checkbox" /> Chỉ hiện mục của ví
+            tôi</label
+          >
+          <button id="btnTai" class="ghost" disabled>Tải lại</button>
+        </div>
+        <ul id="ds"></ul>
+        <p class="empty" id="trong" hidden>Chưa có mục nào.</p>
+      </section>
+    </main>
+
+    <script type="module">
+      import {
+        BrowserProvider,
+        Contract,
+        formatEther,
+        isAddress,
+      } from "https://cdn.jsdelivr.net/npm/ethers@6.13.4/+esm";
+
+      const ABI = [
+        "function ghi(string noiDung)",
+        "function soMuc() view returns (uint256)",
+        "function cacMuc(uint256) view returns (address nguoiGhi, uint256 thoiGian, string noiDung)",
+      ];
+      const MANG = {
+        31337: { ten: "Hardhat Local", tien: "ETH" },
+        10143: {
+          ten: "Monad Testnet",
+          tien: "MON",
+          explorer: "https://testnet.monadexplorer.com",
+        },
+        11155111: {
+          ten: "Sepolia",
+          tien: "ETH",
+          explorer: "https://sepolia.etherscan.io",
+        },
+      };
+
+      const $ = (id) => document.getElementById(id);
+      let contract, viCuaToi, chainId;
+
+      function datTrangThai(el, text, loi = false) {
+        el.textContent = text;
+        el.classList.toggle("err", loi);
+      }
+
+      // Địa chỉ contract theo mạng, do deploy.js ghi: { "31337": "0x...", "10143": "0x..." }
+      const daDeployP = fetch("deployed.json")
+        .then((r) => r.json())
+        .catch(() => ({}));
+
+      async function taiDanhSach() {
+        const n = Number(await contract.soMuc());
+        const chiCuaToi = $("chiCuaToi").checked;
+        const stt = Array.from({ length: n }, (_, i) => i)
+          .reverse()
+          .slice(0, 100);
+        const muc = await Promise.all(stt.map((i) => contract.cacMuc(i)));
+
+        const ds = $("ds");
+        ds.replaceChildren();
+        let dem = 0;
+        muc.forEach((m, k) => {
+          const laCuaToi = m.nguoiGhi.toLowerCase() === viCuaToi.toLowerCase();
+          if (chiCuaToi && !laCuaToi) return;
+          dem++;
+          const li = document.createElement("li");
+          if (laCuaToi) li.className = "mine";
+          li.append(document.createTextNode(`#${stt[k]} ${m.noiDung}`)); // textContent: nội dung từ chain không được chèn thành HTML
+          const s = document.createElement("small");
+          s.textContent = `${new Date(Number(m.thoiGian) * 1000).toLocaleString("vi-VN")} - ví ${m.nguoiGhi}`;
+          li.append(s);
+          ds.append(li);
+        });
+        $("trong").hidden = dem > 0;
+      }
+
+      $("chiCuaToi").onchange = () => contract && taiDanhSach();
+      $("btnTai").onclick = () =>
+        taiDanhSach().catch((e) =>
+          datTrangThai(
+            $("trangThai"),
+            "Lỗi tải: " + (e.shortMessage || e.message),
+            true,
+          ),
+        );
+
+      // Thêm mạng Monad Testnet vào MetaMask bằng một cú bấm
+      $("btnMonad").onclick = async () => {
+        const st = $("ketNoiStatus");
+        if (!window.ethereum)
+          return datTrangThai(st, "Chưa cài MetaMask.", true);
+        try {
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: "0x" + (10143).toString(16),
+                chainName: "Monad Testnet",
+                nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+                rpcUrls: ["https://testnet-rpc.monad.xyz"],
+                blockExplorerUrls: ["https://testnet.monadexplorer.com"],
+              },
+            ],
+          });
+          datTrangThai(
+            st,
+            "Đã thêm mạng Monad Testnet. Chọn mạng này trong MetaMask rồi bấm Kết nối ví.",
+          );
+        } catch (e) {
+          datTrangThai(
+            st,
+            "Không thêm được mạng: " + (e.shortMessage || e.message),
+            true,
+          );
+        }
+      };
+
+      $("btnVi").onclick = async () => {
+        const st = $("ketNoiStatus");
+        datTrangThai(st, "");
+        if (!window.ethereum)
+          return datTrangThai(st, "Chưa cài MetaMask.", true);
+
+        try {
+          const provider = new BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner(); // bật popup MetaMask
+          viCuaToi = await signer.getAddress();
+          chainId = Number((await provider.getNetwork()).chainId);
+          const mang = MANG[chainId];
+          const tenMang = mang?.ten || "chainId " + chainId;
+
+          const diaChi =
+            $("diaChi").value.trim() ||
+            (await daDeployP)[String(chainId)] ||
+            "";
+          if (!diaChi) {
+            return datTrangThai(
+              st,
+              `Chưa có địa chỉ contract cho mạng ${tenMang}. Hãy deploy lên mạng này (deploy.js) rồi tải lại trang, hoặc dán địa chỉ vào ô bên dưới.`,
+              true,
+            );
+          }
+          if (!isAddress(diaChi))
+            return datTrangThai(
+              st,
+              "Địa chỉ contract không hợp lệ (phải dạng 0x... 42 ký tự).",
+              true,
+            );
+
+          // Contract có thật trên mạng đang chọn không? (chain local reset thì mất)
+          if ((await provider.getCode(diaChi)) === "0x") {
+            return datTrangThai(
+              st,
+              `Không có contract tại ${diaChi} trên mạng ${tenMang}. ` +
+                "Kiểm tra MetaMask đang đúng mạng, hoặc deploy lại.",
+              true,
+            );
+          }
+
+          const so = formatEther(await provider.getBalance(viCuaToi));
+          const info = $("viInfo");
+          info.replaceChildren(
+            document.createTextNode(
+              `Ví: ${viCuaToi} - Số dư: ${Number(so).toFixed(4)} ${mang?.tien || ""} `,
+            ),
+          );
+          const badge = document.createElement("span");
+          badge.className = "badge" + (mang ? "" : " warn");
+          badge.textContent = mang ? mang.ten : `Mạng lạ (chainId ${chainId})`;
+          info.append(badge);
+
+          contract = new Contract(diaChi, ABI, signer);
+          $("noiDung").disabled = false;
+          $("btnGhi").disabled = false;
+          $("btnTai").disabled = false;
+          await taiDanhSach();
+        } catch (e) {
+          datTrangThai(
+            st,
+            "Lỗi kết nối: " + (e.shortMessage || e.message),
+            true,
+          );
+        }
+      };
+
+      $("btnGhi").onclick = async () => {
+        const st = $("trangThai");
+        const text = $("noiDung").value.trim();
+        if (!text) return datTrangThai(st, "Hãy nhập nội dung.", true);
+        $("btnGhi").disabled = true;
+        try {
+          datTrangThai(st, "Đang chờ bạn xác nhận trong MetaMask...");
+          const tx = await contract.ghi(text);
+          datTrangThai(st, "Đã gửi, đang chờ xác nhận... tx: " + tx.hash);
+          await tx.wait();
+
+          st.classList.remove("err");
+          st.replaceChildren(
+            document.createTextNode("Đã ghi xong. tx: " + tx.hash + " "),
+          );
+          const explorer = MANG[chainId]?.explorer;
+          if (explorer) {
+            const a = document.createElement("a");
+            a.href = `${explorer}/tx/${tx.hash}`;
+            a.target = "_blank";
+            a.rel = "noopener";
+            a.textContent = "Xem trên explorer";
+            st.append(a);
+          }
+          $("noiDung").value = "";
+          await taiDanhSach();
+        } catch (e) {
+          datTrangThai(
+            st,
+            e.code === "ACTION_REJECTED"
+              ? "Bạn đã từ chối giao dịch."
+              : "Lỗi: " + (e.shortMessage || e.message),
+            true,
+          );
+        } finally {
+          $("btnGhi").disabled = false;
+        }
+      };
+
+      // Đổi tài khoản hoặc đổi mạng trong MetaMask -> tải lại để kết nối lại cho đúng
+      if (window.ethereum) {
+        window.ethereum.on?.("accountsChanged", () => location.reload());
+        window.ethereum.on?.("chainChanged", () => location.reload());
+      }
+    </script>
+  </body>
+</html>

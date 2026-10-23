@@ -1,0 +1,16 @@
+{
+  "C:\\xampp\\htdocs\\Agrichain\\blockchain\\contracts\\NhatKy.sol": {
+    "jobHash": "solc-0_8_24-e48e95c4478a38da0d2fd335305b169fd46cfd89",
+    "isolated": false,
+    "compilerType": "solc",
+    "artifactPaths": [
+      "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\contracts\\NhatKy.sol\\NhatKy.json"
+    ],
+    "buildInfoPath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\build-info\\solc-0_8_24-e48e95c4478a38da0d2fd335305b169fd46cfd89.json",
+    "buildInfoOutputPath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\build-info\\solc-0_8_24-e48e95c4478a38da0d2fd335305b169fd46cfd89.output.json",
+    "typeFilePath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\contracts\\NhatKy.sol\\artifacts.d.ts",
+    "wasm": false,
+    "artifactsDirectory": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts",
+    "emitsTypeDeclarations": true
+  }
+}
