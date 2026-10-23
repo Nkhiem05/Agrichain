@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import "../../css/nongdan.css";
 import { useNavigate } from "react-router-dom";
+import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
 
 const DEFAULT_FARM_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg";
@@ -1198,6 +1199,7 @@ const DashboardPage = () => {
     }
 
     setSavingBatch(true);
+    const dangTaoMoi = !editingBatch; // chỉ ký blockchain khi TẠO lô mới
 
     try {
       const response = await fetch(
@@ -1226,6 +1228,27 @@ const DashboardPage = () => {
       await fetchBatches();
       // Mùa vụ vừa dùng để tạo lô sẽ biến mất khỏi tab Quản lý mùa vụ
       await fetchSeasons();
+
+      // Tạo lô xong: mở MetaMask để ký sự kiện thu hoạch lên blockchain
+      if (dangTaoMoi) {
+        try {
+          const kq = await kyCacSuKienDangCho();
+          alert(
+            kq.soDaKy > 0
+              ? "Đã ký sự kiện thu hoạch lên blockchain"
+              : `Lô đã tạo, chưa ký blockchain: ${kq.lyDo}`,
+          );
+          await fetchBatches();
+        } catch (loi) {
+          const lyDo =
+            loi?.code === "ACTION_REJECTED" || loi?.code === 4001
+              ? "bạn đã từ chối trong MetaMask"
+              : loi?.reason || loi?.shortMessage || loi?.message;
+          alert(
+            `Lô đã tạo nhưng chưa ký blockchain (${lyDo}). Bạn có thể ký lại ở Trang cá nhân.`,
+          );
+        }
+      }
     } catch (error) {
       console.error("Lỗi lưu lô thu hoạch:", error);
       alert("Không thể kết nối tới backend");
@@ -3221,8 +3244,8 @@ const DashboardPage = () => {
                 {!partnerError && readyBatches.length === 0 && (
                   <p style={{ color: "#6b7280", fontSize: 12, marginTop: 6 }}>
                     Chưa có lô nào sẵn sàng. Lô phải còn ở nông trại, đã được
-                    kiểm định đạt chuẩn (chứng thư còn hiệu lực) và chưa có
-                    lệnh vận chuyển.
+                    kiểm định đạt chuẩn (chứng thư còn hiệu lực) và chưa có lệnh
+                    vận chuyển.
                   </p>
                 )}
               </div>

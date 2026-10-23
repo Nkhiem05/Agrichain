@@ -1,3 +1,5 @@
+import { BrowserProvider, Contract } from "ethers";
+
 const API_URL = "http://localhost:3000/api/blockchain";
 
 const authHeaders = () => {
@@ -98,4 +100,94 @@ export const tuChoiVi = async (diaChi) => {
     headers: jsonHeaders(),
   });
   return parseJson(res);
+};
+
+// Mở MetaMask, chuyển đúng mạng, trả về signer (ví đang chọn)
+const ketNoiMetaMask = async (cauHinh) => {
+  if (!window.ethereum) throw new Error("Chưa cài MetaMask");
+
+  let provider = new BrowserProvider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+
+  const mang = await provider.getNetwork();
+  if (Number(mang.chainId) !== cauHinh.chainId) {
+    const chainIdHex = "0x" + cauHinh.chainId.toString(16);
+    try {
+      await window.ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: chainIdHex }],
+      });
+    } catch (e) {
+      // 4902: ví chưa có mạng này -> thêm mạng
+      if (e?.code !== 4902 && e?.data?.originalError?.code !== 4902) throw e;
+      await window.ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [
+          {
+            chainId: chainIdHex,
+            chainName: cauHinh.tenMang,
+            nativeCurrency: {
+              name: cauHinh.tienTe,
+              symbol: cauHinh.tienTe,
+              decimals: 18,
+            },
+            rpcUrls: [cauHinh.rpcUrl],
+            blockExplorerUrls: cauHinh.explorerUrl ? [cauHinh.explorerUrl] : [],
+          },
+        ],
+      });
+    }
+    provider = new BrowserProvider(window.ethereum); // mạng đã đổi: tạo provider mới
+  }
+
+  const signer = await provider.getSigner();
+  return { signer, diaChi: await signer.getAddress() };
+};
+
+// Ký (qua MetaMask) mọi sự kiện đang sẵn sàng của người dùng đang đăng nhập.
+// Gọi ngay sau một thao tác nghiệp vụ (ví dụ tạo lô thu hoạch) để MetaMask hiện popup xác nhận.
+// Trả về { soDaKy, lyDo }: soDaKy = 0 kèm lyDo khi chưa ký được vì thiếu điều kiện.
+// Ném lỗi khi người dùng từ chối trong MetaMask hoặc giao dịch thất bại.
+export const kyCacSuKienDangCho = async () => {
+  const [cauHinh, thongTin] = await Promise.all([
+    fetchCauHinh(),
+    fetchViCuaToi(),
+  ]);
+
+  if (!cauHinh.daCauHinh) {
+    return { soDaKy: 0, lyDo: "máy chủ chưa cấu hình contract blockchain" };
+  }
+  const vi = thongTin.vi;
+  if (!vi || vi.trang_thai_duyet !== "DA_DUYET") {
+    return {
+      soDaKy: 0,
+      lyDo: "bạn chưa có ví blockchain được duyệt (vào Trang cá nhân để liên kết)",
+    };
+  }
+
+  let dsSanSang = (await fetchChoKy()).su_kien.filter((x) => x.san_sang);
+  if (dsSanSang.length === 0) {
+    return { soDaKy: 0, lyDo: "không có sự kiện nào sẵn sàng để ký" };
+  }
+
+  const { signer, diaChi } = await ketNoiMetaMask(cauHinh);
+  if (diaChi.toLowerCase() !== vi.dia_chi_vi.toLowerCase()) {
+    throw new Error(
+      `Hãy chọn đúng ví ${vi.dia_chi_vi.slice(0, 6)}...${vi.dia_chi_vi.slice(-4)} trong MetaMask`,
+    );
+  }
+  const contract = new Contract(cauHinh.contractAddress, cauHinh.abi, signer);
+
+  // Sự kiện kế tiếp có thể sẵn sàng sau khi ký xong sự kiện trước: ký lần lượt đến khi hết
+  let soDaKy = 0;
+  for (let vong = 0; vong < 30 && dsSanSang.length > 0; vong++) {
+    for (const item of dsSanSang) {
+      const tx = await contract[item.ham](...item.args);
+      await tx.wait();
+      await xacNhanSuKien(item.ma_lich_su, tx.hash);
+      soDaKy++;
+    }
+    dsSanSang = (await fetchChoKy()).su_kien.filter((x) => x.san_sang);
+  }
+  return { soDaKy };
 };
