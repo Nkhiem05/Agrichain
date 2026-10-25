@@ -21,8 +21,10 @@ import {
   XCircle,
   AlertCircle,
   LogOut,
+  Wallet,
 } from "lucide-react";
 import "../../css/donvivanchuyen.css";
+import BlockchainPanel from "../blockchainpannel";
 import {
   fetchMyTrips,
   acceptTrip,
@@ -64,7 +66,7 @@ const tripRoute = (t) =>
 export default function AgriChainLogistics() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [currentTab, setCurrentTab] = usePersistentTab("vanchuyen", "shipping", ["shipping","pickup","delivery"]);
+  const [currentTab, setCurrentTab] = usePersistentTab("vanchuyen", "shipping", ["shipping","pickup","delivery","blockchain"]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -329,6 +331,13 @@ export default function AgriChainLogistics() {
                 <ClipboardCheck size={20} />
                 <span>Xác nhận giao hàng đến</span>
               </button>
+              <button
+                onClick={() => setCurrentTab("blockchain")}
+                className={`nav-item ${currentTab === "blockchain" ? "active" : ""}`}
+              >
+                <Wallet size={20} />
+                <span>Ký blockchain</span>
+              </button>
             </nav>
 
             <div style={{ padding: "0 12px 12px 12px", display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -396,7 +405,16 @@ export default function AgriChainLogistics() {
               <div style={{ padding: "48px", textAlign: "center", color: "#6b7280" }}>Đang tải dữ liệu...</div>
             ) : (
               <>
-                {/* TAB 1: QUẢN LÝ VẬN CHUYỂN */}
+                {currentTab === "blockchain" && (
+            <div style={{ maxWidth: 980, paddingTop: 16 }}>
+              <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
+                Đơn vị vận chuyển ký các bước: lấy hàng, giao tới nơi, từ chối chuyến, chở trả hàng bị từ chối. Các bước của một lô ký theo thứ tự.
+              </p>
+              <BlockchainPanel />
+            </div>
+          )}
+
+          {/* TAB 1: QUẢN LÝ VẬN CHUYỂN */}
                 {currentTab === "shipping" && (
                   <main className="view-container">
                     <div className="metrics-row">

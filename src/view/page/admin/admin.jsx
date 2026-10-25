@@ -27,8 +27,11 @@ import {
   KeyRound,
   Pencil,
   LogOut,
+  Wallet,
 } from "lucide-react";
 import "../../css/admin.css";
+import DuyetViBlockchain from "./duyetviblockchain";
+import DoiSoatToanVen from "./doisoattoanven";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
@@ -132,7 +135,7 @@ export default function AdminDashboard() {
   };
 
   // ================= TABS =================
-  const [activeTab, setActiveTab] = usePersistentTab("admin", "overview", ["overview","farms","users","catalog","batches","inspection","shipping","integrity"]);
+  const [activeTab, setActiveTab] = usePersistentTab("admin", "overview", ["overview","farms","users","catalog","batches","inspection","shipping","integrity","wallets"]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // ================= MODALS STATE =================
@@ -200,8 +203,6 @@ export default function AdminDashboard() {
   const [loadingShipments, setLoadingShipments] = useState(true);
 
   // ================= TOÀN VẸN CHUỖI ON-CHAIN (chưa triển khai, dữ liệu minh họa) =================
-  const [blocksVerified, setBlocksVerified] = useState(42918);
-  const [isVerifying, setIsVerifying] = useState(false);
 
   // ================= FORM STATES =================
   const [newActor, setNewActor] = useState({
@@ -710,17 +711,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleVerifyChain = () => {
-    setIsVerifying(true);
-    setTimeout(() => {
-      setBlocksVerified((prev) => prev + Math.floor(Math.random() * 8 + 1));
-      setIsVerifying(false);
-      alert(
-        "Đã đối soát xong! Toàn bộ khối giao dịch đều khớp 100% với Smart Contract.",
-      );
-    }, 1000);
-  };
-
   return (
     <div className="admin">
       {/* ================= HEADER ================= */}
@@ -846,6 +836,14 @@ export default function AdminDashboard() {
               >
                 <Link2 size={18} />
                 <span>Nhật ký & toàn vẹn</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("wallets")}
+                className={`nav-item-btn ${activeTab === "wallets" ? "active" : ""}`}
+              >
+                <Wallet size={18} />
+                <span>Ví blockchain</span>
               </button>
             </nav>
           </div>
@@ -1000,7 +998,9 @@ export default function AdminDashboard() {
                                     ? "inspection"
                                     : item.loai === "VAN_CHUYEN_TU_CHOI"
                                       ? "shipping"
-                                      : "farms",
+                                      : item.loai === "VI_CHO_DUYET"
+                                        ? "wallets"
+                                        : "farms",
                             )
                           }
                         >
@@ -2144,147 +2144,11 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* TAB 8: NHẬT KÝ & TOÀN VẸN */}
-          {activeTab === "integrity" && (
-            <div>
-              <div className="sticky-top-section">
-                <div className="alert-box ok">
-                  <div>
-                    <b>Kiểm tra tính toàn vẹn chuỗi dữ liệu</b>
-                    <p>
-                      Đối chiếu Hash khối giữa CSDL tập trung và sổ cái Smart
-                      Contract. Lần gần nhất:{" "}
-                      <b>{blocksVerified.toLocaleString()} khối</b> khớp hoàn
-                      toàn.
-                    </p>
-                  </div>
-                  <button
-                    className="btn-primary-action"
-                    onClick={handleVerifyChain}
-                    disabled={isVerifying}
-                  >
-                    <RefreshCw
-                      size={15}
-                      className={isVerifying ? "spin-icon" : ""}
-                    />
-                    {isVerifying ? "Đang kiểm tra..." : "Chạy kiểm tra ngay"}
-                  </button>
-                </div>
+          {/* TAB 9: DUYỆT VÍ BLOCKCHAIN */}
+          {activeTab === "wallets" && <DuyetViBlockchain />}
 
-                <div className="content-head">
-                  <div>
-                    <h2>Nhật ký thao tác quản trị và chuỗi</h2>
-                    <p>
-                      Mọi thay đổi quyền, khóa tài khoản và giao dịch bị chặn
-                      đều được ghi lại.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="table-container">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Thời gian</th>
-                      <th>Tác nhân</th>
-                      <th>Hành động</th>
-                      <th>Đối tượng</th>
-                      <th>Tx Hash</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>08/10/2026 09:41</td>
-                      <td>
-                        <b>admin</b>
-                      </td>
-                      <td>
-                        <span className="status-pill danger">
-                          Vô hiệu hóa nông trại
-                        </span>
-                      </td>
-                      <td>HTX Bến Tre Fresh</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0x91c2...03ab
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>08/10/2026 09:12</td>
-                      <td>
-                        <b>kiemdinh_ttgd2</b>
-                      </td>
-                      <td>
-                        <span className="status-pill danger">
-                          Đình chỉ tem chứng nhận
-                        </span>
-                      </td>
-                      <td>Lô #LH-8790</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#dc2626", fontWeight: 700 }}
-                      >
-                        0xe419...77aa
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>08/10/2026 08:30</td>
-                      <td>
-                        <b>taixe_hung65c</b>
-                      </td>
-                      <td>
-                        <span className="status-pill info">Cập nhật GPS</span>
-                      </td>
-                      <td>Chuyến #VC-3021</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0x7c49...a74c
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>07/10/2026 16:05</td>
-                      <td>
-                        <b>soche_tranvanlong</b>
-                      </td>
-                      <td>
-                        <span className="status-pill warning">Gộp lô</span>
-                      </td>
-                      <td>#SC-2026-004</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0xb7e3...12c9
-                      </td>
-                    </tr>
-                    <tr>
-                      <td>07/10/2026 14:20</td>
-                      <td>
-                        <b>admin</b>
-                      </td>
-                      <td>
-                        <span className="status-pill success">
-                          Tạo tài khoản
-                        </span>
-                      </td>
-                      <td>taixe_minhtri</td>
-                      <td
-                        className="mono"
-                        style={{ color: "#15803d", fontWeight: 700 }}
-                      >
-                        0x4ab0...e5f1
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+          {/* TAB 8: NHẬT KÝ & TOÀN VẸN: đối soát thật mọi lô với blockchain + nhật ký ký */}
+          {activeTab === "integrity" && <DoiSoatToanVen />}
         </main>
       </div>
 

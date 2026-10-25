@@ -49,6 +49,16 @@ const getOverview = async (req, res) => {
     const [[pendingRequestCount]] = await db.query(
       `SELECT COUNT(*) AS n FROM yeu_cau_cap_tai_khoan WHERE trang_thai_duyet = 'PENDING'`,
     );
+    // Ví blockchain người dùng đã liên kết, chờ admin gán vai trò trên hợp đồng
+    let pendingWalletCount = 0;
+    try {
+      const [[r]] = await db.query(
+        `SELECT COUNT(*) AS n FROM vi_blockchain WHERE trang_thai_duyet = 'CHO_DUYET'`,
+      );
+      pendingWalletCount = Number(r.n);
+    } catch (err) {
+      if (err.code !== "ER_NO_SUCH_TABLE" && err.code !== "ER_BAD_FIELD_ERROR") throw err;
+    }
     const [[lockedOrgCount]] = await db.query(
       `SELECT COUNT(*) AS n FROM nguoi_dung WHERE trang_thai = 0 AND vai_tro <> 'ADMIN'`,
     );
@@ -99,6 +109,16 @@ const getOverview = async (req, res) => {
               tieu_de: "Hồ sơ đăng ký chờ duyệt",
               mo_ta: `${pendingRequestCount.n} đơn vị vừa đăng ký, đang chờ admin duyệt`,
               so_luong: pendingRequestCount.n,
+            },
+          ]
+        : []),
+      ...(pendingWalletCount > 0
+        ? [
+            {
+              loai: "VI_CHO_DUYET",
+              tieu_de: "Ví blockchain chờ duyệt",
+              mo_ta: `${pendingWalletCount} ví đã liên kết, chờ admin gán vai trò trên hợp đồng`,
+              so_luong: pendingWalletCount,
             },
           ]
         : []),

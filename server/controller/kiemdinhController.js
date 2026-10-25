@@ -1,6 +1,35 @@
 const db = require("../config/db");
 const { generateUniqueCode } = require("../utils/generateCode");
 const { allIndicatorsPass } = require("../utils/danhGiaChiSo");
+const {
+  ghiSuKienKiemDinhTrong,
+  daCoSuKienKiemDinh,
+} = require("../services/blockchain/hook");
+const { phienBanNguongHienHanh } = require("../services/blockchain/nguong");
+const { layCauHinh } = require("../services/blockchain/chainClient");
+
+// Chạy nghiệp vụ + ghi sự kiện blockchain trong cùng một transaction (lỗi thì hoàn tác cả hai)
+const trongGiaoDich = async (fn) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const ketQua = await fn(connection);
+    await connection.commit();
+    return ketQua;
+  } catch (err) {
+    await connection.rollback().catch(() => {});
+    throw err;
+  } finally {
+    connection.release();
+  }
+};
+
+class LoiNghiepVu extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
 
 // Hàm tải danh sách yêu cầu kiểm định
 const taidlyeucaukiemdinh = async (req, res) => {
@@ -180,6 +209,8 @@ const getSamplingScheduleList = async (req, res) => {
         kd.tinh_trang_cam_quan,
         kd.thoi_gian_lay_mau,
         kd.trang_thai_ho_so,
+        kd.chu_lo_da_xac_nhan,
+        kd.da_ghi_chuoi,
         sp.ma_san_pham,
         sp.ten_san_pham,
         lo.so_luong_hien_tai,
@@ -249,27 +280,47 @@ const getSamplingScheduleList = async (req, res) => {
   }
 };
 
-// Cập nhật lấy mẫu
+// Cập nhật lấy mẫu & niêm phong. Lưu xong thì biên bản được ghi vào hàng chờ ký blockchain
+// (SAMPLING_SEALED, cơ quan kiểm định ký) và không sửa được nữa: chủ lô sẽ ký xác nhận đúng nội dung này.
 const updateSampleDetail = async (req, res) => {
   const { code } = req.query;
   const { sealcode, sampleweight, samplemethod, visualconsition } = req.body;
 
-  const sql = `UPDATE kiem_dinh_lo_hang SET ma_niem_phong =?, khoi_luong_mau=?, phuong_phap_lay_mau =?, tinh_trang_cam_quan=?, trang_thai_ho_so='CHO_LAY_MAU' WHERE ma_kiem_dinh =?`;
-  const [result] = await db.query(sql, [
-    sealcode,
-    sampleweight,
-    samplemethod,
-    visualconsition,
-    code,
-  ]);
+  try {
+    await trongGiaoDich(async (conn) => {
+      const [rows] = await conn.query(
+        `SELECT trang_thai_ho_so FROM kiem_dinh_lo_hang WHERE ma_kiem_dinh = ? FOR UPDATE`,
+        [code],
+      );
+      if (rows.length === 0) throw new LoiNghiepVu(404, "Không tìm thấy hồ sơ kiểm định");
+      if (!["DA_HEN_LICH", "CHO_LAY_MAU"].includes(rows[0].trang_thai_ho_so)) {
+        throw new LoiNghiepVu(409, "Hồ sơ không còn ở bước lấy mẫu");
+      }
+      if (await daCoSuKienKiemDinh(conn, code, "SAMPLING_SEALED")) {
+        throw new LoiNghiepVu(
+          409,
+          "Biên bản lấy mẫu đã niêm phong và ghi nhận lên blockchain, không sửa được nữa",
+        );
+      }
 
-  if (result.affectedRows) {
-    res.status(200).json({
-      status: true,
-      message: "đã lấy mẫu",
+      await conn.query(
+        `UPDATE kiem_dinh_lo_hang
+         SET ma_niem_phong = ?, khoi_luong_mau = ?, phuong_phap_lay_mau = ?, tinh_trang_cam_quan = ?,
+             thoi_gian_lay_mau = COALESCE(thoi_gian_lay_mau, NOW()), trang_thai_ho_so = 'CHO_LAY_MAU'
+         WHERE ma_kiem_dinh = ?`,
+        [sealcode, sampleweight, samplemethod, visualconsition, code],
+      );
+      await ghiSuKienKiemDinhTrong(conn, code, "SAMPLING_SEALED");
     });
-  } else {
-    res.status(200).json({
+
+    return res.status(200).json({
+      status: true,
+      message: "Đã lấy mẫu. Chờ chủ lô xác nhận biên bản lấy mẫu",
+    });
+  } catch (err) {
+    if (err.status) return res.status(200).json({ status: false, message: err.message });
+    console.error("Lỗi cập nhật lấy mẫu:", err);
+    return res.status(200).json({
       status: false,
       message: "có lỗi xảy ra vui lòng thử lại",
     });
@@ -365,6 +416,24 @@ const saveTestIndicators = async (req, res) => {
       });
     }
 
+    // Kết quả đã công bố (đã vào chuỗi hash) thì không sửa chỉ số nữa
+    const [hoSo] = await db.query(
+      `SELECT trang_thai_ho_so, da_ghi_chuoi FROM kiem_dinh_lo_hang WHERE ma_kiem_dinh = ?`,
+      [code],
+    );
+    if (hoSo.length === 0) {
+      return res.status(200).json({ status: false, message: "Không tìm thấy hồ sơ kiểm định" });
+    }
+    if (
+      hoSo[0].da_ghi_chuoi ||
+      ["DA_CONG_BO", "THU_HOI", "TU_CHOI"].includes(hoSo[0].trang_thai_ho_so)
+    ) {
+      return res.status(200).json({
+        status: false,
+        message: "Kết quả kiểm định đã công bố, không sửa chỉ số được nữa",
+      });
+    }
+
     // 1. Xóa toàn bộ chỉ số kiểm định cũ của mã kiểm định này
     await db.query(`DELETE FROM chi_so_kiem_dinh WHERE ma_kiem_dinh = ?`, [
       code,
@@ -423,98 +492,123 @@ const updateInspectionStatus = async (req, res) => {
         .json({ status: false, message: "Thiếu mã kiểm định" });
     }
 
-    if (status === "accept" || status === "fail") {
-      // Chỉ công bố khi hồ sơ đã lấy mẫu và nhập chỉ số (DA_LAY_MAU)
-      const [rows] = await db.query(
-        `SELECT trang_thai_ho_so FROM kiem_dinh_lo_hang WHERE ma_kiem_dinh = ?`,
+    const ketQua = await trongGiaoDich(async (conn) => {
+      const [rows] = await conn.query(
+        `SELECT trang_thai_ho_so, ket_luan, chu_lo_da_xac_nhan
+         FROM kiem_dinh_lo_hang WHERE ma_kiem_dinh = ? FOR UPDATE`,
         [code],
       );
-      if (rows.length === 0) {
-        return res
-          .status(404)
-          .json({ status: false, message: "Không tìm thấy hồ sơ kiểm định" });
-      }
-      if (rows[0].trang_thai_ho_so !== "DA_LAY_MAU") {
-        return res.status(409).json({
-          status: false,
-          message:
-            "Chỉ công bố được hồ sơ đã lấy mẫu và nhập chỉ số kiểm định",
-        });
-      }
+      if (rows.length === 0) throw new LoiNghiepVu(404, "Không tìm thấy hồ sơ kiểm định");
+      const hoSo = rows[0];
 
-      // Server tự đánh giá lại các chỉ số đã lưu, không tin giao diện
-      const [chiSoRows] = await db.query(
-        `SELECT cs.gia_tri, nq.toan_tu_so_sanh, nq.nguong_toi_da
-         FROM chi_so_kiem_dinh cs
-         LEFT JOIN nguong_kiem_dinh_chuan nq
-           ON cs.ma_chi_so = nq.ma_chi_so AND cs.ten_chi_so = nq.ten_chi_tiet_chat
-         WHERE cs.ma_kiem_dinh = ?
-         GROUP BY cs.ma_chi_so_kd`,
-        [code],
-      );
-      const tatCaDat = allIndicatorsPass(chiSoRows);
-      if (status === "accept" && !tatCaDat) {
-        return res.status(409).json({
-          status: false,
-          message:
+      if (status === "accept" || status === "fail") {
+        // Chỉ công bố khi hồ sơ đã lấy mẫu và nhập chỉ số (DA_LAY_MAU)
+        if (hoSo.trang_thai_ho_so !== "DA_LAY_MAU") {
+          throw new LoiNghiepVu(409, "Chỉ công bố được hồ sơ đã lấy mẫu và nhập chỉ số kiểm định");
+        }
+        // Chủ lô phải ký xác nhận biên bản lấy mẫu trước (hợp đồng cũng chặn nếu thiếu bước này)
+        if (!hoSo.chu_lo_da_xac_nhan) {
+          throw new LoiNghiepVu(
+            409,
+            "Chủ lô chưa xác nhận biên bản lấy mẫu. Chủ lô vào trang Nông dân → Lịch hẹn kiểm định để xác nhận.",
+          );
+        }
+
+        // Server tự đánh giá lại các chỉ số đã lưu, không tin giao diện
+        const [chiSoRows] = await conn.query(
+          `SELECT cs.gia_tri, nq.toan_tu_so_sanh, nq.nguong_toi_da
+           FROM chi_so_kiem_dinh cs
+           LEFT JOIN nguong_kiem_dinh_chuan nq
+             ON cs.ma_chi_so = nq.ma_chi_so AND cs.ten_chi_so = nq.ten_chi_tiet_chat
+           WHERE cs.ma_kiem_dinh = ?
+           GROUP BY cs.ma_chi_so_kd`,
+          [code],
+        );
+        const tatCaDat = allIndicatorsPass(chiSoRows);
+        if (status === "accept" && !tatCaDat) {
+          throw new LoiNghiepVu(
+            409,
             chiSoRows.length === 0
               ? "Hồ sơ chưa có chỉ số kiểm định để công bố"
               : "Có chỉ số không đạt ngưỡng, không thể cấp chứng nhận. Hãy công bố kết luận Không đạt.",
-        });
-      }
-      if (status === "fail" && tatCaDat) {
-        return res.status(409).json({
-          status: false,
-          message:
+          );
+        }
+        if (status === "fail" && tatCaDat) {
+          throw new LoiNghiepVu(
+            409,
             "Tất cả chỉ số đều đạt, không thể công bố Không đạt. Hãy cấp chứng nhận.",
-        });
-      }
-    }
+          );
+        }
 
-    if (status === "accept") {
-      const soChungNhan = await generateCertificateNumber(db);
-      const sql = `UPDATE kiem_dinh_lo_hang
-        SET trang_thai_ho_so = 'DA_CONG_BO', ket_luan = 'PASSED',
-            so_chung_nhan = ?, hieu_luc_tu = CURDATE(),
-            hieu_luc_den = DATE_ADD(CURDATE(), INTERVAL 12 MONTH),
-            updated_at = CURRENT_TIMESTAMP
-        WHERE ma_kiem_dinh = ? AND trang_thai_ho_so = 'DA_LAY_MAU'`;
-      const [result] = await db.query(sql, [soChungNhan, code]);
-      if (result.affectedRows > 0) {
-        return res.status(200).json({
-          message: `Công bố chứng nhận thành công (số chứng nhận ${soChungNhan})`,
-          status: true,
-          so_chung_nhan: soChungNhan,
-        });
-      }
-    } else if (status === "fail") {
-      const sql = `UPDATE kiem_dinh_lo_hang
-        SET trang_thai_ho_so = 'DA_CONG_BO', ket_luan = 'FAILED',
-            updated_at = CURRENT_TIMESTAMP
-        WHERE ma_kiem_dinh = ? AND trang_thai_ho_so = 'DA_LAY_MAU'`;
-      const [result] = await db.query(sql, [code]);
-      if (result.affectedRows > 0) {
-        return res.status(200).json({
-          message: "Đã công bố kết luận KHÔNG ĐẠT cho lô hàng",
-          status: true,
-        });
-      }
-    } else {
-      const sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so = 'THU_HOI', ket_luan = 'REVOKED', ly_do_thu_hoi = ?, ngay_thu_hoi = NOW(), updated_at = CURRENT_TIMESTAMP WHERE ma_kiem_dinh = ?;`;
-      const [result] = await db.query(sql, [message, code]);
-      if (result.affectedRows > 0) {
-        return res.status(200).json({
-          message: "Đã yêu cầu thu hồi chứng nhận",
-          status: true,
-        });
-      }
-    }
+        // Kết quả được đánh giá theo bộ ngưỡng hiện hành; bộ ngưỡng này phải đã được admin ghi lên blockchain
+        let maPhienBan = null;
+        if (layCauHinh().daCauHinh) {
+          const nguong = await phienBanNguongHienHanh(conn);
+          if (!nguong.phienBan?.ma_giao_dich_blockchain) {
+            throw new LoiNghiepVu(
+              409,
+              "Bộ ngưỡng kiểm định hiện hành chưa được quản trị viên ghi lên blockchain, chưa công bố được. Hãy báo quản trị viên (Quản trị → Ví blockchain → Bộ ngưỡng kiểm định).",
+            );
+          }
+          maPhienBan = nguong.phienBan.ma_phien_ban;
+        }
 
-    return res.status(409).json({
-      status: false,
-      message: "Không cập nhật được hồ sơ, vui lòng tải lại danh sách",
+        if (status === "accept") {
+          const soChungNhan = await generateCertificateNumber(conn);
+          await conn.query(
+            `UPDATE kiem_dinh_lo_hang
+             SET trang_thai_ho_so = 'DA_CONG_BO', ket_luan = 'PASSED',
+                 so_chung_nhan = ?, hieu_luc_tu = CURDATE(),
+                 hieu_luc_den = DATE_ADD(CURDATE(), INTERVAL 12 MONTH),
+                 ma_phien_ban_nguong = ?, da_ghi_chuoi = 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE ma_kiem_dinh = ?`,
+            [soChungNhan, maPhienBan, code],
+          );
+          await ghiSuKienKiemDinhTrong(conn, code, "CERTIFICATE_ISSUED");
+          return {
+            message: `Công bố chứng nhận thành công (số chứng nhận ${soChungNhan})`,
+            so_chung_nhan: soChungNhan,
+          };
+        }
+
+        await conn.query(
+          `UPDATE kiem_dinh_lo_hang
+           SET trang_thai_ho_so = 'DA_CONG_BO', ket_luan = 'FAILED',
+               ma_phien_ban_nguong = ?, da_ghi_chuoi = 1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE ma_kiem_dinh = ?`,
+          [maPhienBan, code],
+        );
+        await ghiSuKienKiemDinhTrong(conn, code, "CERTIFICATE_FAILED");
+        return { message: "Đã công bố kết luận KHÔNG ĐẠT cho lô hàng" };
+      }
+
+      // Thu hồi
+      if (hoSo.trang_thai_ho_so === "THU_HOI") {
+        throw new LoiNghiepVu(409, "Hồ sơ đã bị thu hồi trước đó");
+      }
+      const thuHoiChungNhan =
+        hoSo.trang_thai_ho_so === "DA_CONG_BO" && hoSo.ket_luan === "PASSED";
+      await conn.query(
+        `UPDATE kiem_dinh_lo_hang
+         SET trang_thai_ho_so = 'THU_HOI', ket_luan = 'REVOKED', ly_do_thu_hoi = ?,
+             ngay_thu_hoi = NOW(), updated_at = CURRENT_TIMESTAMP
+         WHERE ma_kiem_dinh = ?`,
+        [message, code],
+      );
+      // Chỉ chứng nhận ĐẠT đã cấp mới có trên chain để thu hồi
+      if (thuHoiChungNhan) {
+        await ghiSuKienKiemDinhTrong(conn, code, "CERTIFICATE_REVOKED");
+      }
+      return { message: "Đã yêu cầu thu hồi chứng nhận" };
     });
+
+    return res.status(200).json({ status: true, ...ketQua });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ status: false, message: error.message });
+    }
     console.error("Lỗi cập nhật trạng thái kiểm định:", error);
     return res.status(500).json({ status: false, message: "Lỗi hệ thống" });
   }

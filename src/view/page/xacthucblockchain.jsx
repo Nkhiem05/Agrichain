@@ -7,6 +7,7 @@ import "../css/blockchain.css";
 export const TEN_SU_KIEN = {
   HARVEST_CONFIRMED: "Chốt thu hoạch",
   SAMPLING_SEALED: "Niêm phong mẫu kiểm định",
+  SAMPLING_CONFIRMED: "Chủ lô xác nhận lấy mẫu",
   CERTIFICATE_ISSUED: "Cấp chứng nhận kiểm định",
   CERTIFICATE_FAILED: "Kết luận kiểm định không đạt",
   CERTIFICATE_REVOKED: "Thu hồi chứng nhận",
@@ -21,6 +22,27 @@ export const TEN_SU_KIEN = {
   DISPATCHED: "Xuất kho cho đại lý",
   DELIVERED_TO_AGENT: "Giao hàng cho đại lý",
   COMPLETE_CONFIRMED: "Hoàn tất",
+  RETURN_SHIPPED: "Gửi trả hàng",
+  RETURN_RECEIVED: "Nhận lại hàng trả",
+  CORRECTION: "Đính chính",
+};
+
+// Vai trò của người ký (hiển thị cạnh tên)
+export const TEN_VAI_TRO_KY = {
+  FARMER_COOP: "Nông dân",
+  CERT_AUTHORITY: "Cơ quan kiểm định",
+  TRANSPORTER: "Vận chuyển",
+  PROCESSOR: "Sơ chế",
+  DISTRIBUTOR: "Phân phối",
+  RETAILER: "Đại lý",
+  ADMIN: "Quản trị",
+};
+
+// Khối lượng trên chain (gram, chuỗi số) -> "1.234,5 kg"
+const gramSangKg = (g) => {
+  const so = Number(g);
+  if (!Number.isFinite(so)) return "";
+  return `${(so / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} kg`;
 };
 
 export const TRANG_THAI_XAC_THUC = {
@@ -169,8 +191,11 @@ export const XacThucBlockchainCard = ({ maLo }) => {
   }
 
   const tt = TRANG_THAI_XAC_THUC[data.trang_thai];
-  const lienKetTx = (tx) =>
-    data.explorer_url && tx ? `${data.explorer_url}/tx/${tx}` : null;
+  const goc = data.explorer_url ? data.explorer_url.replace(/\/$/, "") : null;
+  const lienKetTx = (tx) => (goc && tx ? `${goc}/tx/${tx}` : null);
+  const lienKetHopDong =
+    goc && data.contract_address ? `${goc}/address/${data.contract_address}` : null;
+  const tren = data.tren_chain;
 
   return (
     <div className="blockchain-card">
@@ -187,6 +212,25 @@ export const XacThucBlockchainCard = ({ maLo }) => {
             <li key={l}>{l}</li>
           ))}
         </ul>
+      )}
+
+      <p className="bc-muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+        Mỗi bước dưới đây do chính bên liên quan ký bằng ví riêng. Hệ thống đối chiếu dữ liệu
+        lưu trữ với mã băm trên blockchain; dữ liệu bị sửa sẽ không khớp.
+      </p>
+
+      {tren?.tonTai && (
+        <p className="tx-hash-label" style={{ fontSize: 11.5, lineHeight: 1.6 }}>
+          Trên blockchain: khối lượng {gramSangKg(tren.khoiLuongGram)}
+          {" • "}
+          {tren.khongDat
+            ? "lô đã bị kết luận KHÔNG ĐẠT"
+            : tren.soChungNhan > 0
+              ? tren.chungNhanHopLe
+                ? `${tren.soChungNhan} chứng nhận còn hiệu lực`
+                : "chứng nhận đã hết hiệu lực hoặc bị thu hồi"
+              : "chưa có chứng nhận"}
+        </p>
       )}
 
       <p className="tx-hash-label">Mã băm sự kiện mới nhất:</p>
@@ -207,6 +251,7 @@ export const XacThucBlockchainCard = ({ maLo }) => {
                 </div>
                 <div className="bc-event-meta">
                   {new Date(e.thoi_diem).toLocaleString("vi-VN")} • {e.nguoi_ky}
+                  {TEN_VAI_TRO_KY[e.vai_tro] ? ` (${TEN_VAI_TRO_KY[e.vai_tro]})` : ""}
                 </div>
                 <div className="bc-event-meta">
                   {e.trang_thai === "CONFIRMED" ? (
@@ -225,7 +270,7 @@ export const XacThucBlockchainCard = ({ maLo }) => {
                       )}
                     </>
                   ) : (
-                    <>Chưa ký lên blockchain</>
+                    <>{e.trang_thai === "SUBMITTED" ? "Đã gửi, đang chờ blockchain xác nhận" : "Chưa ký lên blockchain"}</>
                   )}
                 </div>
               </li>
@@ -238,7 +283,13 @@ export const XacThucBlockchainCard = ({ maLo }) => {
         <span>
           Đã ký {data.da_xac_nhan}/{data.so_su_kien} sự kiện
         </span>
-        <span>{data.ten_mang}</span>
+        {lienKetHopDong ? (
+          <a href={lienKetHopDong} target="_blank" rel="noopener noreferrer" style={{ color: "#bbf7d0" }}>
+            {data.ten_mang} • Hợp đồng {rutGon(data.contract_address)}
+          </a>
+        ) : (
+          <span>{data.ten_mang}</span>
+        )}
       </div>
     </div>
   );

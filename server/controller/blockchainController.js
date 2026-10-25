@@ -1,5 +1,5 @@
 const crypto = require("crypto");
-const { verifyMessage, isAddress, getAddress, ZeroAddress } = require("ethers");
+const { verifyMessage, isAddress, getAddress } = require("ethers");
 const db = require("../config/db");
 const {
   ABI,
@@ -11,12 +11,17 @@ const {
   hashNoiDung,
   hashSuKien,
   batchIdCuaLo,
+  certIdCuaHoSo,
+  productIdCuaSanPham,
 } = require("../services/blockchain/canonical");
 const {
   layBanChupMuaVu,
   layChiSoKiemDinh,
 } = require("../services/blockchain/traceEvent");
 const chain = require("../services/blockchain/chainClient");
+const { phienBanNguongHienHanh } = require("../services/blockchain/nguong");
+const { ghiNhanDaXacNhan, ghiNhanDaGui } = require("../services/blockchain/ghiNhan");
+const outboxWorker = require("../services/blockchain/outboxWorker");
 
 class ApiError extends Error {
   constructor(status, message) {
@@ -247,6 +252,52 @@ const danhSachViChoDuyet = async (req, res) => {
   }
 };
 
+// Danh sách ví cho trang quản trị (lọc theo trạng thái duyệt) + ví admin của hợp đồng để đối chiếu
+const danhSachVi = async (req, res) => {
+  try {
+    const trangThai = ["CHO_DUYET", "DA_DUYET", "TU_CHOI"].includes(req.query?.trang_thai)
+      ? req.query.trang_thai
+      : null;
+    const [rows] = await db.query(
+      `
+      SELECT v.dia_chi_vi, v.ma_nguoi_dung, v.trang_thai, v.trang_thai_duyet, v.tx_gan_vai_tro,
+             v.thoi_diem_dang_ky, v.thoi_diem_duyet, nd.ho_ten, nd.ten_dang_nhap, nd.vai_tro
+      FROM vi_blockchain v
+      JOIN nguoi_dung nd ON nd.ma_nguoi_dung = v.ma_nguoi_dung
+      ${trangThai ? "WHERE v.trang_thai_duyet = ?" : ""}
+      ORDER BY FIELD(v.trang_thai_duyet, 'CHO_DUYET', 'DA_DUYET', 'TU_CHOI'), v.thoi_diem_dang_ky DESC
+      `,
+      trangThai ? [trangThai] : [],
+    );
+
+    let adminHopDong = null;
+    let loiHopDong = null;
+    try {
+      loiHopDong = await chain.chanDoanHopDong();
+      if (!loiHopDong) adminHopDong = await chain.adminTrenChain();
+    } catch (err) {
+      console.error("Lỗi đọc admin của contract:", err);
+      loiHopDong = err.shortMessage || err.message;
+    }
+    if (loiHopDong) console.warn("Hợp đồng blockchain:", loiHopDong);
+
+    return res.json({
+      success: true,
+      data: {
+        admin_hop_dong: adminHopDong,
+        hop_dong: { dia_chi: chain.layCauHinh().contractAddress, loi: loiHopDong },
+        vi: rows.map((r) => ({
+          ...r,
+          dia_chi_vi: getAddress(r.dia_chi_vi),
+          vai_tro_on_chain: VAI_TRO_ON_CHAIN[r.vai_tro] || null,
+        })),
+      },
+    });
+  } catch (err) {
+    return sendError(res, err, "Không thể lấy danh sách ví");
+  }
+};
+
 // Sau khi admin ký setRole bằng ví của mình, server kiểm tra lại trực tiếp trên chain rồi mới đánh dấu đã duyệt
 const duyetVi = async (req, res) => {
   try {
@@ -314,6 +365,137 @@ const tuChoiVi = async (req, res) => {
   }
 };
 
+/* ======================= Bộ ngưỡng kiểm định ======================= */
+
+const txHashHopLe = (v) =>
+  typeof v === "string" && /^0x[0-9a-fA-F]{64}$/.test(v) ? v.toLowerCase() : null;
+
+// Bộ ngưỡng đang áp dụng: mã băm, đã ghi lên hợp đồng chưa, các phiên bản đã lưu
+const thongTinNguong = async (req, res) => {
+  try {
+    const hienHanh = await phienBanNguongHienHanh(db);
+    let trenChain = null;
+    let loiChain = null;
+    try {
+      trenChain = await chain.nguongTrenChain(hienHanh.maBam);
+    } catch (err) {
+      loiChain = err.shortMessage || err.message;
+    }
+    const [lichSu] = await db.query(
+      `
+      SELECT ma_phien_ban, ma_bam, ghi_chu, ma_giao_dich_blockchain, created_at,
+             JSON_LENGTH(noi_dung, '$.nguong') AS so_chi_tieu
+      FROM phien_ban_nguong
+      ORDER BY ma_phien_ban DESC
+      LIMIT 20
+      `,
+    );
+    return res.json({
+      success: true,
+      data: {
+        ma_bam: hienHanh.maBam,
+        so_chi_tieu: hienHanh.soChiTieu,
+        phien_ban: hienHanh.phienBan,
+        tren_chain: trenChain,
+        loi_chain: loiChain,
+        lich_su: lichSu,
+      },
+    });
+  } catch (err) {
+    return sendError(res, err, "Không thể lấy thông tin bộ ngưỡng");
+  }
+};
+
+// Admin đã ký setThreshold(mã băm): server đọc lại trên chain rồi lưu phiên bản để cơ quan kiểm định dùng khi công bố
+const xacNhanNguong = async (req, res) => {
+  try {
+    const txHash = txHashHopLe(req.body?.txHash);
+    if (!txHash) throw new ApiError(400, "Thiếu mã giao dịch hợp lệ");
+
+    const hienHanh = await phienBanNguongHienHanh(db);
+    if (req.body?.ma_bam && req.body.ma_bam !== hienHanh.maBam) {
+      throw new ApiError(409, "Bộ ngưỡng vừa thay đổi trong lúc ký, hãy tải lại và ký lại");
+    }
+
+    let gd;
+    let daGhi;
+    try {
+      gd = await chain.kiemTraGiaoDichHopDong(txHash);
+      daGhi = await chain.nguongTrenChain(hienHanh.maBam);
+    } catch (err) {
+      console.error("Lỗi đọc bộ ngưỡng trên chain:", err);
+      throw new ApiError(502, "Không đọc được blockchain, thử lại sau");
+    }
+    if (!gd.ok) throw new ApiError(409, gd.lyDo);
+    if (!daGhi) throw new ApiError(409, "Trên blockchain chưa có bộ ngưỡng này (giao dịch không phải setThreshold đúng mã băm)");
+
+    await db.query(
+      `
+      INSERT INTO phien_ban_nguong (ma_bam, noi_dung, ghi_chu, ma_giao_dich_blockchain)
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE ma_giao_dich_blockchain = VALUES(ma_giao_dich_blockchain)
+      `,
+      [
+        hienHanh.maBam,
+        hienHanh.noiDungJson,
+        `${hienHanh.soChiTieu} chỉ tiêu đang áp dụng`,
+        txHash,
+      ],
+    );
+    return res.json({ success: true, message: "Đã ghi nhận bộ ngưỡng trên blockchain" });
+  } catch (err) {
+    return sendError(res, err, "Không thể xác nhận bộ ngưỡng");
+  }
+};
+
+/* ======================= Outbox (hàng chờ ghi blockchain) ======================= */
+
+const thongTinOutbox = async (req, res) => {
+  try {
+    const [dem] = await db.query(
+      `SELECT status, COUNT(*) AS so FROM blockchain_outbox GROUP BY status`,
+    );
+    const [ganDay] = await db.query(
+      `
+      SELECT o.event_id, o.status, o.tx_hash, o.retry_count, o.last_error, o.submitted_at, o.confirmed_at,
+             ls.ma_lo_nong_san, ls.loai_hoat_dong, ls.ma_nguoi_dung, nd.ho_ten
+      FROM blockchain_outbox o
+      JOIN lich_su_truy_xuat_lo ls ON ls.ma_lich_su = o.event_id
+      JOIN nguoi_dung nd ON nd.ma_nguoi_dung = ls.ma_nguoi_dung
+      WHERE o.status <> 'CONFIRMED' OR o.last_error IS NOT NULL
+      ORDER BY (o.status = 'CONFIRMED'), o.created_at DESC
+      LIMIT 30
+      `,
+    );
+    const w = outboxWorker.trangThai;
+    return res.json({
+      success: true,
+      data: {
+        dem: Object.fromEntries(dem.map((d) => [d.status, Number(d.so)])),
+        gan_day: ganDay,
+        worker: {
+          dang_bat: w.dangBat,
+          chu_ky_giay: w.chuKyGiay,
+          lan_chay_cuoi: w.lanChayCuoi,
+          ket_qua_cuoi: w.ketQuaCuoi,
+          loi_cuoi: w.loiCuoi,
+        },
+      },
+    });
+  } catch (err) {
+    return sendError(res, err, "Không thể lấy tình trạng hàng chờ blockchain");
+  }
+};
+
+const chayOutboxNgay = async (req, res) => {
+  try {
+    const kq = await outboxWorker.chayMotLan();
+    return res.json({ success: true, data: kq, message: "Đã chạy đối soát" });
+  } catch (err) {
+    return sendError(res, err, "Không thể chạy đối soát");
+  }
+};
+
 /* ======================= Danh sách sự kiện chờ ký ======================= */
 
 const layViDaDuyet = async (maNguoiDungs) => {
@@ -329,7 +511,8 @@ const layViDaDuyet = async (maNguoiDungs) => {
   return new Map(rows.map((r) => [r.ma_nguoi_dung, getAddress(r.dia_chi_vi)]));
 };
 
-// Dựng tham số gọi hàm contract cho một sự kiện. Trả { args } hoặc { thieuVi: [...] }.
+// Dựng tham số gọi hàm contract (v2) cho một sự kiện. Trả { args }, { thieuVi: [...] } hoặc { loi }.
+// Số lượng (gram) gửi dạng chuỗi để đi qua JSON; ethers tự đổi sang uint128.
 const dungThamSoGoiHam = (o, viCua) => {
   const {
     batch_id: batchId,
@@ -340,32 +523,62 @@ const dungThamSoGoiHam = (o, viCua) => {
   } = o;
   switch (o.ham) {
     case "harvest":
-      return { args: [batchId, ev] };
+      if (!ts.so_luong_gram || ts.so_luong_gram === "0")
+        return { loi: "Sự kiện thu hoạch thiếu khối lượng (tạo trước khi nâng cấp hợp đồng v2)" };
+      return {
+        args: [batchId, productIdCuaSanPham(ts.ma_san_pham), String(ts.so_luong_gram), ev],
+      };
     case "certify":
-      return { args: [batchId, loaiMa, ts.het_han || 0, prev, ev] };
+      if (!ts.ma_kiem_dinh) return { loi: "Sự kiện kiểm định thiếu mã hồ sơ" };
+      if ((o.loai === "CERTIFICATE_ISSUED" || o.loai === "CERTIFICATE_FAILED") && !ts.phien_ban_nguong)
+        return { loi: "Kết quả kiểm định chưa gắn bộ ngưỡng đã ghi trên blockchain" };
+      return {
+        args: [
+          batchId,
+          certIdCuaHoSo(ts.ma_kiem_dinh),
+          loaiMa,
+          ts.het_han || 0,
+          ts.phien_ban_nguong || ZERO_HASH,
+          prev,
+          ev,
+        ],
+      };
+    case "confirmSampling":
+      if (!ts.ma_kiem_dinh) return { loi: "Sự kiện xác nhận lấy mẫu thiếu mã hồ sơ" };
+      return { args: [batchId, certIdCuaHoSo(ts.ma_kiem_dinh), prev, ev] };
     case "orderTransport": {
+      if (!ts.ma_ben_nhan)
+        return { loi: "Lệnh vận chuyển không có bên nhận có tài khoản, không ký lên blockchain được" };
       const thieuVi = [];
       const vanChuyen = viCua.get(ts.ma_don_vi_van_chuyen);
       if (!vanChuyen) thieuVi.push(ts.ma_don_vi_van_chuyen);
-      let benNhan = ZeroAddress;
-      if (ts.ma_ben_nhan) {
-        benNhan = viCua.get(ts.ma_ben_nhan);
-        if (!benNhan) thieuVi.push(ts.ma_ben_nhan);
-      }
+      const benNhan = viCua.get(ts.ma_ben_nhan);
+      if (!benNhan) thieuVi.push(ts.ma_ben_nhan);
       if (thieuVi.length > 0) return { thieuVi };
       return { args: [batchId, vanChuyen, benNhan, prev, ev] };
     }
+    case "confirmReceive":
+      if (!ts.khoi_luong_nhan_gram || ts.khoi_luong_nhan_gram === "0")
+        return { loi: "Sự kiện nhận hàng thiếu khối lượng thực nhận" };
+      return { args: [batchId, String(ts.khoi_luong_nhan_gram), prev, ev] };
     case "pickup":
     case "arrive":
-    case "confirmReceive":
     case "rejectHandover":
+    case "returnShip":
+    case "returnReceive":
+    case "correct":
       return { args: [batchId, prev, ev] };
     case "createChild":
+      if (!ts.so_luong_con_gram || !(ts.so_luong_nguon_gram || []).length)
+        return { loi: "Sự kiện tạo lô con thiếu khối lượng" };
       return {
         args: [
           batchId,
           (ts.ma_lo_nguon || []).map(batchIdCuaLo),
           ts.hash_lo_nguon || [],
+          ts.so_luong_nguon_gram.map(String),
+          String(ts.so_luong_con_gram),
+          productIdCuaSanPham(ts.ma_san_pham),
           ev,
         ],
       };
@@ -382,7 +595,8 @@ const choKy = async (req, res) => {
     const [rows] = await db.query(
       `
       SELECT ls.ma_lich_su, ls.ma_lo_nong_san, ls.so_thu_tu_su_kien, ls.loai_hoat_dong,
-             ls.blockchain_sync_status, ls.thoi_diem_xay_ra, o.payload
+             ls.blockchain_sync_status, ls.thoi_diem_xay_ra, o.payload,
+             o.tx_hash, o.last_error
       FROM lich_su_truy_xuat_lo ls
       JOIN blockchain_outbox o ON o.event_id = ls.ma_lich_su
       WHERE ls.ma_nguoi_dung = ? AND ls.blockchain_sync_status <> 'CONFIRMED'
@@ -433,7 +647,9 @@ const choKy = async (req, res) => {
       const stt = Number(it.so_thu_tu_su_kien);
       let lyDo = null;
 
-      if (!viCuaToiAddr) lyDo = "Bạn chưa có ví được duyệt";
+      if (it.blockchain_sync_status === "SUBMITTED")
+        lyDo = "Đã gửi giao dịch, đang chờ blockchain xác nhận (hệ thống tự kiểm tra)";
+      else if (!viCuaToiAddr) lyDo = "Bạn chưa có ví được duyệt";
       else if (minChuaXacNhan.get(it.ma_lo_nong_san) !== stt)
         lyDo = "Đang chờ sự kiện trước của lô được ký";
 
@@ -448,6 +664,7 @@ const choKy = async (req, res) => {
       }
 
       const dung = dungThamSoGoiHam(it.outbox, viCua);
+      if (!lyDo && dung.loi) lyDo = dung.loi;
       if (!lyDo && dung.thieuVi) {
         lyDo = `Chờ ${dung.thieuVi.join(", ")} liên kết và được duyệt ví`;
       }
@@ -461,6 +678,8 @@ const choKy = async (req, res) => {
         trang_thai: it.blockchain_sync_status,
         san_sang: !lyDo,
         ly_do: lyDo,
+        tx_hash: it.blockchain_sync_status === "SUBMITTED" ? it.tx_hash : null,
+        loi_truoc: it.blockchain_sync_status === "SUBMITTED" ? null : it.last_error || null,
         ham: it.outbox.ham,
         args: lyDo ? null : dung.args,
       };
@@ -477,15 +696,28 @@ const choKy = async (req, res) => {
 
 /* ======================= Xác nhận giao dịch ======================= */
 
-const capNhatTrangThaiLo = async (executor, maLo) => {
-  const [r] = await executor.query(
-    `SELECT COUNT(*) AS con FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? AND blockchain_sync_status <> 'CONFIRMED'`,
-    [maLo],
-  );
-  await executor.query(
-    `UPDATE lo_nong_san SET blockchain_sync_status = ? WHERE ma_lo_nong_san = ?`,
-    [Number(r[0].con) === 0 ? "CONFIRMED" : "QUEUED", maLo],
-  );
+// Trình duyệt báo "đã gửi giao dịch" ngay khi MetaMask trả mã giao dịch (trước khi vào khối).
+// Nếu sau đó trình duyệt bị đóng, Outbox worker vẫn theo dõi giao dịch này tới khi xác nhận.
+const daGuiSuKien = async (req, res) => {
+  try {
+    const { maLichSu } = req.params;
+    const txHash = txHashHopLe(req.body?.txHash);
+    if (!txHash) throw new ApiError(400, "Mã giao dịch không hợp lệ");
+    const [rows] = await db.query(
+      `SELECT ma_nguoi_dung, blockchain_sync_status FROM lich_su_truy_xuat_lo WHERE ma_lich_su = ? LIMIT 1`,
+      [maLichSu],
+    );
+    const ev = rows[0];
+    if (!ev || ev.ma_nguoi_dung !== req.user.ma_nguoi_dung) {
+      throw new ApiError(404, "Không tìm thấy sự kiện cần ký của bạn");
+    }
+    if (ev.blockchain_sync_status !== "CONFIRMED") {
+      await withTransaction((connection) => ghiNhanDaGui(connection, { maLichSu, txHash }));
+    }
+    return res.json({ success: true, message: "Đã ghi nhận giao dịch, đang chờ blockchain xác nhận" });
+  } catch (err) {
+    return sendError(res, err, "Không thể ghi nhận giao dịch đã gửi");
+  }
 };
 
 const xacNhanSuKien = async (req, res) => {
@@ -528,25 +760,15 @@ const xacNhanSuKien = async (req, res) => {
       throw new ApiError(403, "Giao dịch không do ví đã duyệt của bạn ký");
     }
 
-    await withTransaction(async (connection) => {
-      await connection.query(
-        `
-        UPDATE lich_su_truy_xuat_lo
-        SET blockchain_sync_status = 'CONFIRMED', ma_giao_dich_blockchain = ?, dia_chi_vi_ky = ?
-        WHERE ma_lich_su = ?
-        `,
-        [txHash.toLowerCase(), kq.signer, maLichSu],
-      );
-      await connection.query(
-        `
-        UPDATE blockchain_outbox
-        SET status = 'CONFIRMED', tx_hash = ?, submitted_at = COALESCE(submitted_at, NOW()), confirmed_at = NOW()
-        WHERE event_id = ?
-        `,
-        [txHash.toLowerCase(), maLichSu],
-      );
-      await capNhatTrangThaiLo(connection, ev.ma_lo_nong_san);
-    });
+    await withTransaction((connection) =>
+      ghiNhanDaXacNhan(connection, {
+        maLichSu,
+        maLo: ev.ma_lo_nong_san,
+        txHash: txHash.toLowerCase(),
+        signer: kq.signer,
+        soBlock: kq.blockNumber,
+      }),
+    );
 
     return res.json({
       success: true,
@@ -559,221 +781,336 @@ const xacNhanSuKien = async (req, res) => {
 
 /* ======================= Xác thực (công khai cho người tiêu dùng) ======================= */
 
-const xacThucLo = async (req, res) => {
-  try {
-    const maLo = String(req.params.maLo || "")
-      .replace(/^#/, "")
-      .trim();
-    const [loRows] = await db.query(
-      `SELECT ma_lo_nong_san, latest_event_sequence, latest_event_hash FROM lo_nong_san WHERE ma_lo_nong_san = ?`,
-      [maLo],
-    );
-    if (loRows.length === 0) throw new ApiError(404, "Không tìm thấy lô hàng");
-    const lo = loRows[0];
+// Đối chiếu một lô: chuỗi hash trong MySQL, dữ liệu gốc (mùa vụ, chỉ số kiểm định, lô nguồn) và hash trên chain.
+// Dùng cho trang xác thực công khai và cho đối soát toàn bộ của admin.
+const xacThucMotLo = async (maLoVao) => {
+  const maLo = String(maLoVao || "")
+    .replace(/^#/, "")
+    .trim();
+  const [loRows] = await db.query(
+    `SELECT ma_lo_nong_san, latest_event_sequence, latest_event_hash FROM lo_nong_san WHERE ma_lo_nong_san = ?`,
+    [maLo],
+  );
+  if (loRows.length === 0) throw new ApiError(404, "Không tìm thấy lô hàng");
+  const lo = loRows[0];
 
-    const [events] = await db.query(
-      `
-      SELECT ls.so_thu_tu_su_kien, ls.loai_hoat_dong, ls.thoi_diem_xay_ra, ls.du_lieu_chi_tiet,
-             ls.ma_bam_du_lieu, ls.ma_bam_su_kien_truoc, ls.ma_bam_su_kien_hien_tai,
-             ls.ma_giao_dich_blockchain, ls.dia_chi_vi_ky, ls.blockchain_sync_status,
-             nd.ho_ten, nd.vai_tro
-      FROM lich_su_truy_xuat_lo ls
-      JOIN nguoi_dung nd ON nd.ma_nguoi_dung = ls.ma_nguoi_dung
-      WHERE ls.ma_lo_nong_san = ?
-      ORDER BY ls.so_thu_tu_su_kien
-      `,
-      [maLo],
-    );
+  const [events] = await db.query(
+    `
+    SELECT ls.so_thu_tu_su_kien, ls.loai_hoat_dong, ls.thoi_diem_xay_ra, ls.du_lieu_chi_tiet,
+           ls.ma_bam_du_lieu, ls.ma_bam_su_kien_truoc, ls.ma_bam_su_kien_hien_tai,
+           ls.ma_giao_dich_blockchain, ls.dia_chi_vi_ky, ls.blockchain_sync_status,
+           nd.ho_ten, nd.vai_tro
+    FROM lich_su_truy_xuat_lo ls
+    JOIN nguoi_dung nd ON nd.ma_nguoi_dung = ls.ma_nguoi_dung
+    WHERE ls.ma_lo_nong_san = ?
+    ORDER BY ls.so_thu_tu_su_kien
+    `,
+    [maLo],
+  );
 
-    const cfg = chain.layCauHinh();
-    let trangThai = "VERIFIED";
-    const lyDo = [];
-    const danger = (status, text) => {
-      // mức nghiêm trọng: BROKEN_CHAIN > MISMATCH > INCOMPLETE > VERIFIED
-      const bac = { VERIFIED: 0, INCOMPLETE: 1, MISMATCH: 2, BROKEN_CHAIN: 3 };
-      if (bac[status] > bac[trangThai]) trangThai = status;
-      lyDo.push(text);
+  const cfg = chain.layCauHinh();
+  let trangThai = "VERIFIED";
+  const lyDo = [];
+  const danger = (status, text) => {
+    // mức nghiêm trọng: BROKEN_CHAIN > MISMATCH > INCOMPLETE > VERIFIED
+    const bac = { VERIFIED: 0, INCOMPLETE: 1, MISMATCH: 2, BROKEN_CHAIN: 3 };
+    if (bac[status] > bac[trangThai]) trangThai = status;
+    lyDo.push(text);
+  };
+
+  if (events.length === 0) {
+    return {
+      trang_thai: "NOT_CHECKED",
+      ly_do: ["Lô chưa có sự kiện truy xuất nào được ghi nhận lên blockchain"],
+      so_su_kien: 0,
+      da_xac_nhan: 0,
+      hash_moi_nhat: null,
+      tren_chain: null,
+      explorer_url: cfg.explorerUrl,
+      contract_address: cfg.contractAddress,
+      ten_mang: cfg.tenMang,
+      chain_id: cfg.chainId,
+      su_kien: [],
     };
+  }
 
-    if (events.length === 0) {
-      return res.json({
-        success: true,
-        data: {
-          trang_thai: "NOT_CHECKED",
-          ly_do: [
-            "Lô chưa có sự kiện truy xuất nào được ghi nhận lên blockchain",
-          ],
-          so_su_kien: 0,
-          da_xac_nhan: 0,
-          hash_moi_nhat: null,
-          tren_chain: null,
-          explorer_url: cfg.explorerUrl,
-          contract_address: cfg.contractAddress,
-          ten_mang: cfg.tenMang,
-          chain_id: cfg.chainId,
-          su_kien: [],
-        },
-      });
+  // 1. Chuỗi hash trong MySQL phải liền mạch và đúng nội dung
+  let prev = ZERO_HASH;
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    const stt = i + 1;
+    if (
+      Number(e.so_thu_tu_su_kien) !== stt ||
+      e.ma_bam_su_kien_truoc !== prev
+    ) {
+      danger("BROKEN_CHAIN", `Chuỗi sự kiện bị đứt tại bước ${stt}`);
+      break;
+    }
+    let payload;
+    try {
+      payload = docJson(e.du_lieu_chi_tiet);
+    } catch {
+      danger("MISMATCH", `Nội dung sự kiện ${stt} không đọc được`);
+      break;
+    }
+    const hashND = hashNoiDung(payload);
+    if (
+      hashND !== e.ma_bam_du_lieu ||
+      hashSuKien(prev, hashND) !== e.ma_bam_su_kien_hien_tai
+    ) {
+      danger(
+        "MISMATCH",
+        `Nội dung sự kiện ${stt} (${e.loai_hoat_dong}) đã bị thay đổi sau khi ghi`,
+      );
+      break;
     }
 
-    // 1. Chuỗi hash trong MySQL phải liền mạch và đúng nội dung
-    let prev = ZERO_HASH;
-    for (let i = 0; i < events.length; i++) {
-      const e = events[i];
-      const stt = i + 1;
-      if (
-        Number(e.so_thu_tu_su_kien) !== stt ||
-        e.ma_bam_su_kien_truoc !== prev
-      ) {
-        danger("BROKEN_CHAIN", `Chuỗi sự kiện bị đứt tại bước ${stt}`);
-        break;
-      }
-      let payload;
-      try {
-        payload = docJson(e.du_lieu_chi_tiet);
-      } catch {
-        danger("MISMATCH", `Nội dung sự kiện ${stt} không đọc được`);
-        break;
-      }
-      const hashND = hashNoiDung(payload);
-      if (
-        hashND !== e.ma_bam_du_lieu ||
-        hashSuKien(prev, hashND) !== e.ma_bam_su_kien_hien_tai
-      ) {
+    // Thu hoạch: snapshot mùa vụ và vật tư hiện tại phải trùng snapshot đã chốt
+    if (
+      e.loai_hoat_dong === "HARVEST_CONFIRMED" &&
+      payload.du_lieu?.ma_mua_vu &&
+      payload.du_lieu?.hash_ban_chup
+    ) {
+      const snap = await layBanChupMuaVu(db, payload.du_lieu.ma_mua_vu);
+      if (!snap || snap.hash !== payload.du_lieu.hash_ban_chup) {
         danger(
           "MISMATCH",
-          `Nội dung sự kiện ${stt} (${e.loai_hoat_dong}) đã bị thay đổi sau khi ghi`,
+          "Thông tin mùa vụ hoặc vật tư (phân bón, thuốc BVTV) đã bị thay đổi sau khi chốt thu hoạch",
         );
-        break;
       }
-
-      // Thu hoạch: snapshot mùa vụ và vật tư hiện tại phải trùng snapshot đã chốt
-      if (
-        e.loai_hoat_dong === "HARVEST_CONFIRMED" &&
-        payload.du_lieu?.ma_mua_vu &&
-        payload.du_lieu?.hash_ban_chup
-      ) {
-        const snap = await layBanChupMuaVu(db, payload.du_lieu.ma_mua_vu);
-        if (!snap || snap.hash !== payload.du_lieu.hash_ban_chup) {
-          danger(
-            "MISMATCH",
-            "Thông tin mùa vụ hoặc vật tư (phân bón, thuốc BVTV) đã bị thay đổi sau khi chốt thu hoạch",
-          );
-        }
-      }
-
-      // Kiểm định: chỉ số xét nghiệm hiện tại phải trùng chỉ số lúc công bố
-      if (payload.du_lieu?.ma_kiem_dinh && payload.du_lieu?.hash_chi_so) {
-        const chiSo = await layChiSoKiemDinh(db, payload.du_lieu.ma_kiem_dinh);
-        if (hashNoiDung(chiSo) !== payload.du_lieu.hash_chi_so) {
-          danger(
-            "MISMATCH",
-            "Chỉ số xét nghiệm của hồ sơ kiểm định đã bị thay đổi sau khi công bố",
-          );
-        }
-      }
-
-      // Lô con: hash lô nguồn đã cam kết phải đúng với chuỗi của lô nguồn
-      if (e.loai_hoat_dong === "BATCH_RELATION") {
-        for (const n of payload.du_lieu?.nguon || []) {
-          const [src] = await db.query(
-            `SELECT ma_bam_su_kien_hien_tai FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? AND so_thu_tu_su_kien = ?`,
-            [n.ma_lo, n.seq],
-          );
-          if (src.length === 0 || src[0].ma_bam_su_kien_hien_tai !== n.hash) {
-            danger(
-              "MISMATCH",
-              `Lô nguồn ${n.ma_lo} không khớp với cam kết khi tạo lô`,
-            );
-          }
-        }
-      }
-      prev = e.ma_bam_su_kien_hien_tai;
-    }
-    if (
-      events.length > 0 &&
-      lo.latest_event_hash !== events[events.length - 1].ma_bam_su_kien_hien_tai
-    ) {
-      danger("BROKEN_CHAIN", "Hash mới nhất của lô không khớp lịch sử sự kiện");
     }
 
-    // 2. Đối chiếu với blockchain
-    let tren = null;
-    if (
-      events.length > 0 &&
-      trangThai !== "BROKEN_CHAIN" &&
-      trangThai !== "MISMATCH"
-    ) {
-      if (!cfg.daCauHinh) {
-        danger("INCOMPLETE", "Server chưa cấu hình contract blockchain");
-      } else {
-        try {
-          tren = await chain.layTrangThaiLoTrenChain(maLo);
-        } catch (err) {
-          console.error("Lỗi đọc blockchain:", err);
+    // Kiểm định: chỉ số xét nghiệm hiện tại phải trùng chỉ số lúc công bố
+    if (payload.du_lieu?.ma_kiem_dinh && payload.du_lieu?.hash_chi_so) {
+      const chiSo = await layChiSoKiemDinh(db, payload.du_lieu.ma_kiem_dinh);
+      if (hashNoiDung(chiSo) !== payload.du_lieu.hash_chi_so) {
+        danger(
+          "MISMATCH",
+          "Chỉ số xét nghiệm của hồ sơ kiểm định đã bị thay đổi sau khi công bố",
+        );
+      }
+    }
+
+    // Lô con: hash lô nguồn đã cam kết phải đúng với chuỗi của lô nguồn
+    if (e.loai_hoat_dong === "BATCH_RELATION") {
+      for (const n of payload.du_lieu?.nguon || []) {
+        const [src] = await db.query(
+          `SELECT ma_bam_su_kien_hien_tai FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? AND so_thu_tu_su_kien = ?`,
+          [n.ma_lo, n.seq],
+        );
+        if (src.length === 0 || src[0].ma_bam_su_kien_hien_tai !== n.hash) {
+          danger(
+            "MISMATCH",
+            `Lô nguồn ${n.ma_lo} không khớp với cam kết khi tạo lô`,
+          );
+        }
+      }
+    }
+    prev = e.ma_bam_su_kien_hien_tai;
+  }
+  if (
+    events.length > 0 &&
+    lo.latest_event_hash !== events[events.length - 1].ma_bam_su_kien_hien_tai
+  ) {
+    danger("BROKEN_CHAIN", "Hash mới nhất của lô không khớp lịch sử sự kiện");
+  }
+
+  // 2. Đối chiếu với blockchain
+  let tren = null;
+  if (
+    events.length > 0 &&
+    trangThai !== "BROKEN_CHAIN" &&
+    trangThai !== "MISMATCH"
+  ) {
+    if (!cfg.daCauHinh) {
+      danger("INCOMPLETE", "Server chưa cấu hình contract blockchain");
+    } else {
+      try {
+        tren = await chain.layTrangThaiLoTrenChain(maLo);
+      } catch (err) {
+        console.error("Lỗi đọc blockchain:", err);
+        danger(
+          "INCOMPLETE",
+          "Không đọc được blockchain lúc này, hãy thử lại sau",
+        );
+      }
+      if (tren) {
+        if (!tren.tonTai) {
           danger(
             "INCOMPLETE",
-            "Không đọc được blockchain lúc này, hãy thử lại sau",
+            "Chưa có sự kiện nào của lô được ký lên blockchain",
           );
-        }
-        if (tren) {
-          if (!tren.tonTai) {
+        } else {
+          const idx = events.findIndex(
+            (e) => e.ma_bam_su_kien_hien_tai === tren.lastHash,
+          );
+          if (idx === -1) {
+            danger(
+              "MISMATCH",
+              "Hash trên blockchain không khớp bất kỳ sự kiện nào trong hệ thống",
+            );
+          } else if (idx < events.length - 1) {
             danger(
               "INCOMPLETE",
-              "Chưa có sự kiện nào của lô được ký lên blockchain",
+              `Mới có ${idx + 1}/${events.length} sự kiện được ký lên blockchain`,
             );
-          } else {
-            const idx = events.findIndex(
-              (e) => e.ma_bam_su_kien_hien_tai === tren.lastHash,
-            );
-            if (idx === -1) {
-              danger(
-                "MISMATCH",
-                "Hash trên blockchain không khớp bất kỳ sự kiện nào trong hệ thống",
-              );
-            } else if (idx < events.length - 1) {
-              danger(
-                "INCOMPLETE",
-                `Mới có ${idx + 1}/${events.length} sự kiện được ký lên blockchain`,
-              );
-            }
           }
         }
       }
     }
+  }
 
-    await db.query(
-      `UPDATE lo_nong_san SET integrity_status = ? WHERE ma_lo_nong_san = ?`,
-      [trangThai, maLo],
+  await db.query(
+    `UPDATE lo_nong_san SET integrity_status = ? WHERE ma_lo_nong_san = ?`,
+    [trangThai, maLo],
+  );
+
+  return {
+    trang_thai: trangThai,
+    ly_do: lyDo,
+    so_su_kien: events.length,
+    da_xac_nhan: events.filter(
+      (e) => e.blockchain_sync_status === "CONFIRMED",
+    ).length,
+    hash_moi_nhat: lo.latest_event_hash,
+    tren_chain: tren,
+    explorer_url: cfg.explorerUrl,
+    contract_address: cfg.contractAddress,
+    ten_mang: cfg.tenMang,
+    chain_id: cfg.chainId,
+    su_kien: events.map((e) => ({
+      stt: Number(e.so_thu_tu_su_kien),
+      loai: e.loai_hoat_dong,
+      thoi_diem: e.thoi_diem_xay_ra,
+      nguoi_ky: e.ho_ten,
+      vai_tro: e.vai_tro,
+      dia_chi_vi_ky: e.dia_chi_vi_ky ? getAddress(e.dia_chi_vi_ky) : null,
+      tx_hash: e.ma_giao_dich_blockchain,
+      trang_thai: e.blockchain_sync_status,
+    })),
+  };
+};
+
+/* ======================= Đối soát toàn bộ (admin) ======================= */
+
+// Kết quả lần đối soát gần nhất (lý do chi tiết từng lô); trạng thái tổng thì lưu ở lo_nong_san.integrity_status
+const doiSoatCuoi = { thoiDiem: null, soLo: 0, thoiGianMs: 0, nguoiChay: null, lyDo: new Map() };
+let dangDoiSoat = false;
+
+const tongQuanDoiSoat = async () => {
+  const [los] = await db.query(
+    `
+    SELECT lo.ma_lo_nong_san, sp.ten_san_pham, lo.integrity_status, lo.blockchain_sync_status,
+           lo.latest_event_sequence AS so_su_kien, nd.ho_ten AS nguoi_giu, nd.vai_tro AS vai_tro_nguoi_giu,
+           (SELECT COUNT(*) FROM lich_su_truy_xuat_lo ls
+             WHERE ls.ma_lo_nong_san = lo.ma_lo_nong_san AND ls.blockchain_sync_status = 'CONFIRMED') AS da_ky
+    FROM lo_nong_san lo
+    LEFT JOIN san_pham_nong_san sp ON sp.ma_san_pham = lo.ma_san_pham
+    LEFT JOIN nguoi_dung nd ON nd.ma_nguoi_dung = lo.ma_nguoi_quan_ly
+    WHERE lo.latest_event_sequence > 0
+    ORDER BY FIELD(lo.integrity_status, 'BROKEN_CHAIN', 'MISMATCH', 'INCOMPLETE', 'NOT_CHECKED', 'VERIFIED'),
+             lo.ma_lo_nong_san DESC
+    LIMIT 500
+    `,
+  );
+  const [[{ chua_theo_doi: chuaTheoDoi }]] = await db.query(
+    `SELECT COUNT(*) AS chua_theo_doi FROM lo_nong_san WHERE latest_event_sequence = 0`,
+  );
+  const [nhatKy] = await db.query(
+    `
+    SELECT ls.ma_lich_su, ls.thoi_diem_xay_ra, ls.loai_hoat_dong, ls.ma_lo_nong_san, nd.ho_ten, nd.vai_tro,
+           ls.dia_chi_vi_ky, ls.ma_giao_dich_blockchain, ls.so_block, ls.blockchain_sync_status
+    FROM lich_su_truy_xuat_lo ls
+    JOIN nguoi_dung nd ON nd.ma_nguoi_dung = ls.ma_nguoi_dung
+    ORDER BY ls.thoi_diem_xay_ra DESC, ls.so_thu_tu_su_kien DESC
+    LIMIT 30
+    `,
+  );
+  const thongKe = { VERIFIED: 0, INCOMPLETE: 0, MISMATCH: 0, BROKEN_CHAIN: 0, NOT_CHECKED: 0 };
+  los.forEach((l) => {
+    thongKe[l.integrity_status] = (thongKe[l.integrity_status] || 0) + 1;
+  });
+  const cfg = chain.layCauHinh();
+  return {
+    thong_ke: { ...thongKe, tong: los.length, chua_theo_doi: Number(chuaTheoDoi) },
+    lo: los.map((l) => ({
+      ...l,
+      so_su_kien: Number(l.so_su_kien),
+      da_ky: Number(l.da_ky),
+      ly_do: doiSoatCuoi.lyDo.get(l.ma_lo_nong_san) || [],
+    })),
+    nhat_ky: nhatKy.map((e) => ({
+      ...e,
+      dia_chi_vi_ky: e.dia_chi_vi_ky ? getAddress(e.dia_chi_vi_ky) : null,
+    })),
+    lan_chay_cuoi: doiSoatCuoi.thoiDiem
+      ? {
+          thoi_diem: doiSoatCuoi.thoiDiem,
+          so_lo: doiSoatCuoi.soLo,
+          thoi_gian_ms: doiSoatCuoi.thoiGianMs,
+          nguoi_chay: doiSoatCuoi.nguoiChay,
+        }
+      : null,
+    dang_chay: dangDoiSoat,
+    explorer_url: cfg.explorerUrl,
+    contract_address: cfg.contractAddress,
+    ten_mang: cfg.tenMang,
+  };
+};
+
+const thongTinDoiSoat = async (req, res) => {
+  try {
+    return res.json({ success: true, data: await tongQuanDoiSoat() });
+  } catch (err) {
+    return sendError(res, err, "Không thể lấy kết quả đối soát");
+  }
+};
+
+// Chạy lại xác thực cho mọi lô có sự kiện: chuỗi hash MySQL, dữ liệu gốc, và hash mới nhất trên chain
+const chayDoiSoat = async (req, res) => {
+  if (dangDoiSoat) {
+    return res.status(409).json({ success: false, message: "Đang có lượt đối soát chạy, hãy đợi" });
+  }
+  dangDoiSoat = true;
+  const batDau = Date.now();
+  try {
+    const [los] = await db.query(
+      `SELECT ma_lo_nong_san FROM lo_nong_san WHERE latest_event_sequence > 0 ORDER BY ma_lo_nong_san LIMIT 500`,
     );
-
+    const lyDo = new Map();
+    for (const { ma_lo_nong_san: maLo } of los) {
+      try {
+        const kq = await xacThucMotLo(maLo);
+        lyDo.set(maLo, kq.ly_do);
+      } catch (err) {
+        lyDo.set(maLo, [`Lỗi khi đối soát: ${err.message}`]);
+      }
+    }
+    Object.assign(doiSoatCuoi, {
+      thoiDiem: new Date(),
+      soLo: los.length,
+      thoiGianMs: Date.now() - batDau,
+      nguoiChay: req.user?.ma_nguoi_dung || null,
+      lyDo,
+    });
+    dangDoiSoat = false;
+    const data = await tongQuanDoiSoat();
+    const t = data.thong_ke;
     return res.json({
       success: true,
-      data: {
-        trang_thai: trangThai,
-        ly_do: lyDo,
-        so_su_kien: events.length,
-        da_xac_nhan: events.filter(
-          (e) => e.blockchain_sync_status === "CONFIRMED",
-        ).length,
-        hash_moi_nhat: lo.latest_event_hash,
-        tren_chain: tren,
-        explorer_url: cfg.explorerUrl,
-        contract_address: cfg.contractAddress,
-        ten_mang: cfg.tenMang,
-        chain_id: cfg.chainId,
-        su_kien: events.map((e) => ({
-          stt: Number(e.so_thu_tu_su_kien),
-          loai: e.loai_hoat_dong,
-          thoi_diem: e.thoi_diem_xay_ra,
-          nguoi_ky: e.ho_ten,
-          vai_tro: e.vai_tro,
-          dia_chi_vi_ky: e.dia_chi_vi_ky ? getAddress(e.dia_chi_vi_ky) : null,
-          tx_hash: e.ma_giao_dich_blockchain,
-          trang_thai: e.blockchain_sync_status,
-        })),
-      },
+      message: `Đã đối soát ${los.length} lô: ${t.VERIFIED} khớp, ${t.INCOMPLETE} chờ đủ chữ ký, ${t.MISMATCH + t.BROKEN_CHAIN} có sai lệch`,
+      data,
     });
+  } catch (err) {
+    dangDoiSoat = false;
+    return sendError(res, err, "Không thể chạy đối soát");
+  }
+};
+
+const xacThucLo = async (req, res) => {
+  try {
+    const data = await xacThucMotLo(req.params.maLo);
+    return res.json({ success: true, data });
   } catch (err) {
     return sendError(res, err, "Không thể xác thực lô hàng");
   }
@@ -785,9 +1122,17 @@ module.exports = {
   taoNonce,
   lienKetVi,
   danhSachViChoDuyet,
+  danhSachVi,
   duyetVi,
   tuChoiVi,
+  thongTinNguong,
+  xacNhanNguong,
+  thongTinOutbox,
+  chayOutboxNgay,
+  thongTinDoiSoat,
+  chayDoiSoat,
   choKy,
+  daGuiSuKien,
   xacNhanSuKien,
   xacThucLo,
 };

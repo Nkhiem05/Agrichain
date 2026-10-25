@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { ghiSuKienVanDon, ghiSuKienTuChoiNhanHang } = require("../services/blockchain/hook");
 
 /*
 ==================================================
@@ -173,9 +174,10 @@ const confirmReceive = async (req, res) => {
     await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `
-        SELECT trang_thai, ma_lo_nong_san
-        FROM lenh_van_chuyen
-        WHERE ma_van_don = ? AND ma_ben_nhan = ?
+        SELECT v.trang_thai, v.ma_lo_nong_san, lo.so_luong_hien_tai, lo.don_vi_tinh
+        FROM lenh_van_chuyen v
+        JOIN lo_nong_san lo ON lo.ma_lo_nong_san = v.ma_lo_nong_san
+        WHERE v.ma_van_don = ? AND v.ma_ben_nhan = ?
         LIMIT 1
         FOR UPDATE
         `,
@@ -190,10 +192,20 @@ const confirmReceive = async (req, res) => {
         throw new ApiError(409, "Lệnh vận chuyển không ở trạng thái có thể tiếp nhận");
       }
 
+      // Không nhận nhiều hơn khối lượng lô gửi đi (hợp đồng cũng chặn: hao hụt chỉ được giảm)
+      if (khoiLuongThucTe > Number(rows[0].so_luong_hien_tai) + 1e-9) {
+        throw new ApiError(
+          400,
+          `Khối lượng thực nhận không được lớn hơn khối lượng lô gửi đi (${Number(rows[0].so_luong_hien_tai)} ${rows[0].don_vi_tinh})`,
+        );
+      }
+
       await connection.execute(
-        `UPDATE lenh_van_chuyen SET trang_thai = 'HOAN_THANH' WHERE ma_van_don = ?`,
-        [maVanDon],
+        `UPDATE lenh_van_chuyen SET trang_thai = 'HOAN_THANH', khoi_luong_nhan = ? WHERE ma_van_don = ?`,
+        [khoiLuongThucTe, maVanDon],
       );
+      // Blockchain: bên nhận ký nhận hàng kèm khối lượng thực nhận; lô đổi chủ trên chain
+      await ghiSuKienVanDon(connection, maVanDon, "STOCK_IN_CONFIRMED", maCoSo);
 
       await connection.execute(
         `
@@ -251,6 +263,8 @@ const rejectReceive = async (req, res) => {
         `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ?`,
         [`Cơ sở từ chối tiếp nhận: ${lyDo}`, maVanDon],
       );
+      // Blockchain: bên nhận ký từ chối, kèm 2 bước trả hàng (vận chuyển ký đã chở về, bên gửi ký đã nhận lại)
+      await ghiSuKienTuChoiNhanHang(connection, maVanDon);
     });
 
     return res.json({ success: true, message: "Đã từ chối tiếp nhận lô hàng" });

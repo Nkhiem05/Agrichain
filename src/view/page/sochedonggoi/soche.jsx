@@ -29,8 +29,10 @@ import {
   FileText,
   MoreVertical,
   LogOut,
+  Wallet,
 } from "lucide-react";
 import "../../css/soche.css";
+import BlockchainPanel from "../blockchainpannel";
 import { useNavigate } from "react-router-dom";
 import {
   fetchIncomingShipments,
@@ -93,7 +95,7 @@ const ProcessingPage = () => {
   const [user, setUser] = useState(null);
 
   // Tab chính: reception -> processing -> batch-split-merge -> shipping
-  const [activeTab, setActiveTab] = usePersistentTab("soche", "reception", ["reception","processing","batch-split-merge","shipping"]);
+  const [activeTab, setActiveTab] = usePersistentTab("soche", "reception", ["reception","processing","batch-split-merge","shipping","blockchain"]);
 
   const [receptionFilter, setReceptionFilter] = useState("ALL");
   const [processingFilter, setProcessingFilter] = useState("ALL");
@@ -597,6 +599,14 @@ const ProcessingPage = () => {
                   <Truck size={20} />
                   <span>Bàn giao vận chuyển</span>
                 </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("blockchain")}
+                className={`nav-item-btn ${activeTab === "blockchain" ? "active" : ""}`}
+              >
+                <Wallet size={20} />
+                <span>Ký blockchain</span>
+              </button>
               </nav>
             </div>
 
@@ -655,7 +665,16 @@ const ProcessingPage = () => {
                 </div>
               ) : (
                 <>
-                  {/* ================= TAB 1: TIẾP NHẬN LÔ NÔNG SẢN ================= */}
+                  {activeTab === "blockchain" && (
+            <div style={{ maxWidth: 980, paddingTop: 16 }}>
+              <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
+                Cơ sở sơ chế ký khi nhận hàng (kèm khối lượng thực nhận) hoặc từ chối nhận. Các bước của một lô ký theo thứ tự.
+              </p>
+              <BlockchainPanel />
+            </div>
+          )}
+
+          {/* ================= TAB 1: TIẾP NHẬN LÔ NÔNG SẢN ================= */}
                   {activeTab === "reception" && (
                     <div>
                       <div className="metrics-row">

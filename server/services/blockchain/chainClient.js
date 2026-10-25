@@ -64,21 +64,105 @@ const layContract = () => {
 const layTrangThaiLoTrenChain = async (maLo) => {
   const c = layContract();
   if (!c) return null;
-  const b = await c.contract.batches(batchIdCuaLo(maLo));
+  const batchId = batchIdCuaLo(maLo);
+  const [b, chungNhanHopLe] = await Promise.all([
+    c.contract.getBatch(batchId),
+    c.contract.isCertValid(batchId),
+  ]);
   return {
     tonTai: b.exists,
+    trangThai: Number(b.status), // 1 còn hàng, 2 đã dùng, 3 đã đóng
+    khongDat: b.failed,
     chuLo: b.owner,
+    khoiLuongGram: b.quantity.toString(),
     lastHash: b.lastHash,
-    certState: Number(b.certState),
-    certExpiry: Number(b.certExpiry),
     orderStage: Number(b.orderStage),
+    soChungNhan: Number(b.certCount),
+    chungNhanHopLe,
   };
+};
+
+// Ví admin của hợp đồng (ví đã deploy hoặc ví được transferAdmin)
+const adminTrenChain = async () => {
+  const c = layContract();
+  if (!c) return null;
+  return getAddress(await c.contract.admin());
+};
+
+// Tìm lý do không đọc được hợp đồng: sai RPC, sai chainId, sai địa chỉ, hay địa chỉ là hợp đồng cũ (không phải v2)
+const chanDoanHopDong = async () => {
+  const c = layContract();
+  if (!c) return "Chưa cấu hình địa chỉ hợp đồng (BLOCKCHAIN_CONTRACT_ADDRESS hoặc blockchain/deployed-agrichain.json)";
+  const { provider, contract, cfg } = c;
+  let chainIdRpc;
+  try {
+    chainIdRpc = Number(await provider.send("eth_chainId", []));
+  } catch (err) {
+    return `Không kết nối được RPC ${cfg.rpcUrl}: ${err.shortMessage || err.message}`;
+  }
+  if (chainIdRpc !== cfg.chainId) {
+    return `RPC ${cfg.rpcUrl} là mạng chainId ${chainIdRpc}, nhưng cấu hình đang là ${cfg.chainId} (BLOCKCHAIN_CHAIN_ID)`;
+  }
+  const code = await provider.getCode(cfg.contractAddress);
+  if (code === "0x") {
+    return `Không có hợp đồng nào ở địa chỉ ${cfg.contractAddress} trên ${cfg.tenMang}. Kiểm tra BLOCKCHAIN_CONTRACT_ADDRESS trong .env`;
+  }
+  try {
+    await contract.admin();
+    await contract.isCertValid("0x" + "00".repeat(32)); // hàm chỉ có ở AgriChain v2
+  } catch {
+    return `Hợp đồng ở ${cfg.contractAddress} không phải AgriChain v2 (có thể .env vẫn trỏ tới hợp đồng cũ). Đổi BLOCKCHAIN_CONTRACT_ADDRESS sang địa chỉ vừa deploy rồi khởi động lại server`;
+  }
+  return null;
+};
+
+// Bộ ngưỡng kiểm định (mã băm) đã được admin ghi lên hợp đồng chưa. null = chưa cấu hình hợp đồng.
+const nguongTrenChain = async (maBam) => {
+  const c = layContract();
+  if (!c) return null;
+  return Boolean(await c.contract.thresholds(maBam));
+};
+
+// Giao dịch đã vào khối và thành công, gửi tới đúng hợp đồng
+const kiemTraGiaoDichHopDong = async (txHash) => {
+  const c = layContract();
+  if (!c) return { ok: false, lyDo: "Chưa cấu hình contract blockchain trên server" };
+  const receipt = await c.provider.getTransactionReceipt(txHash);
+  if (!receipt) return { ok: false, lyDo: "Chưa thấy giao dịch trên blockchain, hãy thử lại sau vài giây" };
+  if (receipt.status !== 1) return { ok: false, lyDo: "Giao dịch thất bại trên blockchain" };
+  if (!receipt.to || getAddress(receipt.to) !== getAddress(c.cfg.contractAddress))
+    return { ok: false, lyDo: "Giao dịch không gửi tới hợp đồng AgriChain đang cấu hình" };
+  return { ok: true };
 };
 
 const vaiTroTrenChain = async (diaChi) => {
   const c = layContract();
   if (!c) return null;
   return Number(await c.contract.roleOf(getAddress(diaChi)));
+};
+
+// Biên lai giao dịch (null nếu chưa vào khối / không tồn tại)
+const docBienLai = async (txHash) => {
+  const c = layContract();
+  if (!c) return null;
+  return c.provider.getTransactionReceipt(txHash);
+};
+
+// Tìm lại giao dịch đã ghi một sự kiện trong các khối gần đây (dùng khi đối soát mà không có mã giao dịch).
+// Nhiều RPC giới hạn eth_getLogs ~100 khối mỗi lần, nên chỉ quét một khoảng ngắn.
+const timGiaoDichSuKien = async (maLo, eventHash, soKhoi = 100) => {
+  const c = layContract();
+  if (!c) return null;
+  const moiNhat = await c.provider.getBlockNumber();
+  const logs = await c.contract.queryFilter(
+    c.contract.filters.Recorded(batchIdCuaLo(maLo)),
+    Math.max(0, moiNhat - soKhoi + 1),
+    moiNhat,
+  );
+  const log = logs.find((l) => String(l.args.eventHash).toLowerCase() === eventHash.toLowerCase());
+  return log
+    ? { txHash: log.transactionHash.toLowerCase(), signer: String(log.args.signer).toLowerCase(), soBlock: log.blockNumber }
+    : null;
 };
 
 // Kiểm tra giao dịch người dùng gửi lên có thật sự ghi đúng sự kiện đó không.
@@ -134,6 +218,12 @@ module.exports = {
   layCauHinh,
   layContract,
   layTrangThaiLoTrenChain,
+  adminTrenChain,
+  chanDoanHopDong,
+  nguongTrenChain,
+  kiemTraGiaoDichHopDong,
   vaiTroTrenChain,
   kiemTraGiaoDichSuKien,
+  docBienLai,
+  timGiaoDichSuKien,
 };

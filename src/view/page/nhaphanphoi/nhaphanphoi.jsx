@@ -20,9 +20,11 @@ import {
   History,
   Power,
   LogOut,
+  Wallet,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "../../css/nhaphanphoi.css";
+import BlockchainPanel from "../blockchainpannel";
 import {
   fetchIncomingShipments,
   confirmReceiveShipment,
@@ -83,7 +85,7 @@ const NhaPhanPhoiPage = () => {
   // ==========================================
   // 1. QUẢN LÝ TAB
   // ==========================================
-  const [activeTab, setActiveTab] = usePersistentTab("nhaphanphoi", "tab-import", ["tab-import","tab-inventory","tab-dispatch","tab-dealers"]);
+  const [activeTab, setActiveTab] = usePersistentTab("nhaphanphoi", "tab-import", ["tab-import","tab-inventory","tab-dispatch","tab-dealers","blockchain"]);
 
   // ==========================================
   // 2. QUẢN LÝ DROPDOWN MENU THAO TÁC (⋮)
@@ -545,6 +547,14 @@ const NhaPhanPhoiPage = () => {
               >
                 <Users size={20} />
                 <span>Đại lý</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("blockchain")}
+                className={`nav-item-btn ${activeTab === "blockchain" ? "active" : ""}`}
+              >
+                <Wallet size={20} />
+                <span>Ký blockchain</span>
               </button>
             </nav>
           </div>
@@ -1021,7 +1031,16 @@ const NhaPhanPhoiPage = () => {
                 </div>
               )}
 
-              {/* ================= TAB 4: ĐẠI LÝ ================= */}
+              {activeTab === "blockchain" && (
+            <div style={{ maxWidth: 980, paddingTop: 16 }}>
+              <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
+                Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận) hoặc từ chối nhận. Các bước của một lô ký theo thứ tự.
+              </p>
+              <BlockchainPanel />
+            </div>
+          )}
+
+          {/* ================= TAB 4: ĐẠI LÝ ================= */}
               {activeTab === "tab-dealers" && (
                 <div>
                   <div className="tab-section-header" style={{ marginTop: 20 }}>

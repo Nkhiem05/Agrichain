@@ -1,5 +1,6 @@
+/* ":root:root" ở đầu mỗi bộ chọn: tăng độ ưu tiên để reset kiểu ".trang * { padding: 0 }" (kể cả ".soche .soche-dashboard *") của các trang không đè lên khung ký */
 /* Panel ví và ký sự kiện blockchain */
-.bc-panel {
+:root:root .bc-panel {
   max-width: 1000px;
   margin: 24px auto;
   padding: 20px 24px;
@@ -9,13 +10,13 @@
   font-size: 14px;
   color: #111827;
 }
-.bc-panel-head {
+:root:root .bc-panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
 }
-.bc-panel-head h3 {
+:root:root .bc-panel-head h3 {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -23,36 +24,36 @@
   font-weight: 700;
   margin: 0;
 }
-.bc-row {
+:root:root .bc-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
-.bc-label {
+:root:root .bc-label {
   font-size: 12px;
   color: #6b7280;
 }
-.bc-mono {
+:root:root .bc-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
   word-break: break-all;
 }
-.bc-muted {
+:root:root .bc-muted {
   color: #6b7280;
   font-size: 13px;
 }
-.bc-ok {
+:root:root .bc-ok {
   color: #16a34a;
   margin: 8px 0;
 }
-.bc-error {
+:root:root .bc-error {
   color: #dc2626;
   margin: 8px 0;
   word-break: break-word;
 }
-.bc-warn {
+:root:root .bc-warn {
   color: #b45309;
   background: #fffbeb;
   border: 1px solid #fde68a;
@@ -60,23 +61,23 @@
   padding: 8px 12px;
   margin: 8px 0;
 }
-.bc-section {
+:root:root .bc-section {
   margin-top: 20px;
   border-top: 1px solid #f3f4f6;
   padding-top: 16px;
 }
-.bc-section-head {
+:root:root .bc-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
 }
-.bc-section-head h4 {
+:root:root .bc-section-head h4 {
   margin: 0;
   font-size: 14px;
   font-weight: 700;
 }
-.bc-btn {
+:root:root .bc-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -89,94 +90,94 @@
   font-weight: 600;
   cursor: pointer;
 }
-.bc-btn:hover:not(:disabled) {
+:root:root .bc-btn:hover:not(:disabled) {
   background: #1f7a3d;
 }
-.bc-btn:disabled {
+:root:root .bc-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
-.bc-btn-ghost {
+:root:root .bc-btn-ghost {
   background: transparent;
   color: #278d49;
   border: 1px solid #d1d5db;
 }
-.bc-btn-ghost:hover:not(:disabled) {
+:root:root .bc-btn-ghost:hover:not(:disabled) {
   background: #f3f4f6;
 }
-.bc-actions {
+:root:root .bc-actions {
   display: flex;
   gap: 8px;
 }
-.bc-table {
+:root:root .bc-table {
   width: 100%;
   border-collapse: collapse;
 }
-.bc-table th,
-.bc-table td {
+:root:root .bc-table th,
+:root:root .bc-table td {
   text-align: left;
   padding: 8px 10px;
   border-bottom: 1px solid #f3f4f6;
   vertical-align: middle;
 }
-.bc-table th {
+:root:root .bc-table th {
   font-size: 12px;
   color: #6b7280;
   font-weight: 600;
 }
 
 /* Thẻ xác thực ở trang người tiêu dùng (dùng thêm class blockchain-card có sẵn) */
-.bc-status {
+:root:root .bc-status {
   font-weight: 700;
 }
-.bc-reasons {
+:root:root .bc-reasons {
   margin: 8px 0;
   padding-left: 18px;
   font-size: 13px;
 }
-.bc-events {
+:root:root .bc-events {
   list-style: none;
   margin: 12px 0 0;
   padding: 0;
   border-top: 1px solid rgba(148, 163, 184, 0.3);
 }
-.bc-events li {
+:root:root .bc-events li {
   padding: 8px 0;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
-.bc-events li.bc-pending {
+:root:root .bc-events li.bc-pending {
   opacity: 0.6;
 }
-.bc-event-title {
+:root:root .bc-event-title {
   display: flex;
   align-items: center;
   gap: 6px;
   font-weight: 600;
   font-size: 13px;
 }
-.bc-event-meta {
+:root:root .bc-event-meta {
   font-size: 12px;
   color: #6b7280;
   margin-left: 20px;
   word-break: break-all;
 }
-.blockchain-card .bc-muted,
-.blockchain-card .bc-error {
+:root:root .blockchain-card .bc-muted,
+:root:root .blockchain-card .bc-error {
   margin: 8px 0;
 }
-.blockchain-card .bc-muted {
+:root:root .blockchain-card .bc-muted {
   color: rgba(255, 255, 255, 0.75);
 }
-.blockchain-card .bc-error {
+:root:root .blockchain-card .bc-error {
   color: #fca5a5;
 }
-.blockchain-card .bc-event-meta {
+:root:root .blockchain-card .bc-event-meta {
   color: rgba(255, 255, 255, 0.72);
 }
-.blockchain-card .bc-event-title {
+:root:root .blockchain-card .bc-event-title {
   color: #ffffff;
 }
-.blockchain-card .bc-events a {
+:root:root .blockchain-card .bc-events a {
   color: #bbf7d0;
   text-decoration: underline;
 }

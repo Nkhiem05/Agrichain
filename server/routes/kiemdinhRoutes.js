@@ -48,5 +48,10 @@ router.get(
   yeucauKiemdinhController.getMyRequests,
 );
 router.post("/yeu-cau", checkAuth, yeucauKiemdinhController.createRequest);
+router.post(
+  "/yeu-cau/:maKiemDinh/xac-nhan-lay-mau",
+  checkAuth,
+  yeucauKiemdinhController.confirmSampling,
+);
 
 module.exports = router;

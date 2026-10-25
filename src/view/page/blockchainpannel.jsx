@@ -7,10 +7,7 @@ import {
   taoNonceLienKet,
   lienKetVi,
   fetchChoKy,
-  xacNhanSuKien,
-  fetchViChoDuyet,
-  duyetVi,
-  tuChoiVi,
+  guiVaXacNhanSuKien,
 } from "../../api/blockchainApi";
 import { TEN_SU_KIEN, rutGon } from "./xacthucblockchain";
 import "../css/blockchain.css";
@@ -74,7 +71,6 @@ const BlockchainPanel = () => {
   const [cauHinh, setCauHinh] = useState(null);
   const [thongTin, setThongTin] = useState(null);
   const [choKy, setChoKy] = useState([]);
-  const [viChoDuyet, setViChoDuyet] = useState([]);
   const [dangTai, setDangTai] = useState(true);
   const [dangXuLy, setDangXuLy] = useState("");
   const [thongBao, setThongBao] = useState({ loai: "", text: "" });
@@ -93,9 +89,6 @@ const BlockchainPanel = () => {
         setChoKy((await fetchChoKy()).su_kien);
       } else {
         setChoKy([]);
-      }
-      if (tt.vai_tro === "ADMIN") {
-        setViChoDuyet(await fetchViChoDuyet());
       }
     } catch (e) {
       // chưa đăng nhập hoặc server chưa có blockchain: ẩn khối này
@@ -146,15 +139,17 @@ const BlockchainPanel = () => {
       );
     }
     const contract = new Contract(cauHinh.contractAddress, cauHinh.abi, signer);
-    const tx = await contract[item.ham](...item.args);
-    await tx.wait();
-    await xacNhanSuKien(item.ma_lich_su, tx.hash);
+    return guiVaXacNhanSuKien(contract, item);
   };
 
   const ky = (item) =>
     chayTacVu(item.ma_lich_su, async () => {
-      await kyMotSuKien(item);
-      baoOk("Đã ký và ghi lên blockchain");
+      const kq = await kyMotSuKien(item);
+      baoOk(
+        kq === "cho-xac-nhan"
+          ? "Đã gửi giao dịch. Blockchain đang xác nhận, hệ thống sẽ tự cập nhật"
+          : "Đã ký và ghi lên blockchain",
+      );
       await taiDuLieu();
     });
 
@@ -175,33 +170,6 @@ const BlockchainPanel = () => {
           ? `Đã ký ${soDaKy} sự kiện`
           : "Không có sự kiện nào sẵn sàng để ký",
       );
-      await taiDuLieu();
-    });
-
-  const duyet = (w) =>
-    chayTacVu(w.dia_chi_vi, async () => {
-      const { signer, diaChi } = await ketNoiMetaMask(cauHinh);
-      if (!vi || diaChi.toLowerCase() !== vi.dia_chi_vi.toLowerCase()) {
-        throw new Error(
-          `Hãy chọn ví admin ${rutGon(vi?.dia_chi_vi)} trong MetaMask`,
-        );
-      }
-      const contract = new Contract(
-        cauHinh.contractAddress,
-        cauHinh.abi,
-        signer,
-      );
-      const tx = await contract.setRole(w.dia_chi_vi, w.vai_tro_on_chain);
-      await tx.wait();
-      await duyetVi(w.dia_chi_vi, tx.hash);
-      baoOk(`Đã duyệt ví của ${w.ho_ten}`);
-      await taiDuLieu();
-    });
-
-  const tuChoi = (w) =>
-    chayTacVu(w.dia_chi_vi, async () => {
-      await tuChoiVi(w.dia_chi_vi);
-      baoOk("Đã từ chối ví");
       await taiDuLieu();
     });
 
@@ -309,6 +277,11 @@ const BlockchainPanel = () => {
                     <td>{TEN_SU_KIEN[it.loai] || it.loai}</td>
                     <td>{new Date(it.thoi_diem).toLocaleString("vi-VN")}</td>
                     <td>
+                      {it.loi_truoc && (
+                        <div className="bc-warn" style={{ marginBottom: 6 }}>
+                          Lần ký trước: {it.loi_truoc}
+                        </div>
+                      )}
                       {it.san_sang ? (
                         <button
                           type="button"
@@ -321,7 +294,21 @@ const BlockchainPanel = () => {
                             : "Ký lên blockchain"}
                         </button>
                       ) : (
-                        <span className="bc-muted">{it.ly_do}</span>
+                        <span className="bc-muted">
+                          {it.ly_do}
+                          {it.tx_hash && cauHinh?.explorerUrl && (
+                            <>
+                              {" "}
+                              <a
+                                href={`${cauHinh.explorerUrl.replace(/\/$/, "")}/tx/${it.tx_hash}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                (xem giao dịch)
+                              </a>
+                            </>
+                          )}
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -332,67 +319,11 @@ const BlockchainPanel = () => {
         </div>
       )}
 
-      {/* Quản trị viên duyệt ví */}
+      {/* Việc duyệt ví đã chuyển sang trang Quản trị */}
       {laAdmin && (
-        <div className="bc-section">
-          <div className="bc-section-head">
-            <h4>Ví chờ duyệt ({viChoDuyet.length})</h4>
-          </div>
-          {!vi && (
-            <p className="bc-warn">
-              Hãy liên kết ví admin (chính ví đã deploy contract) trước khi
-              duyệt ví của người khác.
-            </p>
-          )}
-          {viChoDuyet.length === 0 ? (
-            <p className="bc-muted">Không có ví nào đang chờ duyệt.</p>
-          ) : (
-            <table className="bc-table">
-              <thead>
-                <tr>
-                  <th>Người dùng</th>
-                  <th>Vai trò</th>
-                  <th>Ví</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {viChoDuyet.map((w) => (
-                  <tr key={w.dia_chi_vi}>
-                    <td>
-                      {w.ho_ten}{" "}
-                      <span className="bc-muted">({w.ma_nguoi_dung})</span>
-                    </td>
-                    <td>{w.vai_tro}</td>
-                    <td className="bc-mono">{rutGon(w.dia_chi_vi, 8, 6)}</td>
-                    <td className="bc-actions">
-                      <button
-                        type="button"
-                        className="bc-btn"
-                        onClick={() => duyet(w)}
-                        disabled={
-                          Boolean(dangXuLy) || !vi || !w.vai_tro_on_chain
-                        }
-                      >
-                        {dangXuLy === w.dia_chi_vi
-                          ? "Đang xử lý..."
-                          : "Duyệt vai trò"}
-                      </button>
-                      <button
-                        type="button"
-                        className="bc-btn bc-btn-ghost"
-                        onClick={() => tuChoi(w)}
-                        disabled={Boolean(dangXuLy)}
-                      >
-                        Từ chối
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+        <p className="bc-muted">
+          Duyệt ví của người dùng nằm ở trang Quản trị → mục "Ví blockchain".
+        </p>
       )}
     </div>
   );

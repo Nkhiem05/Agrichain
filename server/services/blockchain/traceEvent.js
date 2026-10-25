@@ -5,6 +5,7 @@ const {
   hashNoiDung,
   hashSuKien,
   batchIdCuaLo,
+  sangGram,
 } = require("./canonical");
 
 // Ghi sự kiện truy xuất vào MySQL (chuỗi hash nối tiếp) và xếp hàng chờ ký lên blockchain.
@@ -215,7 +216,7 @@ const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
 
   const [nguon] = await executor.query(
     `
-    SELECT ma_lo_nguon, loai_lien_ket, CAST(so_luong_tham_gia AS CHAR) AS so_luong_tham_gia
+    SELECT ma_lo_nguon, loai_lien_ket, CAST(so_luong_tham_gia AS CHAR) AS so_luong_tham_gia, don_vi_tinh
     FROM lien_ket_nguon_goc_lo
     WHERE ma_lo_duoc_tao_ra = ?
     ORDER BY ma_lo_nguon
@@ -225,6 +226,7 @@ const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
 
   if (nguon.length > 0) {
     const chiTietNguon = [];
+    const gramNguon = [];
     for (const n of nguon) {
       await baoDamSuKienGoc(executor, n.ma_lo_nguon, doSau + 1);
       const src = await khoaLo(executor, n.ma_lo_nguon);
@@ -235,6 +237,7 @@ const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
         hash: src.latest_event_hash,
         so_luong_tham_gia: n.so_luong_tham_gia,
       });
+      gramNguon.push(sangGram(n.so_luong_tham_gia, n.don_vi_tinh));
     }
 
     await taoSuKien(executor, lot, {
@@ -250,6 +253,10 @@ const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
         ma_lo_nguon: chiTietNguon.map((n) => n.ma_lo),
         hash_lo_nguon: chiTietNguon.map((n) => n.hash),
         seq_lo_nguon: chiTietNguon.map((n) => n.seq),
+        // hợp đồng v2: khối lượng lấy từ từng lô nguồn và khối lượng lô con (gram), sản phẩm của lô con
+        so_luong_nguon_gram: gramNguon,
+        so_luong_con_gram: sangGram(lot.so_luong_hien_tai, lot.don_vi_tinh),
+        ma_san_pham: lot.ma_san_pham,
       },
     });
     return khoaLo(executor, maLo);
@@ -270,6 +277,11 @@ const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
       don_vi_tinh: lot.don_vi_tinh,
       ban_chup_mua_vu: snap?.banChup ?? null,
       hash_ban_chup: snap?.hash ?? null,
+    },
+    // hợp đồng v2: khối lượng (gram) và sản phẩm được lưu trên chain
+    thamSo: {
+      ma_san_pham: lot.ma_san_pham,
+      so_luong_gram: sangGram(lot.so_luong_hien_tai, lot.don_vi_tinh),
     },
   });
   return khoaLo(executor, maLo);

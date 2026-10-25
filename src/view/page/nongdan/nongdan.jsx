@@ -13,8 +13,10 @@ import {
   MoreVertical,
   Pencil,
   LogOut,
+  Wallet,
 } from "lucide-react";
 import "../../css/nongdan.css";
+import BlockchainPanel from "../blockchainpannel";
 import { useNavigate } from "react-router-dom";
 import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
 
@@ -135,6 +137,8 @@ const getInspectionStatus = (item) => {
       return { label: "Chờ phê duyệt", tone: "warning" };
     case "DA_HEN_LICH":
       return { label: "Đã hẹn lịch", tone: "success" };
+    case "CHO_LAY_MAU":
+      return { label: "Đã lấy mẫu, đang xét nghiệm", tone: "success" };
     case "DA_LAY_MAU":
       return { label: "Đã lấy mẫu", tone: "success" };
     case "DA_CONG_BO":
@@ -156,7 +160,7 @@ const DashboardPage = () => {
   // =========================================================
   // TAB
   // =========================================================
-  const [activeTab, setActiveTab] = usePersistentTab("nongdan", "farm", ["farm","season","batch","inspection","shipping"]);
+  const [activeTab, setActiveTab] = usePersistentTab("nongdan", "farm", ["farm","season","batch","inspection","shipping","blockchain"]);
 
   // =========================================================
   // POPUP
@@ -1266,6 +1270,42 @@ const DashboardPage = () => {
     }
   }, [activeTab]);
 
+  // Chủ lô xác nhận biên bản lấy mẫu của cơ quan kiểm định (sau đó ký bằng ví ở Trang cá nhân)
+  const [confirmingSample, setConfirmingSample] = useState("");
+  const handleConfirmSampling = async (item) => {
+    const bienBan = [
+      `Hồ sơ: ${item.ma_ho_so} - Lô ${item.ma_lo_nong_san}`,
+      `Kiểm định viên: ${item.kiem_dinh_vien || "—"}`,
+      `Mã niêm phong: ${item.ma_niem_phong || "—"}`,
+      `Khối lượng mẫu: ${item.khoi_luong_mau || "—"}`,
+      `Phương pháp lấy mẫu: ${item.phuong_phap_lay_mau || "—"}`,
+      `Tình trạng cảm quan: ${item.tinh_trang_cam_quan || "—"}`,
+      `Thời gian lấy mẫu: ${item.thoi_gian_lay_mau || "—"}`,
+    ].join("\n");
+    if (
+      !window.confirm(
+        `Xác nhận biên bản lấy mẫu dưới đây đúng với thực tế?\n\n${bienBan}\n\nSau khi xác nhận, bạn ký bằng ví MetaMask ở Trang cá nhân → Ví blockchain.`,
+      )
+    )
+      return;
+
+    setConfirmingSample(item.ma_kiem_dinh);
+    try {
+      const response = await fetch(
+        `${API_URL}/api/kiem-dinh/yeu-cau/${item.ma_kiem_dinh}/xac-nhan-lay-mau`,
+        { method: "POST", headers: authHeaders() },
+      );
+      const data = await response.json();
+      alert(data.message || (response.ok ? "Đã xác nhận" : "Không thể xác nhận"));
+      if (response.ok) fetchInspections();
+    } catch (error) {
+      console.error("Lỗi xác nhận biên bản lấy mẫu:", error);
+      alert("Không thể kết nối tới backend");
+    } finally {
+      setConfirmingSample("");
+    }
+  };
+
   const fetchAuthorities = async () => {
     setAuthorityError("");
 
@@ -1686,6 +1726,14 @@ const DashboardPage = () => {
                 <Truck size={20} />
                 <span>Vận chuyển & Bàn giao</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("blockchain")}
+                className={`nav-item-btn ${activeTab === "blockchain" ? "active" : ""}`}
+              >
+                <Wallet size={20} />
+                <span>Ký blockchain</span>
+              </button>
             </nav>
           </div>
 
@@ -1729,6 +1777,15 @@ const DashboardPage = () => {
           {/* =================================================
               TAB NÔNG TRẠI
           ================================================== */}
+          {activeTab === "blockchain" && (
+            <div style={{ maxWidth: 980, paddingTop: 16 }}>
+              <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
+                Mỗi bước của lô (chốt thu hoạch, xác nhận lấy mẫu, tạo / hủy lệnh vận chuyển, nhận lại hàng bị trả) cần bạn ký bằng ví MetaMask để ghi lên blockchain.
+              </p>
+              <BlockchainPanel />
+            </div>
+          )}
+
           {activeTab === "farm" && (
             <div>
               <div className="metrics-row">
@@ -2375,7 +2432,34 @@ const DashboardPage = () => {
                             </span>
                           </td>
                           <td className="col-actions">
-                            {canResend ? (
+                            {["CHO_LAY_MAU", "DA_LAY_MAU"].includes(
+                              item.trang_thai_ho_so,
+                            ) &&
+                            item.ma_niem_phong &&
+                            item.ma_nguoi_quan_ly === user?.ma_nguoi_dung ? (
+                              item.chu_lo_da_xac_nhan ? (
+                                <span
+                                  style={{ fontSize: 12.5, color: "#047857", fontWeight: 600, display: "inline-block", lineHeight: 1.3 }}
+                                  title="Ký xác nhận bằng ví ở Trang cá nhân → Ví blockchain nếu chưa ký"
+                                >
+                                  Đã xác nhận biên bản lấy mẫu
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-action-retry"
+                                  style={{ whiteSpace: "normal", lineHeight: 1.25, textAlign: "left" }}
+                                  title="Xác nhận biên bản lấy mẫu của cơ quan kiểm định"
+                                  disabled={confirmingSample === item.ma_kiem_dinh}
+                                  onClick={() => handleConfirmSampling(item)}
+                                >
+                                  <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+                                  {confirmingSample === item.ma_kiem_dinh
+                                    ? "Đang xác nhận..."
+                                    : "Xác nhận lấy mẫu"}
+                                </button>
+                              )
+                            ) : canResend ? (
                               <button
                                 type="button"
                                 className="btn-action-retry"

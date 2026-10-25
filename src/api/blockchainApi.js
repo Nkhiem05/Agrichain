@@ -65,6 +65,36 @@ export const fetchChoKy = async () => {
   return (await parseJson(res)).data;
 };
 
+// Báo server mã giao dịch ngay khi MetaMask gửi đi (trước khi vào khối).
+// Lỗi ở bước này không chặn việc ký: Outbox worker vẫn đối soát được với chain.
+export const baoDaGui = async (maLichSu, txHash) => {
+  try {
+    const res = await fetch(
+      `${API_URL}/su-kien/${encodeURIComponent(maLichSu)}/da-gui`,
+      { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ txHash }) },
+    );
+    return await parseJson(res);
+  } catch (e) {
+    console.warn("Không báo được giao dịch đã gửi:", e.message);
+    return null;
+  }
+};
+
+// Ký một sự kiện bằng contract (đã gắn signer MetaMask): gửi -> báo đã gửi -> chờ vào khối -> báo xác nhận.
+// Trả "da-xac-nhan", hoặc "cho-xac-nhan" khi server chưa thấy giao dịch (worker sẽ tự xác nhận sau).
+export const guiVaXacNhanSuKien = async (contract, item) => {
+  const tx = await contract[item.ham](...item.args);
+  await baoDaGui(item.ma_lich_su, tx.hash);
+  await tx.wait();
+  try {
+    await xacNhanSuKien(item.ma_lich_su, tx.hash);
+    return "da-xac-nhan";
+  } catch (e) {
+    if (/Chưa thấy giao dịch/.test(e.message)) return "cho-xac-nhan";
+    throw e;
+  }
+};
+
 export const xacNhanSuKien = async (maLichSu, txHash) => {
   const res = await fetch(
     `${API_URL}/su-kien/${encodeURIComponent(maLichSu)}/xac-nhan`,
@@ -78,6 +108,50 @@ export const xacNhanSuKien = async (maLichSu, txHash) => {
 };
 
 // Quản trị viên duyệt ví
+// Danh sách ví (trangThai: CHO_DUYET | DA_DUYET | TU_CHOI, bỏ trống = tất cả) + ví admin của hợp đồng
+export const fetchDanhSachVi = async (trangThai = "") => {
+  const q = trangThai ? `?trang_thai=${encodeURIComponent(trangThai)}` : "";
+  const res = await fetch(`${API_URL}/admin/vi${q}`, { headers: authHeaders() });
+  return (await parseJson(res)).data;
+};
+
+// Bộ ngưỡng kiểm định trên blockchain (admin ký setThreshold)
+export const fetchNguong = async () => {
+  const res = await fetch(`${API_URL}/admin/nguong`, { headers: authHeaders() });
+  return (await parseJson(res)).data;
+};
+
+export const xacNhanNguong = async (maBam, txHash) => {
+  const res = await fetch(`${API_URL}/admin/nguong/xac-nhan`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify({ ma_bam: maBam, txHash }),
+  });
+  return parseJson(res);
+};
+
+// Hàng chờ ghi blockchain (Outbox) và worker đối soát
+export const fetchOutbox = async () => {
+  const res = await fetch(`${API_URL}/admin/outbox`, { headers: authHeaders() });
+  return (await parseJson(res)).data;
+};
+
+export const chayOutboxNgay = async () => {
+  const res = await fetch(`${API_URL}/admin/outbox/chay`, { method: "POST", headers: jsonHeaders() });
+  return parseJson(res);
+};
+
+// Đối soát toàn bộ lô với blockchain (tab "Nhật ký & toàn vẹn" của admin)
+export const fetchDoiSoat = async () => {
+  const res = await fetch(`${API_URL}/admin/doi-soat`, { headers: authHeaders() });
+  return (await parseJson(res)).data;
+};
+
+export const chayDoiSoat = async () => {
+  const res = await fetch(`${API_URL}/admin/doi-soat/chay`, { method: "POST", headers: jsonHeaders() });
+  return parseJson(res);
+};
+
 export const fetchViChoDuyet = async () => {
   const res = await fetch(`${API_URL}/admin/vi-cho-duyet`, {
     headers: authHeaders(),
@@ -103,7 +177,7 @@ export const tuChoiVi = async (diaChi) => {
 };
 
 // Mở MetaMask, chuyển đúng mạng, trả về signer (ví đang chọn)
-const ketNoiMetaMask = async (cauHinh) => {
+export const ketNoiMetaMask = async (cauHinh) => {
   if (!window.ethereum) throw new Error("Chưa cài MetaMask");
 
   let provider = new BrowserProvider(window.ethereum);
@@ -182,9 +256,7 @@ export const kyCacSuKienDangCho = async () => {
   let soDaKy = 0;
   for (let vong = 0; vong < 30 && dsSanSang.length > 0; vong++) {
     for (const item of dsSanSang) {
-      const tx = await contract[item.ham](...item.args);
-      await tx.wait();
-      await xacNhanSuKien(item.ma_lich_su, tx.hash);
+      await guiVaXacNhanSuKien(contract, item);
       soDaKy++;
     }
     dsSanSang = (await fetchChoKy()).su_kien.filter((x) => x.san_sang);

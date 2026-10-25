@@ -39,9 +39,11 @@ import {
   UserPlus,
   Phone,
   Mail,
+  Wallet,
 } from "lucide-react";
 import "../../css/coquankiemdinh.css";
 import { useNavigate } from "react-router-dom";
+import BlockchainPanel from "../blockchainpannel";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
@@ -51,6 +53,23 @@ const normalizeStatus = (s) =>
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
+
+// Chủ lô đã ký xác nhận biên bản lấy mẫu chưa (bắt buộc trước khi công bố kết quả)
+const BadgeChuLoXacNhan = ({ item }) =>
+  item.chu_lo_da_xac_nhan ? (
+    <span
+      style={{ fontSize: 12.5, fontWeight: 600, color: "#047857", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 999, padding: "3px 10px", marginLeft: 8 }}
+    >
+      Chủ lô đã xác nhận biên bản lấy mẫu
+    </span>
+  ) : (
+    <span
+      style={{ fontSize: 12.5, fontWeight: 600, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 999, padding: "3px 10px", marginLeft: 8 }}
+      title="Chủ lô xác nhận ở trang Nông dân → Lịch hẹn kiểm định. Có bước này mới công bố được kết quả."
+    >
+      Chờ chủ lô xác nhận biên bản lấy mẫu
+    </span>
+  );
 
 const SCHEDULED_STATUSES = ["DA_HEN_LICH", "DA_HEN"];
 const PENDING_SAMPLE_STATUSES = [
@@ -134,7 +153,7 @@ function Coquankiemdinh() {
   const savedUser = localStorage.getItem("user");
   const user = savedUser ? JSON.parse(savedUser) : null;
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = usePersistentTab("kiemdinh", "requests", ["requests","sampling","results","violations","inspectors"]);
+  const [currentTab, setCurrentTab] = usePersistentTab("kiemdinh", "requests", ["requests","sampling","results","violations","inspectors","blockchain"]);
 
   const [samplingFilterStatus, setSamplingFilterStatus] = useState("ALL");
 
@@ -393,16 +412,21 @@ function Coquankiemdinh() {
     }
 
     try {
-      await updateInspectionStatus(
+      const ketQua = await updateInspectionStatus(
         revokeItem.ma_kiem_dinh,
         "Deny",
         revokeReason,
       );
+      if (!ketQua?.status) {
+        alert(ketQua?.message || "Gửi yêu cầu thu hồi thất bại!");
+        return;
+      }
       alert(
         `Đã kích hoạt thu hồi lô #${revokeItem.ma_lo_nong_san} thành công!`,
       );
       setModalRevokeOpen(false);
       fetchSamplingRequests();
+      fetchPublishedCertificates();
       fetchRevokedCertificates();
     } catch (err) {
       console.error("Lỗi yêu cầu thu hồi:", err);
@@ -425,7 +449,7 @@ function Coquankiemdinh() {
       alert(
         `Đã công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!${
           result.so_chung_nhan ? ` Số chứng nhận: ${result.so_chung_nhan}` : ""
-        }`,
+        }\nVào mục "Ký blockchain" để ký công bố.`,
       );
       setModalConfirmPublishOpen(false);
       fetchSamplingRequests();
@@ -455,7 +479,7 @@ function Coquankiemdinh() {
         return;
       }
       alert(
-        `Đã công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.`,
+        `Đã công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.\nVào mục "Ký blockchain" để ký công bố.`,
       );
       setModalFailOpen(false);
       fetchSamplingRequests();
@@ -761,6 +785,17 @@ function Coquankiemdinh() {
                 >
                   <Users size={20} />
                   <span>Kiểm định viên</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentTab("blockchain")}
+                  className={`nav-item-btn ${
+                    currentTab === "blockchain" ? "active" : ""
+                  }`}
+                >
+                  <Wallet size={20} />
+                  <span>Ký blockchain</span>
                 </button>
               </nav>
             </div>
@@ -1121,6 +1156,7 @@ function Coquankiemdinh() {
                                   <span className="status-badge-purple">
                                     Trạng thái: Chờ lấy mẫu &amp; Xét nghiệm Lab
                                   </span>
+                                  <BadgeChuLoXacNhan item={item} />
                                 </div>
                               </div>
                             </div>
@@ -1225,6 +1261,7 @@ function Coquankiemdinh() {
                                       ? "Trạng thái: Đã xét nghiệm & Đạt chuẩn"
                                       : "Trạng thái: Không đạt chuẩn kiểm định"}
                                   </span>
+                                  <BadgeChuLoXacNhan item={item} />
                                 </div>
                               </div>
                             </div>
@@ -1247,6 +1284,17 @@ function Coquankiemdinh() {
                               {allPassed && (
                                 <button
                                   type="button"
+                                  disabled={!item.chu_lo_da_xac_nhan}
+                                  title={
+                                    item.chu_lo_da_xac_nhan
+                                      ? undefined
+                                      : "Chờ chủ lô xác nhận biên bản lấy mẫu"
+                                  }
+                                  style={
+                                    item.chu_lo_da_xac_nhan
+                                      ? undefined
+                                      : { opacity: 0.5, cursor: "not-allowed" }
+                                  }
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleOpenConfirmPublishModal(item);
@@ -1263,6 +1311,17 @@ function Coquankiemdinh() {
                                 (item.danh_sach_chi_so || []).length > 0 && (
                                   <button
                                     type="button"
+                                    disabled={!item.chu_lo_da_xac_nhan}
+                                    title={
+                                      item.chu_lo_da_xac_nhan
+                                        ? undefined
+                                        : "Chờ chủ lô xác nhận biên bản lấy mẫu"
+                                    }
+                                    style={
+                                      item.chu_lo_da_xac_nhan
+                                        ? undefined
+                                        : { opacity: 0.5, cursor: "not-allowed" }
+                                    }
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleOpenFailModal(item);
@@ -1589,6 +1648,17 @@ function Coquankiemdinh() {
               </main>
             )}
             {/* TAB 5: KIỂM ĐỊNH VIÊN */}
+            {currentTab === "blockchain" && (
+              <div style={{ maxWidth: 980, paddingTop: 24 }}>
+                <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
+                  Mỗi bước kiểm định (niêm phong mẫu, công bố Đạt / Không đạt, thu hồi) cần cơ
+                  quan ký bằng ví MetaMask để ghi lên blockchain. Các bước của một lô phải ký theo
+                  thứ tự, nên có bước sẽ chờ chủ lô ký trước.
+                </p>
+                <BlockchainPanel />
+              </div>
+            )}
+
             {currentTab === "inspectors" && (
               <main className="view-panel">
                 <div className="metrics-sticky-wrapper">
@@ -2031,12 +2101,23 @@ function Coquankiemdinh() {
                   type="button"
                   onClick={async () => {
                     try {
-                      await updateSampleDetail(
+                      const ketQua = await updateSampleDetail(
                         code,
                         sealCode,
                         sampleWeight,
                         sampleMethod,
                         visualCondition,
+                      );
+                      if (!ketQua) {
+                        alert("Vui lòng nhập đầy đủ thông tin biên bản lấy mẫu");
+                        return;
+                      }
+                      if (!ketQua.status) {
+                        alert(ketQua.message || "Cập nhật biên bản thất bại!");
+                        return;
+                      }
+                      alert(
+                        `${ketQua.message}. Biên bản đã niêm phong, không sửa được nữa; vào mục "Ký blockchain" để ký.`,
                       );
                       setModalSamplingOpen(false);
                       fetchSamplingRequests();

@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { ghiSuKienVanDon } = require("../services/blockchain/hook");
 
 /*
 ==================================================
@@ -214,6 +215,11 @@ const rejectTrip = async (req, res) => {
         `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ?`,
         [`Đơn vị vận chuyển từ chối: ${lyDo}`, maVanDon],
       );
+      // Blockchain: đơn vị vận chuyển ký từ chối chuyến (lô ở lại bên gửi)
+      await ghiSuKienVanDon(connection, maVanDon, "HANDOVER_REJECTED", maDonVi, {
+        ben_tu_choi: "VAN_CHUYEN",
+        ly_do: lyDo,
+      });
     });
 
     return res.json({ success: true, message: "Đã từ chối chuyến vận chuyển" });
@@ -246,6 +252,8 @@ const confirmPickup = async (req, res) => {
         `UPDATE lenh_van_chuyen SET trang_thai = 'DANG_VAN_CHUYEN', khoi_luong = COALESCE(?, khoi_luong) WHERE ma_van_don = ?`,
         [khoiLuongThucTe, maVanDon],
       );
+      // Blockchain: đơn vị vận chuyển ký đã lấy hàng
+      await ghiSuKienVanDon(connection, maVanDon, "PICKUP_CONFIRMED", maDonVi);
     });
 
     return res.json({ success: true, message: "Đã xác nhận lấy hàng, chuyến bắt đầu vận chuyển" });
@@ -275,6 +283,8 @@ const confirmArrival = async (req, res) => {
         `UPDATE lenh_van_chuyen SET trang_thai = 'CHO_TIEP_NHAN' WHERE ma_van_don = ?`,
         [maVanDon],
       );
+      // Blockchain: đơn vị vận chuyển ký đã giao tới nơi
+      await ghiSuKienVanDon(connection, maVanDon, "DELIVERY_CONFIRMED", maDonVi);
     });
 
     return res.json({

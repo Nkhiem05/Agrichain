@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { ghiSuKienKiemDinhTrong } = require("../services/blockchain/hook");
 
 /*
 ==================================================
@@ -369,6 +370,14 @@ const getMyRequests = async (req, res) => {
         kd.trang_thai_ho_so,
         kd.ket_luan,
         kd.created_at,
+        kd.kiem_dinh_vien,
+        kd.ma_niem_phong,
+        kd.khoi_luong_mau,
+        kd.phuong_phap_lay_mau,
+        kd.tinh_trang_cam_quan,
+        DATE_FORMAT(kd.thoi_gian_lay_mau, '%Y-%m-%d %H:%i') AS thoi_gian_lay_mau,
+        kd.chu_lo_da_xac_nhan,
+        lo.ma_nguoi_quan_ly,
         mv.loai_cay_trong,
         lo.so_luong_hien_tai,
         lo.don_vi_tinh
@@ -403,8 +412,64 @@ const getMyRequests = async (req, res) => {
   }
 };
 
+// Chủ lô xác nhận biên bản lấy mẫu (mã niêm phong, khối lượng, phương pháp) đúng với thực tế.
+// Ghi SAMPLING_CONFIRMED vào hàng chờ ký; chủ lô ký bằng ví của mình. Có bước này cơ quan mới công bố được.
+const confirmSampling = async (req, res) => {
+  try {
+    const maNguoiDung = getFarmerId(req);
+    const maKiemDinh = cleanText(req.params.maKiemDinh);
+
+    await withTransaction(async (connection) => {
+      const [rows] = await connection.query(
+        `
+        SELECT kd.trang_thai_ho_so, kd.chu_lo_da_xac_nhan, kd.ma_niem_phong, kd.khoi_luong_mau,
+               lo.ma_nguoi_quan_ly
+        FROM kiem_dinh_lo_hang kd
+        JOIN lo_nong_san lo ON lo.ma_lo_nong_san = kd.ma_lo_nong_san
+        WHERE kd.ma_kiem_dinh = ?
+        FOR UPDATE
+        `,
+        [maKiemDinh],
+      );
+      if (rows.length === 0) throw new ApiError(404, "Không tìm thấy hồ sơ kiểm định");
+      const kd = rows[0];
+      if (kd.ma_nguoi_quan_ly !== maNguoiDung) {
+        throw new ApiError(403, "Chỉ chủ lô đang giữ lô mới xác nhận được biên bản lấy mẫu");
+      }
+      if (!["CHO_LAY_MAU", "DA_LAY_MAU"].includes(kd.trang_thai_ho_so) || !kd.ma_niem_phong) {
+        throw new ApiError(409, "Cơ quan kiểm định chưa lập biên bản lấy mẫu cho hồ sơ này");
+      }
+      if (kd.chu_lo_da_xac_nhan) {
+        throw new ApiError(409, "Bạn đã xác nhận biên bản lấy mẫu này rồi");
+      }
+
+      await connection.query(
+        `UPDATE kiem_dinh_lo_hang SET chu_lo_da_xac_nhan = 1 WHERE ma_kiem_dinh = ?`,
+        [maKiemDinh],
+      );
+      // Hồ sơ lập trước khi có bước niêm phong trên chain: bổ sung sự kiện niêm phong (cơ quan ký) trước
+      await ghiSuKienKiemDinhTrong(connection, maKiemDinh, "SAMPLING_SEALED");
+      await ghiSuKienKiemDinhTrong(connection, maKiemDinh, "SAMPLING_CONFIRMED");
+    });
+
+    return res.json({
+      success: true,
+      message:
+        "Đã xác nhận biên bản lấy mẫu. Hãy ký xác nhận bằng ví ở mục Ví blockchain (Trang cá nhân)",
+    });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận biên bản lấy mẫu:",
+      "Không thể xác nhận biên bản lấy mẫu",
+    );
+  }
+};
+
 module.exports = {
   getAuthorities,
   createRequest,
   getMyRequests,
+  confirmSampling,
 };

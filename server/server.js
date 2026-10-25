@@ -92,4 +92,6 @@ app.use("/api/nha-phan-phoi", nhaphanphoiRoutes);
 app.use("/api/blockchain", blockchainRoutes);
 app.listen(port, () => {
   console.log(`Server đang chạy tại http://localhost:${port}`);
+  // Outbox worker: theo dõi giao dịch đã gửi và đối soát với chain (không ký thay ai)
+  require("./services/blockchain/outboxWorker").batDau();
 });

@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { ghiSuKienVanDon, chuaCoViDuyet } = require("../services/blockchain/hook");
 
 /*
 ==================================================
@@ -525,6 +526,9 @@ const createOrder = async (req, res) => {
             ],
           );
 
+          // Blockchain: nông dân ký tạo lệnh bàn giao (gắn ví vận chuyển + ví bên nhận)
+          await ghiSuKienVanDon(connection, newCode, "TRANSPORT_ORDERED", maNguoiDung);
+
           return newCode;
         });
 
@@ -535,9 +539,20 @@ const createOrder = async (req, res) => {
       }
     }
 
+    // Các bước ký blockchain của lệnh sẽ chờ tới khi các bên có ví được admin duyệt
+    let canhBaoVi = "";
+    try {
+      const thieu = await chuaCoViDuyet(db, [maNguoiDung, ma_don_vi_van_chuyen, ma_ben_nhan]);
+      if (thieu.length > 0) {
+        canhBaoVi = `. Lưu ý: ${thieu.join(", ")} chưa có ví blockchain được duyệt nên các bước ký của lệnh này sẽ chờ`;
+      }
+    } catch {
+      canhBaoVi = "";
+    }
+
     return res.status(201).json({
       success: true,
-      message: "Tạo lệnh vận chuyển & bàn giao thành công",
+      message: `Tạo lệnh vận chuyển & bàn giao thành công${canhBaoVi}`,
       data: { ma_van_don },
     });
   } catch (err) {
@@ -684,6 +699,10 @@ const cancelOrder = async (req, res) => {
         `UPDATE lenh_van_chuyen SET trang_thai = 'DA_HUY' WHERE ma_van_don = ?`,
         [maVanDon],
       );
+      // Blockchain: nông dân ký hủy lệnh (lô ở lại nông trại)
+      await ghiSuKienVanDon(connection, maVanDon, "HANDOVER_REJECTED", maNguoiDung, {
+        ben_tu_choi: "BEN_GUI",
+      });
     });
 
     return res.json({

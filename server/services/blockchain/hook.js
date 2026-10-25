@@ -1,5 +1,5 @@
 const { ghiSuKien, layChiSoKiemDinh } = require("./traceEvent");
-const { hashNoiDung } = require("./canonical");
+const { hashNoiDung, sangGram } = require("./canonical");
 
 // Các hàm ghi sự kiện cho từng nghiệp vụ, để controller chỉ cần gọi một dòng.
 
@@ -16,6 +16,8 @@ const LOAI_SAU_LENH = [
   "DELIVERY_CONFIRMED",
   "STOCK_IN_CONFIRMED",
   "HANDOVER_REJECTED",
+  "RETURN_SHIPPED",
+  "RETURN_RECEIVED",
 ];
 
 // Sự kiện của một lệnh vận chuyển (lenh_van_chuyen). Gọi bên trong transaction của controller.
@@ -29,7 +31,8 @@ const ghiSuKienVanDon = async (
   const [rows] = await executor.query(
     `
     SELECT ma_van_don, ma_lo_nong_san, ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan,
-           CAST(khoi_luong AS CHAR) AS khoi_luong, don_vi_tinh, ten_tai_xe, bien_so_xe
+           CAST(khoi_luong AS CHAR) AS khoi_luong, CAST(khoi_luong_nhan AS CHAR) AS khoi_luong_nhan,
+           don_vi_tinh, ten_tai_xe, bien_so_xe
     FROM lenh_van_chuyen
     WHERE ma_van_don = ?
     LIMIT 1
@@ -80,75 +83,145 @@ const ghiSuKienVanDon = async (
     }
   }
 
+  // hợp đồng v2: bên nhận ký kèm khối lượng thực nhận (gram)
+  const thamSo =
+    loai === "TRANSPORT_ORDERED"
+      ? thamSoLenh
+      : loai === "STOCK_IN_CONFIRMED"
+        ? { khoi_luong_nhan_gram: sangGram(v.khoi_luong_nhan || v.khoi_luong, v.don_vi_tinh) }
+        : {};
+
   return ghiSuKien(executor, {
     maLo: v.ma_lo_nong_san,
     loai,
     maNguoiKy,
-    duLieu,
-    thamSo: loai === "TRANSPORT_ORDERED" ? thamSoLenh : {},
+    duLieu: loai === "STOCK_IN_CONFIRMED" ? { ...duLieu, khoi_luong_nhan: v.khoi_luong_nhan || v.khoi_luong } : duLieu,
+    thamSo,
   });
 };
 
-// Sự kiện kiểm định. Các controller kiểm định không dùng transaction nên hàm này tự mở transaction riêng
-// và KHÔNG ném lỗi: nghiệp vụ kiểm định đã hoàn tất, việc ghi hàng chờ blockchain lỗi chỉ được ghi log.
+// Bên nhận (sơ chế / phân phối) từ chối khi hàng đã đến nơi. Trên chain lô chuyển sang "bị từ chối" và
+// chỉ dùng lại được sau 2 bước trả hàng, nên xếp luôn cả 3 sự kiện vào hàng chờ ký:
+//   HANDOVER_REJECTED (bên nhận ký) -> RETURN_SHIPPED (vận chuyển ký khi đã chở về)
+//   -> RETURN_RECEIVED (bên gửi ký khi đã nhận lại hàng).
+// Mỗi bên ký đúng lúc việc đó xảy ra; chữ ký chính là xác nhận của họ.
+const ghiSuKienTuChoiNhanHang = async (executor, maVanDon) => {
+  const [rows] = await executor.query(
+    `SELECT ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan FROM lenh_van_chuyen WHERE ma_van_don = ? LIMIT 1`,
+    [maVanDon],
+  );
+  if (rows.length === 0) throw new Error(`Không tìm thấy lệnh vận chuyển ${maVanDon}`);
+  const v = rows[0];
+  const tuChoi = await ghiSuKienVanDon(executor, maVanDon, "HANDOVER_REJECTED", v.ma_ben_nhan, { ben_tu_choi: "BEN_NHAN" });
+  if (!tuChoi) return null; // lô không được theo dõi trên chain
+  await ghiSuKienVanDon(executor, maVanDon, "RETURN_SHIPPED", v.ma_don_vi_van_chuyen);
+  await ghiSuKienVanDon(executor, maVanDon, "RETURN_RECEIVED", v.ma_nguoi_gui);
+  return tuChoi;
+};
+
+// Mã người dùng (trong danh sách) chưa có ví được duyệt: các bước họ phải ký sẽ chờ tới khi có ví
+const chuaCoViDuyet = async (executor, maNguoiDungs) => {
+  const ds = [...new Set(maNguoiDungs.filter(Boolean))];
+  if (ds.length === 0) return [];
+  const [rows] = await executor.query(
+    `SELECT ma_nguoi_dung FROM vi_blockchain WHERE ma_nguoi_dung IN (?) AND trang_thai = 1 AND trang_thai_duyet = 'DA_DUYET'`,
+    [ds],
+  );
+  const coVi = new Set(rows.map((r) => r.ma_nguoi_dung));
+  return ds.filter((m) => !coVi.has(m));
+};
+
+// Hồ sơ kiểm định đã có sự kiện loại này trong chuỗi chưa (mỗi bước chỉ ghi một lần)
+const daCoSuKienKiemDinh = async (executor, maKiemDinh, loai) => {
+  const [rows] = await executor.query(
+    `
+    SELECT ma_lich_su FROM lich_su_truy_xuat_lo
+    WHERE loai_hoat_dong = ?
+      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_kiem_dinh')) = ?
+    LIMIT 1
+    `,
+    [loai, maKiemDinh],
+  );
+  return rows.length > 0;
+};
+
+// Sự kiện kiểm định, gọi BÊN TRONG transaction của controller (lỗi sẽ ném ra để rollback cả nghiệp vụ).
+// Trả null nếu sự kiện đã có hoặc lô không được theo dõi.
+const ghiSuKienKiemDinhTrong = async (connection, maKiemDinh, loai) => {
+  if (await daCoSuKienKiemDinh(connection, maKiemDinh, loai)) return null;
+
+  const [rows] = await connection.query(
+    `
+    SELECT kd.ma_kiem_dinh, kd.ma_ho_so, kd.ma_lo_nong_san, kd.ma_co_quan, kd.tieu_chuan_dang_ky,
+           kd.so_chung_nhan, kd.ket_luan, kd.kiem_dinh_vien,
+           DATE_FORMAT(kd.hieu_luc_tu, '%Y-%m-%d') AS hieu_luc_tu,
+           DATE_FORMAT(kd.hieu_luc_den, '%Y-%m-%d') AS hieu_luc_den,
+           kd.ma_niem_phong, kd.khoi_luong_mau, kd.phuong_phap_lay_mau, kd.tinh_trang_cam_quan,
+           DATE_FORMAT(kd.thoi_gian_lay_mau, '%Y-%m-%d %H:%i:%s') AS thoi_gian_lay_mau,
+           kd.ly_do_thu_hoi, lo.ma_nguoi_quan_ly AS ma_chu_lo, pbn.ma_bam AS phien_ban_nguong
+    FROM kiem_dinh_lo_hang kd
+    JOIN lo_nong_san lo ON lo.ma_lo_nong_san = kd.ma_lo_nong_san
+    LEFT JOIN phien_ban_nguong pbn ON pbn.ma_phien_ban = kd.ma_phien_ban_nguong
+    WHERE kd.ma_kiem_dinh = ?
+    LIMIT 1
+    `,
+    [maKiemDinh],
+  );
+  if (rows.length === 0) throw new Error(`Không tìm thấy hồ sơ kiểm định ${maKiemDinh}`);
+  const kd = rows[0];
+
+  // Biên bản lấy mẫu: cơ quan niêm phong, chủ lô ký xác nhận đúng nội dung này
+  const duLieu = {
+    ma_kiem_dinh: kd.ma_kiem_dinh,
+    ma_ho_so: kd.ma_ho_so,
+    tieu_chuan_dang_ky: kd.tieu_chuan_dang_ky,
+    kiem_dinh_vien: kd.kiem_dinh_vien,
+    ma_niem_phong: kd.ma_niem_phong,
+    khoi_luong_mau: kd.khoi_luong_mau,
+    phuong_phap_lay_mau: kd.phuong_phap_lay_mau,
+    tinh_trang_cam_quan: kd.tinh_trang_cam_quan,
+    thoi_gian_lay_mau: kd.thoi_gian_lay_mau,
+  };
+  if (loai !== "SAMPLING_SEALED" && loai !== "SAMPLING_CONFIRMED") {
+    const chiSo = await layChiSoKiemDinh(connection, maKiemDinh);
+    Object.assign(duLieu, {
+      so_chung_nhan: kd.so_chung_nhan,
+      ket_luan: kd.ket_luan,
+      hieu_luc_tu: kd.hieu_luc_tu,
+      hieu_luc_den: kd.hieu_luc_den,
+      ly_do_thu_hoi: kd.ly_do_thu_hoi,
+      phien_ban_nguong: kd.phien_ban_nguong,
+      chi_so: chiSo,
+      hash_chi_so: hashNoiDung(chiSo),
+    });
+  }
+
+  return ghiSuKien(connection, {
+    maLo: kd.ma_lo_nong_san,
+    loai,
+    // chủ lô ký xác nhận biên bản lấy mẫu; các bước còn lại do cơ quan kiểm định ký
+    maNguoiKy: loai === "SAMPLING_CONFIRMED" ? kd.ma_chu_lo : kd.ma_co_quan,
+    duLieu,
+    // hợp đồng v2: chứng nhận gắn theo mã hồ sơ; công bố phải kèm bộ ngưỡng đã ghi trên chain
+    thamSo: {
+      ma_kiem_dinh: kd.ma_kiem_dinh,
+      ...(loai === "CERTIFICATE_ISSUED"
+        ? { het_han: hanChungNhanUnix(kd.hieu_luc_den) }
+        : {}),
+      ...(loai === "CERTIFICATE_ISSUED" || loai === "CERTIFICATE_FAILED"
+        ? { phien_ban_nguong: kd.phien_ban_nguong || null }
+        : {}),
+    },
+  });
+};
+
+// Bản tự mở transaction riêng và KHÔNG ném lỗi (dùng ở nơi nghiệp vụ đã xong, chỉ cần ghi log khi lỗi)
 const ghiSuKienKiemDinh = async (db, maKiemDinh, loai) => {
   let connection;
   try {
     connection = await db.getConnection();
     await connection.beginTransaction();
-
-    const [rows] = await connection.query(
-      `
-      SELECT ma_kiem_dinh, ma_ho_so, ma_lo_nong_san, ma_co_quan, tieu_chuan_dang_ky, so_chung_nhan,
-             ket_luan, DATE_FORMAT(hieu_luc_tu, '%Y-%m-%d') AS hieu_luc_tu,
-             DATE_FORMAT(hieu_luc_den, '%Y-%m-%d') AS hieu_luc_den,
-             ma_niem_phong, khoi_luong_mau,
-             DATE_FORMAT(thoi_gian_lay_mau, '%Y-%m-%d %H:%i:%s') AS thoi_gian_lay_mau,
-             ly_do_thu_hoi
-      FROM kiem_dinh_lo_hang
-      WHERE ma_kiem_dinh = ?
-      LIMIT 1
-      `,
-      [maKiemDinh],
-    );
-    if (rows.length === 0) {
-      await connection.rollback();
-      return null;
-    }
-    const kd = rows[0];
-
-    const duLieu = {
-      ma_kiem_dinh: kd.ma_kiem_dinh,
-      ma_ho_so: kd.ma_ho_so,
-      tieu_chuan_dang_ky: kd.tieu_chuan_dang_ky,
-      ma_niem_phong: kd.ma_niem_phong,
-      khoi_luong_mau: kd.khoi_luong_mau,
-      thoi_gian_lay_mau: kd.thoi_gian_lay_mau,
-    };
-    if (loai !== "SAMPLING_SEALED") {
-      const chiSo = await layChiSoKiemDinh(connection, maKiemDinh);
-      Object.assign(duLieu, {
-        so_chung_nhan: kd.so_chung_nhan,
-        ket_luan: kd.ket_luan,
-        hieu_luc_tu: kd.hieu_luc_tu,
-        hieu_luc_den: kd.hieu_luc_den,
-        ly_do_thu_hoi: kd.ly_do_thu_hoi,
-        chi_so: chiSo,
-        hash_chi_so: hashNoiDung(chiSo),
-      });
-    }
-
-    const ketQua = await ghiSuKien(connection, {
-      maLo: kd.ma_lo_nong_san,
-      loai,
-      maNguoiKy: kd.ma_co_quan,
-      duLieu,
-      thamSo:
-        loai === "CERTIFICATE_ISSUED"
-          ? { het_han: hanChungNhanUnix(kd.hieu_luc_den) }
-          : {},
-    });
-
+    const ketQua = await ghiSuKienKiemDinhTrong(connection, maKiemDinh, loai);
     await connection.commit();
     return ketQua;
   } catch (err) {
@@ -163,4 +236,12 @@ const ghiSuKienKiemDinh = async (db, maKiemDinh, loai) => {
   }
 };
 
-module.exports = { ghiSuKienVanDon, ghiSuKienKiemDinh, hanChungNhanUnix };
+module.exports = {
+  ghiSuKienVanDon,
+  ghiSuKienTuChoiNhanHang,
+  chuaCoViDuyet,
+  ghiSuKienKiemDinh,
+  ghiSuKienKiemDinhTrong,
+  daCoSuKienKiemDinh,
+  hanChungNhanUnix,
+};

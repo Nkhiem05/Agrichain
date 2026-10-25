@@ -19,7 +19,11 @@ const accounts = process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [];
 
 export default defineConfig({
   plugins: [hardhatEthers],
-  solidity: "0.8.24",
+  // Bật optimizer: hợp đồng v2 khi không tối ưu dài ~26,9 KB, vượt giới hạn 24 KB của EVM
+  solidity: {
+    version: "0.8.24",
+    settings: { optimizer: { enabled: true, runs: 200 } },
+  },
   networks: {
     localhost: { type: "http", url: "http://127.0.0.1:8545" },
     monadTestnet: {
