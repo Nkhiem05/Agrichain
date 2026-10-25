@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const { kiemTraDienTichThua } = require("../utils/dienTich");
 
 /*
 ==================================================
@@ -254,6 +255,13 @@ const createPlot = async (req, res) => {
             throw new ApiError(404, "Không tìm thấy nông trại");
           }
 
+          const loiDienTich = await kiemTraDienTichThua(
+            connection,
+            maNongTrai,
+            dien_tich,
+          );
+          if (loiDienTich) throw new ApiError(400, loiDienTich);
+
           const [duplicates] = await connection.execute(
             `
             SELECT ma_thua_dat
@@ -388,6 +396,20 @@ const updatePlot = async (req, res) => {
 
     await withTransaction(async (connection) => {
       const plot = await getPlotForUpdate(connection, maNongTrai, maThuaDat);
+
+      // Khóa dòng nông trại để 2 lần sửa cùng lúc không cùng vượt diện tích
+      await connection.execute(
+        `SELECT ma_nong_trai FROM nong_trai WHERE ma_nong_trai = ? FOR UPDATE`,
+        [maNongTrai],
+      );
+
+      const loiDienTich = await kiemTraDienTichThua(
+        connection,
+        maNongTrai,
+        dien_tich,
+        maThuaDat,
+      );
+      if (loiDienTich) throw new ApiError(400, loiDienTich);
 
       if (plot.mua_vu_dang_chay && trang_thai) {
         throw new ApiError(

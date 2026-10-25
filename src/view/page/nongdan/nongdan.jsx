@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import usePersistentTab from "../../../hooks/usePersistentTab";
 import {
   Sprout,
   Wheat,
@@ -155,7 +156,7 @@ const DashboardPage = () => {
   // =========================================================
   // TAB
   // =========================================================
-  const [activeTab, setActiveTab] = useState("farm");
+  const [activeTab, setActiveTab] = usePersistentTab("nongdan", "farm", ["farm","season","batch","inspection","shipping"]);
 
   // =========================================================
   // POPUP
@@ -185,7 +186,6 @@ const DashboardPage = () => {
   // =========================================================
   // DANH SÁCH NGƯỜI QUẢN LÝ
   // =========================================================
-  const [managers, setManagers] = useState([]);
 
   // =========================================================
   // NÔNG TRẠI ĐANG SỬA
@@ -373,34 +373,11 @@ const DashboardPage = () => {
     }
   };
 
-  // =========================================================
-  // LẤY DANH SÁCH NGƯỜI QUẢN LÝ
-  // =========================================================
-  const fetchManagers = async () => {
-    try {
-      const response = await fetch(`${API_URL}/api/farmer/managers`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        console.error(data.message || "Không thể lấy danh sách người quản lý");
-        return;
-      }
-
-      setManagers(data.data || []);
-    } catch (error) {
-      console.error("Lỗi lấy danh sách người quản lý:", error);
-    }
-  };
-
   useEffect(() => {
     if (user?.ma_nguoi_dung) {
       fetchFarms(user.ma_nguoi_dung);
     }
   }, [user]);
-
-  useEffect(() => {
-    fetchManagers();
-  }, []);
 
   // =========================================================
   // DROPDOWN
@@ -730,9 +707,6 @@ const DashboardPage = () => {
   // TÌM TÊN NGƯỜI QUẢN LÝ
   // =========================================================
   const getManagerName = (maNguoiDung) => {
-    const manager = managers.find((item) => item.ma_nguoi_dung === maNguoiDung);
-
-    if (manager) return manager.ho_ten;
     if (user?.ma_nguoi_dung === maNguoiDung) return user.ho_ten;
 
     return maNguoiDung;
@@ -2124,7 +2098,7 @@ const DashboardPage = () => {
                   <thead>
                     <tr>
                       <th>Mã mùa vụ</th>
-                      <th>Mã nông trại</th>
+                      <th>Tên nông trại</th>
                       <th>Mùa vụ</th>
                       <th>Thửa đất</th>
                       <th>Sản lượng</th>
@@ -2154,7 +2128,7 @@ const DashboardPage = () => {
                           }
                         >
                           <td>{batch.ma_mua_vu || "—"}</td>
-                          <td>{batch.ma_nong_trai || "—"}</td>
+                          <td>{batch.ten_nong_trai || batch.ma_nong_trai || "—"}</td>
                           <td>{batch.loai_cay_trong || "—"}</td>
                           <td>{batch.ten_thua_dat || "—"}</td>
                           <td>
@@ -2632,21 +2606,12 @@ const DashboardPage = () => {
               {editingFarm && (
                 <div className="form-group">
                   <label>Người quản lý</label>
-                  <select
-                    name="ma_nguoi_dung"
-                    value={farmForm.ma_nguoi_dung}
-                    onChange={handleFarmInputChange}
-                  >
-                    <option value="">-- Chọn người quản lý --</option>
-                    {managers.map((manager) => (
-                      <option
-                        key={manager.ma_nguoi_dung}
-                        value={manager.ma_nguoi_dung}
-                      >
-                        {manager.ho_ten}
-                      </option>
-                    ))}
-                  </select>
+                  {/* Chỉ xem: nông trại thuộc tài khoản của bạn, không chuyển cho người khác */}
+                  <input
+                    type="text"
+                    value={getManagerName(farmForm.ma_nguoi_dung)}
+                    readOnly
+                  />
                 </div>
               )}
 
@@ -2763,19 +2728,46 @@ const DashboardPage = () => {
                     value={seasonForm.ma_thua_dat}
                     onChange={handleSeasonInputChange}
                   >
-                    <option value="">-- Chọn thửa đất --</option>
-                    {plots
-                      .filter(
-                        (plot) =>
-                          !plot.ma_mua_vu ||
-                          plot.ma_thua_dat === seasonForm.ma_thua_dat,
-                      )
-                      .map((plot) => (
-                        <option key={plot.ma_thua_dat} value={plot.ma_thua_dat}>
+                    <option value="">
+                      {plots.length === 0
+                        ? "-- Nông trại chưa có thửa đất --"
+                        : "-- Chọn thửa đất --"}
+                    </option>
+                    {plots.map((plot) => {
+                      // Thửa đang có mùa vụ khác chạy thì hiện mờ, không chọn được
+                      // (mỗi thửa chỉ có 1 mùa vụ tại một thời điểm)
+                      const busy =
+                        !!plot.ma_mua_vu &&
+                        plot.ma_thua_dat !== seasonForm.ma_thua_dat;
+
+                      return (
+                        <option
+                          key={plot.ma_thua_dat}
+                          value={plot.ma_thua_dat}
+                          disabled={busy}
+                        >
                           {plot.ten_thua_dat}
+                          {busy ? ` — đang có mùa vụ ${plot.ma_mua_vu}` : ""}
                         </option>
-                      ))}
+                      );
+                    })}
                   </select>
+                  {plots.length === 0 && (
+                    <small style={{ color: "#6b7280", display: "block", marginTop: 4 }}>
+                      Hãy thêm thửa đất ở mục Quản lý nông trại → Xem chi tiết.
+                    </small>
+                  )}
+                  {plots.length > 0 &&
+                    plots.every(
+                      (plot) =>
+                        !!plot.ma_mua_vu &&
+                        plot.ma_thua_dat !== seasonForm.ma_thua_dat,
+                    ) && (
+                      <small style={{ color: "#6b7280", display: "block", marginTop: 4 }}>
+                        Tất cả thửa đất đang có mùa vụ. Hãy thu hoạch/tạo lô cho
+                        mùa vụ cũ hoặc thêm thửa đất mới.
+                      </small>
+                    )}
                 </div>
 
                 <div className="form-group">

@@ -14,8 +14,7 @@ const EMPTY_PLOT_FORM = {
   ten_thua_dat: "",
   dien_tich: "",
   loai_dat: "",
-  status: "active",
-  loai_cay_trong: "",
+  status: "DAT_TRONG",
 };
 
 // "2026-06-18" -> "18/06/2026"
@@ -103,6 +102,22 @@ export default function FarmDetail() {
 
   const plots = farm?.thua_dat || [];
 
+  // Diện tích còn có thể chia cho thửa đang thêm/sửa: diện tích nông trại trừ diện tích
+  // các thửa khác (không tính thửa đang sửa). Nông trại chưa nhập diện tích thì không giới hạn.
+  const farmArea =
+    farm?.dien_tich_nong_trai === null ||
+    farm?.dien_tich_nong_trai === undefined ||
+    farm?.dien_tich_nong_trai === ""
+      ? null
+      : Number(farm.dien_tich_nong_trai);
+  const usedByOthers = plots
+    .filter((p) => !editingPlot || p.ma_thua_dat !== editingPlot.ma_thua_dat)
+    .reduce((total, p) => total + Number(p.dien_tich || 0), 0);
+  const remainingArea =
+    farmArea && farmArea > 0
+      ? Math.max(0, Math.round((farmArea - usedByOthers) * 100) / 100)
+      : null;
+
   const filteredPlots = plots.filter((plot) => {
     const keyword = searchTerm.trim().toLowerCase();
 
@@ -140,7 +155,6 @@ export default function FarmDetail() {
       loai_dat: plot.loai_dat || "",
       // Chỉ đổi được giữa "đất trống" và "tạm ngưng"
       status: plot.trang_thai === "TAM_NGUNG" ? "TAM_NGUNG" : "DAT_TRONG",
-      loai_cay_trong: "",
     });
     setIsModalOpen(true);
   };
@@ -152,6 +166,21 @@ export default function FarmDetail() {
     e.preventDefault();
 
     if (!formData.ten_thua_dat.trim()) return;
+
+    if (
+      remainingArea !== null &&
+      formData.dien_tich !== "" &&
+      Number(formData.dien_tich) > remainingArea + 0.005
+    ) {
+      alert(
+        `Diện tích thửa đất không được vượt phần còn lại của nông trại: tối đa ${formatArea(
+          remainingArea,
+        )} (nông trại ${formatArea(farmArea)}, các thửa khác đã dùng ${formatArea(
+          usedByOthers,
+        )}).`,
+      );
+      return;
+    }
 
     setSaving(true);
 
@@ -175,9 +204,9 @@ export default function FarmDetail() {
                   ...(editingHasSeason ? {} : { trang_thai: formData.status }),
                 }
               : {
+                  // Thửa mới luôn là đất trống; cây trồng nhập khi thêm mùa vụ
                   ...common,
-                  bat_dau_canh_tac: formData.status === "active",
-                  loai_cay_trong: formData.loai_cay_trong.trim(),
+                  bat_dau_canh_tac: false,
                 },
           ),
         },
@@ -479,6 +508,13 @@ export default function FarmDetail() {
                       setFormData({ ...formData, dien_tich: e.target.value })
                     }
                   />
+                  {remainingArea !== null && (
+                    <small style={{ color: "#6b7280", display: "block", marginTop: 4 }}>
+                      Còn có thể chia tối đa {formatArea(remainingArea)} (nông trại{" "}
+                      {formatArea(farmArea)}, các thửa khác đã dùng{" "}
+                      {formatArea(usedByOthers)}).
+                    </small>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -515,38 +551,16 @@ export default function FarmDetail() {
                     )}
                   </div>
                 ) : (
-                  <>
-                    <div className="form-group">
-                      <label>Trạng thái ban đầu</label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) =>
-                          setFormData({ ...formData, status: e.target.value })
-                        }
-                      >
-                        <option value="active">Đang canh tác</option>
-                        <option value="empty">Đất trống</option>
-                      </select>
-                    </div>
-
-                    {formData.status === "active" && (
-                      <div className="form-group">
-                        <label>Loại cây trồng</label>
-                        <input
-                          type="text"
-                          placeholder="Quýt đường, Cam sành..."
-                          value={formData.loai_cay_trong}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              loai_cay_trong: e.target.value,
-                            })
-                          }
-                          required
-                        />
-                      </div>
-                    )}
-                  </>
+                  <p
+                    style={{
+                      color: "#6b7280",
+                      fontSize: 13,
+                      margin: "0 0 12px",
+                    }}
+                  >
+                    Thửa mới ở trạng thái đất trống. Loại cây trồng và giống cây
+                    được nhập khi thêm mùa vụ cho thửa này (Quản lý mùa vụ).
+                  </p>
                 )}
 
                 <div className="modal-actions">

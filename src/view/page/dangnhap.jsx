@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { clearSavedTabs } from "../../hooks/usePersistentTab";
 import "../css/dangnhap.css";
 import { useNavigate } from "react-router-dom";
 
@@ -55,6 +56,7 @@ const LoginPage = () => {
         setLoi(data.message || "Đăng nhập thất bại");
         return;
       }
+      clearSavedTabs();
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 

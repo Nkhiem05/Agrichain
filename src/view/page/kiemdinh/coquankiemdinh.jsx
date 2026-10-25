@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import usePersistentTab from "../../../hooks/usePersistentTab";
 import {
   accepauthority,
   fetchSamplingListApi,
@@ -7,6 +8,10 @@ import {
   updateInspectionStatus,
   exportInspectionCertificateWord,
   fetchNguongKiemDinhApi,
+  fetchInspectorsApi,
+  createInspectorApi,
+  updateInspectorApi,
+  setInspectorStatusApi,
 } from "../../../api/coquankiemdinhApi";
 import {
   ClipboardList,
@@ -30,6 +35,10 @@ import {
   Check,
   Edit3,
   LogOut,
+  Users,
+  UserPlus,
+  Phone,
+  Mail,
 } from "lucide-react";
 import "../../css/coquankiemdinh.css";
 import { useNavigate } from "react-router-dom";
@@ -118,83 +127,14 @@ const formatGioHen = (g) => {
   return `${h.padStart(2, "0")}:${(m ?? "00").slice(0, 2)} ${buoi}`;
 };
 
-// Hàm kiểm tra 1 chỉ số có đạt chuẩn hay không
-const isIndicatorValid = (val, toanTu, nguongToiDa) => {
-  if (val === undefined || val === null || val === "") return false;
-  const strVal = String(val).trim().toUpperCase();
-  const numVal = parseFloat(strVal);
-  const max =
-    nguongToiDa !== null && nguongToiDa !== undefined && nguongToiDa !== ""
-      ? parseFloat(nguongToiDa)
-      : null;
-
-  // So sánh âm tính
-  if (toanTu === "AM_TINH") {
-    if (
-      strVal.includes("ÂM") ||
-      strVal.includes("AM") ||
-      strVal.includes("KHÔNG PHÁT HIỆN") ||
-      strVal.includes("KHONG PHAT HIEN") ||
-      strVal.includes("NEGATIVE") ||
-      strVal.startsWith("<")
-    ) {
-      return true;
-    }
-
-    if (!Number.isNaN(numVal)) {
-      if (numVal === 0) return true;
-      // Khi nguong_toi_da = 0 hoặc null với AM_TINH: giá trị số là LOD thiết bị, coi là đạt
-      if (max === null || Number.isNaN(max) || max === 0) return true;
-      return numVal <= max;
-    }
-    return false;
-  }
-
-  if (Number.isNaN(numVal)) {
-    return (
-      strVal.includes("ĐẠT") ||
-      strVal.includes("DAT") ||
-      strVal.includes("ÂM") ||
-      strVal.includes("AM")
-    );
-  }
-
-  if (max === null || Number.isNaN(max)) return true;
-
-  switch (toanTu) {
-    case "<=":
-      return numVal <= max;
-    case "<":
-      return numVal < max;
-    case ">=":
-      return numVal >= max;
-    case ">":
-      return numVal > max;
-    case "BANG":
-      return Math.abs(numVal - max) < 0.0001;
-    default:
-      return numVal <= max;
-  }
-};
-// Kiểm tra toàn bộ các chất của lô hàng có đạt chuẩn hay không
-const checkAllIndicatorsPass = (item) => {
-  if (!item.danh_sach_chi_so || item.danh_sach_chi_so.length === 0) {
-    return false;
-  }
-
-  for (const cs of item.danh_sach_chi_so) {
-    if (!isIndicatorValid(cs.gia_tri, cs.toan_tu_so_sanh, cs.nguong_toi_da)) {
-      return false; // Chỉ cần 1 chất không đạt thì không cho công bố
-    }
-  }
-  return true;
-};
+// Kết quả Đạt / Không đạt do server đánh giá (server/utils/danhGiaChiSo.js) để mọi trang cùng một công thức
+const checkAllIndicatorsPass = (item) => item.tat_ca_dat === true;
 
 function Coquankiemdinh() {
   const savedUser = localStorage.getItem("user");
   const user = savedUser ? JSON.parse(savedUser) : null;
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = useState("requests");
+  const [currentTab, setCurrentTab] = usePersistentTab("kiemdinh", "requests", ["requests","sampling","results","violations","inspectors"]);
 
   const [samplingFilterStatus, setSamplingFilterStatus] = useState("ALL");
 
@@ -240,15 +180,105 @@ function Coquankiemdinh() {
   const [code, setCode] = useState("");
   const [day, setDay] = useState("");
   const [time, setTime] = useState("");
-  const [inspector, setInspector] = useState(
-    "KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)",
-  );
+  const [inspectors, setInspectors] = useState([]);
+  const [inspectorsLoading, setInspectorsLoading] = useState(false);
+  const [selectedInspectorId, setSelectedInspectorId] = useState("");
+  const [modalInspectorOpen, setModalInspectorOpen] = useState(false);
+  const [editingInspectorId, setEditingInspectorId] = useState(null);
+  const [inspectorForm, setInspectorForm] = useState({
+    ho_ten: "",
+    chuc_vu: "",
+    so_dien_thoai: "",
+    email: "",
+  });
+  const [inspectorFormError, setInspectorFormError] = useState("");
+  const [inspectorSaving, setInspectorSaving] = useState(false);
   const [sealCode, setSealCode] = useState("");
   const [sampleWeight, setSampleWeight] = useState("");
   const [sampleMethod, setSampleMethod] = useState(
     "Lấy chéo góc 5 điểm ngẫu nhiên trên liếp vườn",
   );
   const [visualCondition, setVisualCondition] = useState("");
+
+  const activeInspectors = inspectors.filter((i) => i.trang_thai === 1);
+
+  const loadInspectors = async () => {
+    setInspectorsLoading(true);
+    try {
+      const res = await fetchInspectorsApi();
+      if (res.ok) setInspectors(res.data || []);
+    } catch (err) {
+      console.error("Lỗi khi tải kiểm định viên:", err);
+    } finally {
+      setInspectorsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentTab === "inspectors" || modalAcceptOpen) {
+      loadInspectors();
+    }
+  }, [currentTab, modalAcceptOpen]);
+
+  // Chọn sẵn kiểm định viên đầu tiên đang hoạt động khi mở hộp thoại chấp thuận
+  useEffect(() => {
+    if (!modalAcceptOpen) return;
+    const stillValid = activeInspectors.some(
+      (i) => i.ma_kiem_dinh_vien === selectedInspectorId,
+    );
+    if (!stillValid) {
+      setSelectedInspectorId(activeInspectors[0]?.ma_kiem_dinh_vien || "");
+    }
+  }, [inspectors, modalAcceptOpen]);
+
+  const openInspectorModal = (item) => {
+    setEditingInspectorId(item ? item.ma_kiem_dinh_vien : null);
+    setInspectorForm({
+      ho_ten: item?.ho_ten || "",
+      chuc_vu: item?.chuc_vu || "",
+      so_dien_thoai: item?.so_dien_thoai || "",
+      email: item?.email || "",
+    });
+    setInspectorFormError("");
+    setModalInspectorOpen(true);
+  };
+
+  const handleSaveInspector = async () => {
+    if (!inspectorForm.ho_ten.trim()) {
+      setInspectorFormError("Vui lòng nhập họ tên kiểm định viên");
+      return;
+    }
+    setInspectorSaving(true);
+    setInspectorFormError("");
+    try {
+      const res = editingInspectorId
+        ? await updateInspectorApi(editingInspectorId, inspectorForm)
+        : await createInspectorApi(inspectorForm);
+      if (!res.ok) {
+        setInspectorFormError(res.message || "Không lưu được kiểm định viên");
+        return;
+      }
+      setModalInspectorOpen(false);
+      loadInspectors();
+    } catch (err) {
+      console.error("Lỗi khi lưu kiểm định viên:", err);
+      setInspectorFormError("Không kết nối được máy chủ");
+    } finally {
+      setInspectorSaving(false);
+    }
+  };
+
+  const handleToggleInspector = async (item) => {
+    const res = await setInspectorStatusApi(
+      item.ma_kiem_dinh_vien,
+      item.trang_thai !== 1,
+    );
+    if (!res.ok) {
+      alert(res.message || "Không đổi được trạng thái");
+      return;
+    }
+    loadInspectors();
+  };
 
   const handleOpenAcceptModal = (codeVal, farmVal, maKiemDinh) => {
     setAcceptData({ code: codeVal, farm: farmVal });
@@ -258,7 +288,29 @@ function Coquankiemdinh() {
 
   const handleConfirmScheduleSampling = async () => {
     try {
-      await accepauthority(true, code, day, time, inspector);
+      const chosen = activeInspectors.find(
+        (i) => i.ma_kiem_dinh_vien === selectedInspectorId,
+      );
+      if (!chosen) {
+        alert("Vui lòng chọn kiểm định viên phụ trách");
+        return;
+      }
+      const inspectorText = chosen.chuc_vu
+        ? `${chosen.ho_ten} (${chosen.chuc_vu})`
+        : chosen.ho_ten;
+      const res = await accepauthority(
+        true,
+        code,
+        day,
+        time,
+        inspectorText,
+        chosen.ma_kiem_dinh_vien,
+      );
+      if (!res) return; // thiếu dữ liệu: API đã báo
+      if (!res.status) {
+        alert(res.message || "Chấp thuận lịch hẹn thất bại!");
+        return;
+      }
       setModalAcceptOpen(false);
       fetchInspectionRequests();
       setCurrentTab("sampling");
@@ -284,6 +336,8 @@ function Coquankiemdinh() {
   // Mở popup và gửi yêu cầu đến server tải các tiêu chuẩn của bảng ngưỡng kiểm định chuẩn
   const handleOpenPublishModal = async (item) => {
     setCode(item.ma_kiem_dinh);
+    setStandardIndicators([]);
+    setIndicatorValues({});
     setLoadingStandards(true);
     setModalPublishOpen(true);
 
@@ -303,11 +357,8 @@ function Coquankiemdinh() {
         // Khởi tạo các giá trị, nếu có giá trị đã lưu trước thì điền vào
         const valMap = {};
         standards.forEach((std) => {
-          const found = saved.find(
-            (s) =>
-              s.ma_chi_so === std.ma_chi_so ||
-              s.ten_chi_so === std.ten_chi_tiet_chat,
-          );
+          // ma_chi_so là mã nhóm (vd KIM_LOAI_NANG, VI_SINH) dùng chung nhiều chất, nên chỉ khớp theo tên chất
+          const found = saved.find((s) => s.ten_chi_so === std.ten_chi_tiet_chat);
           valMap[std.ma_nguong] = found ? found.gia_tri : "";
         });
 
@@ -699,6 +750,17 @@ function Coquankiemdinh() {
                 >
                   <ShieldAlert size={20} />
                   <span>Cảnh báo &amp; Thu hồi</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentTab("inspectors")}
+                  className={`nav-item-btn ${
+                    currentTab === "inspectors" ? "active" : ""
+                  }`}
+                >
+                  <Users size={20} />
+                  <span>Kiểm định viên</span>
                 </button>
               </nav>
             </div>
@@ -1526,6 +1588,126 @@ function Coquankiemdinh() {
                 </div>
               </main>
             )}
+            {/* TAB 5: KIỂM ĐỊNH VIÊN */}
+            {currentTab === "inspectors" && (
+              <main className="view-panel">
+                <div className="metrics-sticky-wrapper">
+                  <div className="metrics-grid">
+                    <div className="metric-card">
+                      <span className="metric-label">Tổng kiểm định viên</span>
+                      <p className="metric-val">
+                        {inspectors.length}{" "}
+                        <span className="metric-unit">Người</span>
+                      </p>
+                    </div>
+                    <div className="metric-card">
+                      <span className="metric-label">Đang hoạt động</span>
+                      <p className="metric-val">
+                        {activeInspectors.length}{" "}
+                        <span className="metric-unit">Người</span>
+                      </p>
+                    </div>
+                    <div className="metric-card">
+                      <span className="metric-label">Hồ sơ đang phụ trách</span>
+                      <p className="metric-val">
+                        {inspectors.reduce((n, i) => n + i.dang_phu_trach, 0)}{" "}
+                        <span className="metric-unit">Hồ sơ</span>
+                      </p>
+                    </div>
+                    <div className="filter-actions">
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        onClick={() => openInspectorModal(null)}
+                      >
+                        <UserPlus size={15} />
+                        Thêm kiểm định viên
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="card-stack">
+                  {inspectorsLoading && inspectors.length === 0 && (
+                    <p className="inspector-empty-hint">Đang tải dữ liệu...</p>
+                  )}
+                  {!inspectorsLoading && inspectors.length === 0 && (
+                    <p className="inspector-empty-hint">
+                      Chưa có kiểm định viên nào. Bấm &quot;Thêm kiểm định
+                      viên&quot; để tạo mới và dùng khi phân công hồ sơ.
+                    </p>
+                  )}
+                  {inspectors.map((item) => (
+                    <div
+                      key={item.ma_kiem_dinh_vien}
+                      className={`item-card inspector-card ${
+                        item.trang_thai === 1 ? "" : "inspector-inactive"
+                      }`}
+                    >
+                      <div className="inspector-info">
+                        <div className="inspector-name-row">
+                          <h4 className="card-title">{item.ho_ten}</h4>
+                          <span
+                            className={
+                              item.trang_thai === 1
+                                ? "status-badge-emerald"
+                                : "status-badge-amber"
+                            }
+                          >
+                            {item.trang_thai === 1
+                              ? "Đang hoạt động"
+                              : "Tạm ngưng"}
+                          </span>
+                        </div>
+                        <p className="inspector-role">
+                          {item.chuc_vu || "Chưa cập nhật chức vụ"}
+                          <span className="inspector-code">
+                            {" "}
+                            · {item.ma_kiem_dinh_vien}
+                          </span>
+                        </p>
+                        <div className="inspector-contact">
+                          {item.so_dien_thoai && (
+                            <span>
+                              <Phone size={13} /> {item.so_dien_thoai}
+                            </span>
+                          )}
+                          {item.email && (
+                            <span>
+                              <Mail size={13} /> {item.email}
+                            </span>
+                          )}
+                        </div>
+                        <p className="inspector-workload">
+                          Đang phụ trách <b>{item.dang_phu_trach}</b> hồ sơ ·
+                          Tổng đã nhận <b>{item.tong_ho_so}</b> hồ sơ
+                        </p>
+                      </div>
+                      <div className="card-actions-row">
+                        <button
+                          type="button"
+                          className="btn-light"
+                          onClick={() => openInspectorModal(item)}
+                        >
+                          <Edit3 size={14} /> Sửa
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            item.trang_thai === 1
+                              ? "btn-reject"
+                              : "btn-primary"
+                          }
+                          onClick={() => handleToggleInspector(item)}
+                        >
+                          {item.trang_thai === 1 ? "Tạm ngưng" : "Kích hoạt"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </main>
+            )}
           </div>
         </div>
 
@@ -1579,16 +1761,32 @@ function Coquankiemdinh() {
                   <label>Phân Công Kiểm Định Viên Phụ Trách</label>
                   <select
                     className="form-control-select"
-                    value={inspector}
-                    onChange={(e) => setInspector(e.target.value)}
+                    value={selectedInspectorId}
+                    onChange={(e) => setSelectedInspectorId(e.target.value)}
+                    disabled={activeInspectors.length === 0}
                   >
-                    <option value="KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)">
-                      KS. Trần Minh Tuấn (Phòng Giám định Trồng trọt)
-                    </option>
-                    <option value="ThS. Lê Hoàng Yến (Chuyên viên vi sinh)">
-                      ThS. Lê Hoàng Yến (Chuyên viên vi sinh)
-                    </option>
+                    {activeInspectors.length === 0 && (
+                      <option value="">-- Chưa có kiểm định viên --</option>
+                    )}
+                    {activeInspectors.map((i) => (
+                      <option
+                        key={i.ma_kiem_dinh_vien}
+                        value={i.ma_kiem_dinh_vien}
+                      >
+                        {i.ho_ten}
+                        {i.chuc_vu ? ` (${i.chuc_vu})` : ""}
+                        {i.dang_phu_trach > 0
+                          ? ` - đang phụ trách ${i.dang_phu_trach} hồ sơ`
+                          : ""}
+                      </option>
+                    ))}
                   </select>
+                  {!inspectorsLoading && activeInspectors.length === 0 && (
+                    <p className="inspector-empty-hint">
+                      Cơ quan chưa có kiểm định viên đang hoạt động. Hãy thêm
+                      tại mục &quot;Kiểm định viên&quot; ở thanh bên.
+                    </p>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -1613,8 +1811,118 @@ function Coquankiemdinh() {
                   type="button"
                   onClick={handleConfirmScheduleSampling}
                   className="btn-primary"
+                  disabled={!selectedInspectorId}
                 >
                   Chấp Thuận &amp; Phát Lịch Hẹn
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: THÊM / SỬA KIỂM ĐỊNH VIÊN */}
+        {modalInspectorOpen && (
+          <div className="modal-overlay">
+            <div className="modal-dialog modal-max-md">
+              <div className="modal-header">
+                <h3 className="modal-title">
+                  <UserPlus size={20} color="#059669" />
+                  {editingInspectorId
+                    ? "Cập Nhật Kiểm Định Viên"
+                    : "Thêm Kiểm Định Viên"}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setModalInspectorOpen(false)}
+                  className="btn-close-modal"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="modal-body">
+                <div className="form-group">
+                  <label>Họ và tên (*)</label>
+                  <input
+                    type="text"
+                    className="form-control-input"
+                    maxLength={150}
+                    placeholder="VD: KS. Nguyễn Văn A"
+                    value={inspectorForm.ho_ten}
+                    onChange={(e) =>
+                      setInspectorForm({
+                        ...inspectorForm,
+                        ho_ten: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Chức vụ / Chuyên môn</label>
+                  <input
+                    type="text"
+                    className="form-control-input"
+                    maxLength={150}
+                    placeholder="VD: Phòng Giám định Trồng trọt"
+                    value={inspectorForm.chuc_vu}
+                    onChange={(e) =>
+                      setInspectorForm({
+                        ...inspectorForm,
+                        chuc_vu: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Số điện thoại</label>
+                  <input
+                    type="text"
+                    className="form-control-input"
+                    maxLength={20}
+                    value={inspectorForm.so_dien_thoai}
+                    onChange={(e) =>
+                      setInspectorForm({
+                        ...inspectorForm,
+                        so_dien_thoai: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email</label>
+                  <input
+                    type="email"
+                    className="form-control-input"
+                    maxLength={150}
+                    value={inspectorForm.email}
+                    onChange={(e) =>
+                      setInspectorForm({
+                        ...inspectorForm,
+                        email: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                {inspectorFormError && (
+                  <p className="inspector-form-error">{inspectorFormError}</p>
+                )}
+              </div>
+
+              <div className="modal-footer">
+                <button
+                  type="button"
+                  onClick={() => setModalInspectorOpen(false)}
+                  className="btn-cancel"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveInspector}
+                  className="btn-primary"
+                  disabled={inspectorSaving}
+                >
+                  {inspectorSaving ? "Đang lưu..." : "Lưu"}
                 </button>
               </div>
             </div>
@@ -1794,8 +2102,14 @@ function Coquankiemdinh() {
                           <span className="indicator-field-label">
                             {std.ten_chi_tiet_chat}
                           </span>
+                          <span className="indicator-threshold-hint">
+                            Đạt khi: <b>{std.mo_ta_nguong}</b>
+                            {std.toan_tu_so_sanh === "AM_TINH" &&
+                              " — nhập “Âm tính” hoặc 0"}
+                          </span>
                           <input
                             type="text"
+                            value={indicatorValues[std.ma_nguong] ?? ""}
                             placeholder={
                               std.don_vi_tinh
                                 ? `Nhập (${std.don_vi_tinh})`

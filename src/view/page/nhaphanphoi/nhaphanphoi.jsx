@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import usePersistentTab from "../../../hooks/usePersistentTab";
 import {
   ArchiveRestore,
   Boxes,
@@ -82,7 +83,7 @@ const NhaPhanPhoiPage = () => {
   // ==========================================
   // 1. QUẢN LÝ TAB
   // ==========================================
-  const [activeTab, setActiveTab] = useState("tab-import");
+  const [activeTab, setActiveTab] = usePersistentTab("nhaphanphoi", "tab-import", ["tab-import","tab-inventory","tab-dispatch","tab-dealers"]);
 
   // ==========================================
   // 2. QUẢN LÝ DROPDOWN MENU THAO TÁC (⋮)

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import usePersistentTab from "../../../hooks/usePersistentTab";
 import { useNavigate } from "react-router-dom";
 import {
   Truck,
@@ -63,7 +64,7 @@ const tripRoute = (t) =>
 export default function AgriChainLogistics() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [currentTab, setCurrentTab] = useState("shipping");
+  const [currentTab, setCurrentTab] = usePersistentTab("vanchuyen", "shipping", ["shipping","pickup","delivery"]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 

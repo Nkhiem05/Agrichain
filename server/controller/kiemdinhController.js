@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { generateUniqueCode } = require("../utils/generateCode");
+const { allIndicatorsPass } = require("../utils/danhGiaChiSo");
 
 // Hàm tải danh sách yêu cầu kiểm định
 const taidlyeucaukiemdinh = async (req, res) => {
@@ -81,9 +82,44 @@ const taidlyeucaukiemdinh = async (req, res) => {
 // Chấp nhận yêu cầu kiểm định
 const accepauthority = async (req, res) => {
   const { code } = req.query;
-  const { status, day, time, inspector } = req.body;
+  const { status, day, time, inspector, ma_kiem_dinh_vien } = req.body;
 
   if (status) {
+    // Kiểm định viên phải thuộc đúng cơ quan của hồ sơ và đang hoạt động
+    let inspectorText = inspector || null;
+    let inspectorCode = null;
+    if (ma_kiem_dinh_vien) {
+      const [found] = await db.query(
+        `SELECT v.ma_kiem_dinh_vien, v.ho_ten, v.chuc_vu, v.trang_thai
+         FROM kiem_dinh_vien v
+         JOIN kiem_dinh_lo_hang kd ON kd.ma_co_quan = v.ma_co_quan
+         WHERE v.ma_kiem_dinh_vien = ? AND kd.ma_kiem_dinh = ?`,
+        [ma_kiem_dinh_vien, code],
+      );
+      if (found.length === 0) {
+        return res.status(400).json({
+          message: "Kiểm định viên không thuộc cơ quan này",
+          status: false,
+        });
+      }
+      if (!found[0].trang_thai) {
+        return res.status(400).json({
+          message: "Kiểm định viên đang tạm ngưng, vui lòng chọn người khác",
+          status: false,
+        });
+      }
+      inspectorCode = found[0].ma_kiem_dinh_vien;
+      inspectorText = found[0].chuc_vu
+        ? `${found[0].ho_ten} (${found[0].chuc_vu})`
+        : found[0].ho_ten;
+    }
+    if (!inspectorText) {
+      return res.status(400).json({
+        message: "Vui lòng chọn kiểm định viên phụ trách",
+        status: false,
+      });
+    }
+
     const qrSealCode = await generateUniqueCode(
       db,
       "kiem_dinh_lo_hang",
@@ -91,12 +127,13 @@ const accepauthority = async (req, res) => {
       "QR-Seal-",
       10,
     );
-    const sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so=?, ngay_hen_lay_mau=?, gio_hen_lay_mau=?, kiem_dinh_vien=?, ma_niem_phong=? WHERE ma_kiem_dinh =?`;
+    const sql = `UPDATE kiem_dinh_lo_hang SET trang_thai_ho_so=?, ngay_hen_lay_mau=?, gio_hen_lay_mau=?, kiem_dinh_vien=?, ma_kiem_dinh_vien=?, ma_niem_phong=? WHERE ma_kiem_dinh =?`;
     const [result] = await db.query(sql, [
       "DA_HEN_LICH",
       day,
       time,
-      inspector,
+      inspectorText,
+      inspectorCode,
       qrSealCode,
       code,
     ]);
@@ -194,6 +231,7 @@ const getSamplingScheduleList = async (req, res) => {
 
       rows.forEach((r) => {
         r.danh_sach_chi_so = chiSoMap[r.ma_kiem_dinh] || [];
+        r.tat_ca_dat = allIndicatorsPass(r.danh_sach_chi_so);
       });
     }
 
@@ -401,6 +439,34 @@ const updateInspectionStatus = async (req, res) => {
           status: false,
           message:
             "Chỉ công bố được hồ sơ đã lấy mẫu và nhập chỉ số kiểm định",
+        });
+      }
+
+      // Server tự đánh giá lại các chỉ số đã lưu, không tin giao diện
+      const [chiSoRows] = await db.query(
+        `SELECT cs.gia_tri, nq.toan_tu_so_sanh, nq.nguong_toi_da
+         FROM chi_so_kiem_dinh cs
+         LEFT JOIN nguong_kiem_dinh_chuan nq
+           ON cs.ma_chi_so = nq.ma_chi_so AND cs.ten_chi_so = nq.ten_chi_tiet_chat
+         WHERE cs.ma_kiem_dinh = ?
+         GROUP BY cs.ma_chi_so_kd`,
+        [code],
+      );
+      const tatCaDat = allIndicatorsPass(chiSoRows);
+      if (status === "accept" && !tatCaDat) {
+        return res.status(409).json({
+          status: false,
+          message:
+            chiSoRows.length === 0
+              ? "Hồ sơ chưa có chỉ số kiểm định để công bố"
+              : "Có chỉ số không đạt ngưỡng, không thể cấp chứng nhận. Hãy công bố kết luận Không đạt.",
+        });
+      }
+      if (status === "fail" && tatCaDat) {
+        return res.status(409).json({
+          status: false,
+          message:
+            "Tất cả chỉ số đều đạt, không thể công bố Không đạt. Hãy cấp chứng nhận.",
         });
       }
     }

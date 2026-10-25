@@ -67,8 +67,29 @@ const getOverview = async (req, res) => {
        LIMIT 5`,
     );
 
+    // Lô đã công bố kết luận KHÔNG ĐẠT (không được cấp chứng nhận, không được vận chuyển)
+    const [failedInspections] = await db.query(
+      `SELECT k.ma_lo_nong_san, k.ma_kiem_dinh, k.updated_at
+       FROM kiem_dinh_lo_hang k
+       WHERE k.trang_thai_ho_so = 'DA_CONG_BO' AND k.ket_luan = 'FAILED'
+       ORDER BY k.updated_at DESC
+       LIMIT 5`,
+    );
+    // Lệnh vận chuyển bị bên nhận từ chối
+    const [rejectedShipments] = await db.query(
+      `SELECT v.ma_van_don, v.ma_lo_nong_san, v.ghi_chu
+       FROM lenh_van_chuyen v
+       WHERE v.trang_thai = 'TU_CHOI'
+       ORDER BY v.updated_at DESC
+       LIMIT 5`,
+    );
+
     const canhBao =
-      recalledBatches.length + rejectedInspections.length + lockedOrgCount.n;
+      recalledBatches.length +
+      rejectedInspections.length +
+      failedInspections.length +
+      rejectedShipments.length +
+      lockedOrgCount.n;
 
     const viecCanXuLy = [
       ...(pendingRequestCount.n > 0
@@ -92,6 +113,20 @@ const getOverview = async (req, res) => {
         tieu_de: `Lô ${b.ma_lo_nong_san} bị từ chối kiểm định`,
         mo_ta: "Cơ quan kiểm định đã từ chối hồ sơ đề nghị",
         ma_lo_nong_san: b.ma_lo_nong_san,
+      })),
+      ...failedInspections.map((b) => ({
+        loai: "KIEM_DINH_KHONG_DAT",
+        tieu_de: `Lô ${b.ma_lo_nong_san} kiểm định KHÔNG ĐẠT`,
+        mo_ta: `Hồ sơ ${b.ma_kiem_dinh} có chỉ số vượt ngưỡng, lô không được cấp chứng nhận và không được vận chuyển`,
+        ma_lo_nong_san: b.ma_lo_nong_san,
+      })),
+      ...rejectedShipments.map((v) => ({
+        loai: "VAN_CHUYEN_TU_CHOI",
+        tieu_de: `Lệnh ${v.ma_van_don} bị từ chối tiếp nhận`,
+        mo_ta: v.ghi_chu
+          ? `Lô ${v.ma_lo_nong_san}: ${v.ghi_chu}`
+          : `Bên nhận đã từ chối lô ${v.ma_lo_nong_san}`,
+        ma_lo_nong_san: v.ma_lo_nong_san,
       })),
       ...(lockedOrgCount.n > 0
         ? [

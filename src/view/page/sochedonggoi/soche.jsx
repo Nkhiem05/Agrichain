@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import usePersistentTab from "../../../hooks/usePersistentTab";
 import {
   ArrowRightLeft,
   Package,
@@ -92,7 +93,7 @@ const ProcessingPage = () => {
   const [user, setUser] = useState(null);
 
   // Tab chính: reception -> processing -> batch-split-merge -> shipping
-  const [activeTab, setActiveTab] = useState("reception");
+  const [activeTab, setActiveTab] = usePersistentTab("soche", "reception", ["reception","processing","batch-split-merge","shipping"]);
 
   const [receptionFilter, setReceptionFilter] = useState("ALL");
   const [processingFilter, setProcessingFilter] = useState("ALL");
@@ -130,6 +131,8 @@ const ProcessingPage = () => {
 
   const [showHandoverModal, setShowHandoverModal] = useState(false);
   const [handoverBatch, setHandoverBatch] = useState(null);
+  // Khác null khi mở từ nút "Tạo lệnh bàn giao" mà có nhiều lô sẵn sàng: người dùng phải chọn lô trong hộp thoại
+  const [handoverPickList, setHandoverPickList] = useState(null);
   const [handoverForm, setHandoverForm] = useState({
     ma_don_vi_van_chuyen: "",
     ten_tai_xe: "",
@@ -392,6 +395,7 @@ const ProcessingPage = () => {
   };
 
   const handleOpenHandover = (batch) => {
+    setHandoverPickList(null);
     setHandoverBatch(batch);
     setHandoverForm({
       ma_don_vi_van_chuyen: "",
@@ -465,11 +469,9 @@ const ProcessingPage = () => {
       return;
     }
     if (readyToShip.length > 1) {
-      // Có nhiều hơn 1 lô sẵn sàng bàn giao: không được tự ý chọn đại 1 lô,
-      // yêu cầu người dùng chọn đúng lô cần giao ở tab Quản lý sơ chế đóng gói.
-      alert(
-        'Hiện có nhiều hơn 1 lô đã đóng gói sẵn sàng bàn giao. Vui lòng vào tab "Quản lý sơ chế đóng gói", bấm ⋮ trên đúng lô cần giao rồi chọn "Bàn giao" để tránh chọn nhầm lô.',
-      );
+      // Nhiều lô sẵn sàng bàn giao: không tự chọn đại 1 lô, bắt buộc người dùng chọn rõ trong hộp thoại.
+      handleOpenHandover(null);
+      setHandoverPickList(readyToShip);
       return;
     }
     handleOpenHandover(readyToShip[0]);
@@ -483,6 +485,7 @@ const ProcessingPage = () => {
   const handleConfirmHandover = async () => {
     const { ma_don_vi_van_chuyen, ten_tai_xe, bien_so_xe, ma_ben_nhan, dia_chi_giao_hang } =
       handoverForm;
+    if (!handoverBatch) return alert("Vui lòng chọn lô hàng cần bàn giao!");
     if (!ma_don_vi_van_chuyen) return alert("Vui lòng chọn đơn vị vận chuyển!");
     if (!ten_tai_xe.trim() || !bien_so_xe.trim())
       return alert("Vui lòng điền đủ tên tài xế và biển số xe vận chuyển!");
@@ -1091,6 +1094,47 @@ const ProcessingPage = () => {
                                         </>
                                       )}
                                     </p>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
+                                      {[...new Map(group.map((g) => [g.ma_lo_duoc_tao_ra, g])).values()].map((g) => {
+                                        const ready = readyToShip.find((r) => r.ma_lo_moi === g.ma_lo_duoc_tao_ra);
+                                        const stateText = g.tinh_trang_lo_moi !== "ACTIVE"
+                                          ? "Đã dùng tiếp (gộp/tách/sơ chế)"
+                                          : g.ma_van_don_lo_moi
+                                            ? `Đã bàn giao - vận đơn ${g.ma_van_don_lo_moi}`
+                                            : ready
+                                              ? "Sẵn sàng bàn giao"
+                                              : "Đang ở kho";
+                                        return (
+                                          <span
+                                            key={g.ma_lo_duoc_tao_ra}
+                                            style={{
+                                              display: "inline-flex",
+                                              alignItems: "center",
+                                              gap: "8px",
+                                              fontSize: "12px",
+                                              padding: "4px 10px",
+                                              border: "1px solid #e5e7eb",
+                                              borderRadius: "8px",
+                                              backgroundColor: "#f9fafb",
+                                            }}
+                                          >
+                                            <strong>#{g.ma_lo_duoc_tao_ra}</strong>
+                                            <span>{formatWeight(g.so_luong_lo_moi, g.don_vi_tinh)}</span>
+                                            <span style={{ color: ready ? "#16a34a" : "#6b7280" }}>{stateText}</span>
+                                            {ready && (
+                                              <button
+                                                type="button"
+                                                className="btn-primary-action"
+                                                style={{ height: "26px", padding: "0 12px", fontSize: "12px" }}
+                                                onClick={() => handleOpenHandover(ready)}
+                                              >
+                                                Bàn giao
+                                              </button>
+                                            )}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
                                 </div>
                                 <div style={{ textAlign: "right", fontSize: "12px" }}>
@@ -1336,7 +1380,7 @@ const ProcessingPage = () => {
         )}
 
         {/* ================= MODAL: TẠO LỆNH BÀN GIAO VẬN CHUYỂN ================= */}
-        {showHandoverModal && handoverBatch && (
+        {showHandoverModal && (handoverBatch || handoverPickList) && (
           <div className="modal-overlay">
             <div className="modal-container">
               <div className="modal-header">
@@ -1349,22 +1393,47 @@ const ProcessingPage = () => {
               </div>
 
               <div className="modal-body">
-                <div
-                  style={{
-                    backgroundColor: "#f8fafc",
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    marginBottom: "14px",
-                    border: "1px solid #e2e8f0",
-                  }}
-                >
-                  <div style={{ fontWeight: "700", color: "#111827" }}>
-                    {handoverBatch.tieu_de} ({handoverBatch.ma_lo_moi || handoverBatch.ma_lo_nong_san})
+                {handoverPickList && (
+                  <div className="form-group">
+                    <label>Lô hàng cần bàn giao (*)</label>
+                    <select
+                      value={handoverBatch?.ma_lo_moi || ""}
+                      onChange={(e) =>
+                        setHandoverBatch(
+                          handoverPickList.find((r) => r.ma_lo_moi === e.target.value) || null,
+                        )
+                      }
+                    >
+                      <option value="">-- Chọn lô đã đóng gói --</option>
+                      {handoverPickList.map((r) => (
+                        <option key={r.ma_lo_moi} value={r.ma_lo_moi}>
+                          {`${r.ma_lo_moi} - ${r.tieu_de} (${formatWeight(r.so_luong_hien_tai, r.don_vi_tinh)})${
+                            r.nguon === "MERGE" ? " · lô gộp" : r.nguon === "SPLIT" ? " · lô tách" : ""
+                          }`}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
-                    Khối lượng xuất kho: <strong>{formatWeight(handoverBatch.so_luong_hien_tai, handoverBatch.don_vi_tinh)}</strong>
+                )}
+
+                {handoverBatch && (
+                  <div
+                    style={{
+                      backgroundColor: "#f8fafc",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      marginBottom: "14px",
+                      border: "1px solid #e2e8f0",
+                    }}
+                  >
+                    <div style={{ fontWeight: "700", color: "#111827" }}>
+                      {handoverBatch.tieu_de} ({handoverBatch.ma_lo_moi || handoverBatch.ma_lo_nong_san})
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>
+                      Khối lượng xuất kho: <strong>{formatWeight(handoverBatch.so_luong_hien_tai, handoverBatch.don_vi_tinh)}</strong>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="form-group">
                   <label>Đơn vị vận chuyển (*)</label>

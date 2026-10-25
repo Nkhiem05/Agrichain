@@ -1237,4 +1237,81 @@
   .btn-cancel:hover {
     background-color: #f3f4f6;
   }
+
+  .indicator-threshold-hint {
+    display: block;
+    font-size: 11.5px;
+    color: #6b7280;
+    margin: 2px 0 4px;
+
+    b {
+      color: #059669;
+      font-weight: 600;
+    }
+  }
+
+  /* Quản lý kiểm định viên */
+  .inspector-card {
+    align-items: center;
+    gap: 16px;
+  }
+
+  .inspector-inactive {
+    opacity: 0.7;
+    background-color: #f9fafb;
+  }
+
+  .inspector-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .inspector-name-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .inspector-role,
+  .inspector-workload {
+    font-size: 12.5px;
+    color: #6b7280;
+  }
+
+  .inspector-code {
+    color: #9ca3af;
+  }
+
+  .inspector-contact {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 12.5px;
+    color: #4b5563;
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+  }
+
+  .inspector-empty-hint {
+    font-size: 12.5px;
+    color: #6b7280;
+    margin-top: 6px;
+  }
+
+  .inspector-form-error {
+    font-size: 12.5px;
+    color: #dc2626;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
 }

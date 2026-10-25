@@ -681,7 +681,14 @@ const getSplitMergeLog = async (req, res) => {
         lk.so_luong_tham_gia,
         lk.don_vi_tinh,
         lk.thoi_diem_tao_lien_ket,
-        loMoi.ghi_chu AS pham_cap_lo_moi
+        loMoi.ghi_chu AS pham_cap_lo_moi,
+        loMoi.so_luong_hien_tai AS so_luong_lo_moi,
+        loMoi.tinh_trang_su_dung AS tinh_trang_lo_moi,
+        (
+          SELECT v.ma_van_don FROM lenh_van_chuyen v
+          WHERE v.ma_lo_nong_san = lk.ma_lo_duoc_tao_ra AND v.trang_thai != 'DA_HUY'
+          ORDER BY v.created_at DESC LIMIT 1
+        ) AS ma_van_don_lo_moi
       FROM lien_ket_nguon_goc_lo lk
       JOIN lo_nong_san loMoi ON lk.ma_lo_duoc_tao_ra = loMoi.ma_lo_nong_san
       LEFT JOIN san_pham_nong_san spMoi ON loMoi.ma_san_pham = spMoi.ma_san_pham
@@ -893,19 +900,44 @@ const getReadyToShip = async (req, res) => {
 
     const [rows] = await db.execute(
       `
-      SELECT sc.ma_so_che, sc.ma_lo_moi, sc.tieu_de, lo.so_luong_hien_tai, lo.don_vi_tinh
-      FROM so_che_lo_hang sc
-      JOIN lo_nong_san lo ON sc.ma_lo_moi = lo.ma_lo_nong_san
-      WHERE sc.ma_co_so = ?
-        AND sc.giai_doan_so_che = 'DA_HOAN_TAT'
-        AND lo.tinh_trang_su_dung = 'ACTIVE'
-        AND NOT EXISTS (
-          SELECT 1 FROM lenh_van_chuyen v
-          WHERE v.ma_lo_nong_san = sc.ma_lo_moi AND v.trang_thai != 'DA_HUY'
-        )
-      ORDER BY sc.ngay_hoan_tat DESC
+      SELECT * FROM (
+        SELECT sc.ma_so_che, sc.ma_lo_moi, sc.tieu_de, lo.so_luong_hien_tai, lo.don_vi_tinh,
+               'SO_CHE' AS nguon, sc.ngay_hoan_tat AS thoi_diem
+        FROM so_che_lo_hang sc
+        JOIN lo_nong_san lo ON sc.ma_lo_moi = lo.ma_lo_nong_san
+        WHERE sc.ma_co_so = ?
+          AND sc.giai_doan_so_che = 'DA_HOAN_TAT'
+          AND lo.tinh_trang_su_dung = 'ACTIVE'
+          AND NOT EXISTS (
+            SELECT 1 FROM lenh_van_chuyen v
+            WHERE v.ma_lo_nong_san = sc.ma_lo_moi AND v.trang_thai != 'DA_HUY'
+          )
+
+        UNION ALL
+
+        -- Lô tạo ra từ tách / gộp lô cũng được bàn giao trực tiếp (không cần qua sơ chế lại)
+        SELECT NULL AS ma_so_che, lo.ma_lo_nong_san AS ma_lo_moi,
+               COALESCE(NULLIF(lo.ghi_chu, ''),
+                        CONCAT(sp.ten_san_pham, IF(MAX(lk.loai_lien_ket) = 'MERGE', ' - Lô gộp', ' - Lô tách'))) AS tieu_de,
+               lo.so_luong_hien_tai, lo.don_vi_tinh,
+               MAX(lk.loai_lien_ket) AS nguon, MAX(lk.thoi_diem_tao_lien_ket) AS thoi_diem
+        FROM lien_ket_nguon_goc_lo lk
+        JOIN lo_nong_san lo ON lk.ma_lo_duoc_tao_ra = lo.ma_lo_nong_san
+        JOIN san_pham_nong_san sp ON lo.ma_san_pham = sp.ma_san_pham
+        WHERE lk.loai_lien_ket IN ('SPLIT', 'MERGE')
+          AND lo.ma_nguoi_quan_ly = ?
+          AND lo.tinh_trang_su_dung = 'ACTIVE'
+          AND lo.so_luong_hien_tai > 0
+          AND NOT EXISTS (
+            SELECT 1 FROM lenh_van_chuyen v
+            WHERE v.ma_lo_nong_san = lo.ma_lo_nong_san AND v.trang_thai != 'DA_HUY'
+          )
+          AND NOT EXISTS (SELECT 1 FROM so_che_lo_hang sc2 WHERE sc2.ma_lo_moi = lo.ma_lo_nong_san)
+        GROUP BY lo.ma_lo_nong_san, lo.ghi_chu, sp.ten_san_pham, lo.so_luong_hien_tai, lo.don_vi_tinh
+      ) ready
+      ORDER BY thoi_diem DESC
       `,
-      [maCoSo],
+      [maCoSo, maCoSo],
     );
 
     return res.json({ success: true, data: rows });

@@ -1,5 +1,9 @@
 const db = require("../../server/config/db");
 const { generateUniqueCode } = require("../utils/generateCode");
+const {
+  kiemTraDienTichThua,
+  kiemTraDienTichNongTrai,
+} = require("../utils/dienTich");
 
 /*
 ==================================================
@@ -247,14 +251,18 @@ const createFarm = async (req, res) => {
   }
 };
 
+// Sửa thông tin nông trại. KHÔNG đổi chủ nông trại: ma_nguoi_dung gửi lên (nếu có) bị bỏ qua,
+// việc chuyển nông trại cho người khác không thuộc chức năng của nông dân.
 const updateFarm = async (req, res) => {
   const { maNongTrai } = req.params;
-  const {
-    ma_nguoi_dung,
-    ten_nong_trai,
-    dia_diem_nong_trai,
-    dien_tich_nong_trai,
-  } = req.body;
+  const { ten_nong_trai, dia_diem_nong_trai, dien_tich_nong_trai } = req.body;
+
+  if (!ten_nong_trai?.trim() || !dia_diem_nong_trai?.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: "Vui lòng nhập đầy đủ thông tin nông trại",
+    });
+  }
 
   const findSql = `
     SELECT anh_nong_trai
@@ -273,6 +281,15 @@ const updateFarm = async (req, res) => {
       });
     }
 
+    const loiDienTich = await kiemTraDienTichNongTrai(
+      db,
+      maNongTrai,
+      dien_tich_nong_trai ? Number(dien_tich_nong_trai) : null,
+    );
+    if (loiDienTich) {
+      return res.status(400).json({ success: false, message: loiDienTich });
+    }
+
     let anh_nong_trai = results[0].anh_nong_trai;
     if (req.file) {
       anh_nong_trai = "/uploads/farms/" + req.file.filename;
@@ -281,7 +298,6 @@ const updateFarm = async (req, res) => {
     const sql = `
       UPDATE nong_trai
       SET
-        ma_nguoi_dung = ?,
         ten_nong_trai = ?,
         dia_diem_nong_trai = ?,
         dien_tich_nong_trai = ?,
@@ -290,9 +306,8 @@ const updateFarm = async (req, res) => {
     `;
 
     await db.execute(sql, [
-      ma_nguoi_dung,
-      ten_nong_trai,
-      dia_diem_nong_trai,
+      ten_nong_trai.trim(),
+      dia_diem_nong_trai.trim(),
       dien_tich_nong_trai || null,
       anh_nong_trai,
       maNongTrai,
@@ -411,6 +426,15 @@ const createPlot = async (req, res) => {
   `;
 
   try {
+    const loiDienTich = await kiemTraDienTichThua(
+      db,
+      ma_nong_trai,
+      dien_tich ? Number(dien_tich) : null,
+    );
+    if (loiDienTich) {
+      return res.status(400).json({ success: false, message: loiDienTich });
+    }
+
     await db.execute(sql, [
       ma_thua_dat,
       ma_nong_trai,
@@ -448,6 +472,23 @@ const updatePlot = async (req, res) => {
   `;
 
   try {
+    const [plots] = await db.execute(
+      `SELECT ma_nong_trai FROM thua_dat WHERE ma_thua_dat = ? LIMIT 1`,
+      [maThuaDat],
+    );
+
+    if (plots.length > 0) {
+      const loiDienTich = await kiemTraDienTichThua(
+        db,
+        plots[0].ma_nong_trai,
+        dien_tich ? Number(dien_tich) : null,
+        maThuaDat,
+      );
+      if (loiDienTich) {
+        return res.status(400).json({ success: false, message: loiDienTich });
+      }
+    }
+
     const [result] = await db.execute(sql, [
       ten_thua_dat,
       dien_tich || null,

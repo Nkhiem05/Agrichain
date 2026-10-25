@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import usePersistentTab from "../../../hooks/usePersistentTab";
 import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -131,7 +132,7 @@ export default function AdminDashboard() {
   };
 
   // ================= TABS =================
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = usePersistentTab("admin", "overview", ["overview","farms","users","catalog","batches","inspection","shipping","integrity"]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // ================= MODALS STATE =================
@@ -966,7 +967,9 @@ export default function AdminDashboard() {
                               fontSize: 13.5,
                               color:
                                 item.loai === "LO_THU_HOI" ||
-                                item.loai === "KIEM_DINH_TU_CHOI"
+                                item.loai === "KIEM_DINH_TU_CHOI" ||
+                                item.loai === "KIEM_DINH_KHONG_DAT" ||
+                                item.loai === "VAN_CHUYEN_TU_CHOI"
                                   ? "#dc2626"
                                   : "#1f2937",
                             }}
@@ -992,9 +995,12 @@ export default function AdminDashboard() {
                                 : item.loai === "DANG_KY_CHO_DUYET"
                                   ? "farms"
                                   : item.loai === "LO_THU_HOI" ||
-                                      item.loai === "KIEM_DINH_TU_CHOI"
+                                      item.loai === "KIEM_DINH_TU_CHOI" ||
+                                      item.loai === "KIEM_DINH_KHONG_DAT"
                                     ? "inspection"
-                                    : "farms",
+                                    : item.loai === "VAN_CHUYEN_TU_CHOI"
+                                      ? "shipping"
+                                      : "farms",
                             )
                           }
                         >

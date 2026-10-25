@@ -14,7 +14,21 @@ import { saveAs } from "file-saver";
 
 const API_URL = "http://localhost:3000/api/kiem-dinh/";
 
-const accepauthority = async (status, code, day, time, inspector) => {
+const INSPECTOR_API_URL = "http://localhost:3000/api/kiem-dinh-vien";
+
+const getAuthHeaders = () => {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const accepauthority = async (
+  status,
+  code,
+  day,
+  time,
+  inspector,
+  maKiemDinhVien,
+) => {
   if (status && (!code || !day || !time || !inspector)) {
     alert("vui lòng nhập đủ dữ liệu");
     return;
@@ -34,6 +48,7 @@ const accepauthority = async (status, code, day, time, inspector) => {
           day: day,
           time: time,
           inspector: inspector,
+          ma_kiem_dinh_vien: maKiemDinhVien,
         }),
       },
     );
@@ -42,6 +57,27 @@ const accepauthority = async (status, code, day, time, inspector) => {
     console.error(err);
   }
 };
+
+// Quản lý kiểm định viên của cơ quan
+const requestInspectorApi = async (path, method, body) => {
+  const res = await fetch(`${INSPECTOR_API_URL}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ...data, ok: res.ok && data.ok !== false };
+};
+
+const fetchInspectorsApi = () => requestInspectorApi("", "GET");
+const createInspectorApi = (payload) =>
+  requestInspectorApi("", "POST", payload);
+const updateInspectorApi = (id, payload) =>
+  requestInspectorApi(`/${encodeURIComponent(id)}`, "PUT", payload);
+const setInspectorStatusApi = (id, active) =>
+  requestInspectorApi(`/${encodeURIComponent(id)}/trang-thai`, "PUT", {
+    trang_thai: active,
+  });
 
 // Tải dữ liệu cho lịch hẹn
 const fetchSamplingListApi = async (maCoQuan) => {
@@ -490,6 +526,10 @@ const exportInspectionCertificateWord = async (item) => {
 
 export {
   accepauthority,
+  fetchInspectorsApi,
+  createInspectorApi,
+  updateInspectorApi,
+  setInspectorStatusApi,
   updateSampleDetail,
   fetchSamplingListApi,
   fetchNguongKiemDinhApi,
