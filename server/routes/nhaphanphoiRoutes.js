@@ -21,7 +21,10 @@ router.get("/xuat-kho/:maPhieu", nhaphanphoiController.getDispatchDetail);
 router.put("/xuat-kho/:maPhieu/xuat-kho", nhaphanphoiController.markDispatchShipped);
 router.put("/xuat-kho/:maPhieu/da-giao", nhaphanphoiController.markDispatchDelivered);
 
+router.get("/don-vi-van-chuyen", nhaphanphoiController.getTransporters);
+
 // 4. Đại lý
+router.get("/tai-khoan-dai-ly", nhaphanphoiController.getDealerAccounts);
 router.get("/dai-ly", nhaphanphoiController.getDealers);
 router.post("/dai-ly", nhaphanphoiController.createDealer);
 router.put("/dai-ly/:maDaiLy", nhaphanphoiController.updateDealer);

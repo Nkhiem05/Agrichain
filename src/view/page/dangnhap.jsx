@@ -88,6 +88,10 @@ const LoginPage = () => {
           navigate("/nha-phan-phoi");
           break;
 
+        case "RETAILER":
+          navigate("/dai-ly");
+          break;
+
         case "CONSUMER":
           alert("Đăng nhập người tiêu dùng thành công");
           break;

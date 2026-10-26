@@ -87,6 +87,8 @@ app.use("/api/don-vi-van-chuyen", donvivanchuyenRoutes);
 app.use("/api/chi-tiet-user", chitietuser);
 // Nhà phân phối (tiếp nhận, kho hàng, phân phối cho đại lý, quản lý đại lý)
 app.use("/api/nha-phan-phoi", nhaphanphoiRoutes);
+// Đại lý (RETAILER): nhận hàng từ nhà phân phối, xác nhận bán hết
+app.use("/api/dai-ly", require("./routes/dailyRoutes"));
 
 // Blockchain: liên kết ví, ký sự kiện truy xuất, xác thực lô hàng
 app.use("/api/blockchain", blockchainRoutes);

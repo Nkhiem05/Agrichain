@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { ghiSuKienVanDon, chuaCoViDuyet } = require("../services/blockchain/hook");
+const { layCauHinh } = require("../services/blockchain/chainClient");
 
 /*
 ==================================================
@@ -470,6 +471,29 @@ const createOrder = async (req, res) => {
               409,
               "Lô chưa được kiểm định đạt chuẩn (hoặc chứng thư đã bị thu hồi/hết hạn), chưa thể tạo lệnh vận chuyển",
             );
+          }
+
+          // Có blockchain: hợp đồng chỉ cho tạo lệnh khi lô có chứng nhận ĐẠT trên chain.
+          // Chứng nhận cấp trước khi bật blockchain (không có sự kiện công bố) thì cần kiểm định lại.
+          if (layCauHinh().daCauHinh) {
+            const [cn] = await connection.query(
+              `SELECT loai_hoat_dong FROM lich_su_truy_xuat_lo
+               WHERE ma_lo_nong_san = ? AND loai_hoat_dong IN ('CERTIFICATE_ISSUED', 'CERTIFICATE_FAILED')`,
+              [ma_lo_nong_san],
+            );
+            // Hợp đồng đánh dấu vĩnh viễn lô từng bị kết luận KHÔNG ĐẠT (kiểm định lại đạt cũng không gỡ được)
+            if (cn.some((r) => r.loai_hoat_dong === "CERTIFICATE_FAILED")) {
+              throw new ApiError(
+                409,
+                "Lô từng bị kết luận KHÔNG ĐẠT trên blockchain nên không được vận chuyển, kể cả khi kiểm định lại đạt",
+              );
+            }
+            if (!cn.some((r) => r.loai_hoat_dong === "CERTIFICATE_ISSUED")) {
+              throw new ApiError(
+                409,
+                "Chứng nhận của lô được cấp trước khi ghi blockchain nên chưa có trên blockchain. Hãy gửi kiểm định lại để cấp chứng nhận mới",
+              );
+            }
           }
 
           const [partners] = await connection.execute(

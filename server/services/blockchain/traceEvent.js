@@ -13,6 +13,8 @@ const {
 //   await ghiSuKien(connection, { maLo, loai: "PICKUP_CONFIRMED", maNguoiKy, duLieu: {...} });
 
 const MAX_DO_SAU_DONG_DOI = 10;
+// Giai đoạn lô còn ở nông trại (lô gốc chỉ bắt đầu được theo dõi khi còn ở đây)
+const GIAI_DOAN_TAI_NONG_TRAI = ["CREATED", "HARVESTED"];
 
 const isoSangSql = (iso) => iso.replace("T", " ").replace("Z", "");
 
@@ -21,6 +23,7 @@ const khoaLo = async (executor, maLo) => {
     `
     SELECT
       ma_lo_nong_san, ma_mua_vu, ma_san_pham, ma_nguoi_quan_ly, so_luong_hien_tai, don_vi_tinh,
+      giai_doan_hien_tai,
       DATE_FORMAT(ngay_thu_hoach, '%Y-%m-%d') AS ngay_thu_hoach,
       latest_event_sequence, latest_event_hash, created_at
     FROM lo_nong_san
@@ -262,7 +265,12 @@ const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
     return khoaLo(executor, maLo);
   }
 
-  // Lô gốc: người ký là chủ nông trại của mùa vụ (kể cả khi lô đã sang tay người khác)
+  // Lô gốc chưa có sự kiện nào mà đã rời nông trại (lô cũ, trước khi bật blockchain): không theo dõi.
+  // Nếu ghi "thu hoạch" bây giờ thì trên chain chủ lô là nông dân trong khi hàng đã ở bên khác,
+  // mọi bước sau (sơ chế, bàn giao...) sẽ bị hợp đồng từ chối và kẹt vĩnh viễn.
+  if (!GIAI_DOAN_TAI_NONG_TRAI.includes(lot.giai_doan_hien_tai)) return null;
+
+  // Lô gốc: người ký là chủ nông trại của mùa vụ
   const snap = lot.ma_mua_vu
     ? await layBanChupMuaVu(executor, lot.ma_mua_vu)
     : null;

@@ -69,8 +69,9 @@ const ChiTietPhanPhoiPage = () => {
       return;
     setActing(true);
     try {
-      await markDispatchShipped(orderDetail.ma_phieu);
+      const res = await markDispatchShipped(orderDetail.ma_phieu);
       await loadDetail();
+      if (orderDetail.ma_van_don && res?.message) alert(`${res.message}. Hãy ký xác nhận ở mục Ký blockchain`);
     } catch (err) {
       alert(err.message || "Không thể xác nhận xuất kho");
     } finally {
@@ -81,14 +82,17 @@ const ChiTietPhanPhoiPage = () => {
   const handleMarkDelivered = async () => {
     if (
       !window.confirm(
-        `Xác nhận đại lý đã nhận đủ hàng cho phiếu ${orderDetail.ma_phieu}?`,
+        orderDetail.ma_van_don
+          ? `Xác nhận hàng của phiếu ${orderDetail.ma_phieu} đã tới nơi? Đại lý sẽ xác nhận nhận hàng trên trang của họ.`
+          : `Xác nhận đại lý đã nhận đủ hàng cho phiếu ${orderDetail.ma_phieu}?`,
       )
     )
       return;
     setActing(true);
     try {
-      await markDispatchDelivered(orderDetail.ma_phieu);
+      const res = await markDispatchDelivered(orderDetail.ma_phieu);
       await loadDetail();
+      if (orderDetail.ma_van_don && res?.message) alert(`${res.message}. Hãy ký xác nhận ở mục Ký blockchain`);
     } catch (err) {
       alert(err.message || "Không thể xác nhận giao hàng");
     } finally {
@@ -126,10 +130,24 @@ const ChiTietPhanPhoiPage = () => {
     );
   }
 
-  const statusInfo = STATUS_LABEL[orderDetail.trang_thai] || {
-    text: orderDetail.trang_thai,
-    tone: "info",
-  };
+  // Phiếu có vận đơn (ghi blockchain): bước giao theo lệnh vận chuyển, đại lý tự ký nhận hàng.
+  // Thuê vận chuyển thì đơn vị vận chuyển bấm lấy hàng / giao hàng trên trang của họ.
+  const coVanDon = Boolean(orderDetail.ma_van_don);
+  const thueVanChuyen = coVanDon && orderDetail.hinh_thuc !== "TU_GIAO";
+  const choDaiLyNhan =
+    coVanDon && orderDetail.trang_thai === "DANG_GIAO" && orderDetail.trang_thai_van_don === "CHO_TIEP_NHAN";
+  const hienXuatKho = orderDetail.trang_thai === "CHO_XUAT" && !thueVanChuyen;
+  const hienDaGiao =
+    orderDetail.trang_thai === "DANG_GIAO" &&
+    !thueVanChuyen &&
+    (!coVanDon || orderDetail.trang_thai_van_don === "DANG_VAN_CHUYEN");
+
+  const statusInfo = choDaiLyNhan
+    ? { text: "Đã tới nơi - Chờ đại lý nhận", tone: "warning" }
+    : STATUS_LABEL[orderDetail.trang_thai] || {
+        text: orderDetail.trang_thai,
+        tone: "info",
+      };
 
   // Dòng thời gian thật, chỉ dựng từ các mốc đã thực sự xảy ra (không có bên
   // thứ 2 xác nhận số liệu vì đại lý không có tài khoản trong hệ thống).
@@ -154,11 +172,21 @@ const ChiTietPhanPhoiPage = () => {
       hoanThanh: true,
     });
   }
+  if (choDaiLyNhan) {
+    timeline.push({
+      tieuDe: "Hàng đã tới nơi",
+      thoiGian: null,
+      moTa: `Đang chờ ${orderDetail.ten_dai_ly} xác nhận nhận hàng và ký trên trang Đại lý.`,
+      hoanThanh: false,
+    });
+  }
   if (orderDetail.thoi_gian_giao) {
     timeline.push({
       tieuDe: "Đại lý đã nhận hàng",
       thoiGian: orderDetail.thoi_gian_giao,
-      moTa: `Nhà phân phối xác nhận đã bàn giao đủ hàng cho ${orderDetail.ten_dai_ly}.`,
+      moTa: coVanDon
+        ? `${orderDetail.ten_dai_ly} đã xác nhận nhận hàng trên trang Đại lý.`
+        : `Nhà phân phối xác nhận đã bàn giao đủ hàng cho ${orderDetail.ten_dai_ly}.`,
       hoanThanh: true,
     });
   }
@@ -213,7 +241,7 @@ const ChiTietPhanPhoiPage = () => {
           </div>
 
           <div className="ctpp-hero-right">
-            {orderDetail.trang_thai === "CHO_XUAT" && (
+            {hienXuatKho && (
               <button
                 type="button"
                 className="ctpp-btn-print"
@@ -224,7 +252,7 @@ const ChiTietPhanPhoiPage = () => {
                 Xác Nhận Đã Xuất Kho
               </button>
             )}
-            {orderDetail.trang_thai === "DANG_GIAO" && (
+            {hienDaGiao && (
               <button
                 type="button"
                 className="ctpp-btn-print"
@@ -232,8 +260,19 @@ const ChiTietPhanPhoiPage = () => {
                 onClick={handleMarkDelivered}
               >
                 <CheckCircle2 size={15} />
-                Xác Nhận Đã Giao Hàng
+                {coVanDon ? "Xác Nhận Đã Tới Nơi" : "Xác Nhận Đã Giao Hàng"}
               </button>
+            )}
+            {thueVanChuyen && ["CHO_XUAT", "DANG_GIAO"].includes(orderDetail.trang_thai) && !choDaiLyNhan && (
+              <span className="ctpp-hero-sub" style={{ maxWidth: 280 }}>
+                Đơn vị vận chuyển {orderDetail.ten_don_vi_van_chuyen || ""} xác nhận lấy hàng / giao hàng trên trang
+                Vận chuyển (vận đơn {orderDetail.ma_van_don}).
+              </span>
+            )}
+            {choDaiLyNhan && (
+              <span className="ctpp-hero-sub" style={{ maxWidth: 280 }}>
+                Chờ đại lý ký nhận hàng trên trang Đại lý (vận đơn {orderDetail.ma_van_don}).
+              </span>
             )}
           </div>
         </div>
