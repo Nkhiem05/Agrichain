@@ -1511,6 +1511,12 @@ const ProcessingPage = () => {
                       </option>
                     ))}
                   </select>
+                  {!handoverForm.ma_ben_nhan && (
+                    <small style={{ display: "block", marginTop: 6, color: "#b45309", lineHeight: 1.4 }}>
+                      Lô được truy xuất trên blockchain thì phải chọn nhà phân phối có tài khoản (bên nhận ký
+                      nhận hàng bằng ví); giao tới địa chỉ tự do sẽ bị từ chối.
+                    </small>
+                  )}
                 </div>
 
                 {!handoverForm.ma_ben_nhan && (

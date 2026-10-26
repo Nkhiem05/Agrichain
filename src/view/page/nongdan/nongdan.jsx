@@ -20,14 +20,39 @@ import "../../css/nongdan.css";
 import BlockchainPanel from "../blockchainpannel";
 import { useNavigate } from "react-router-dom";
 import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
+import {
+  fileUrl,
+  fetchNongTrai,
+  themNongTrai,
+  capNhatNongTrai,
+  xoaNongTrai,
+  fetchMuaVuVaThongKe,
+  fetchDanhMucVatTu,
+  fetchThuaDat,
+  fetchChiTietMuaVu,
+  luuMuaVu,
+  xoaMuaVu,
+  danhDauMuaVuSanSang,
+  fetchLoThuHoachVaThongKe,
+  fetchMuaVuSanSang,
+  luuLoThuHoach,
+  xoaLoThuHoach,
+  fetchYeuCauKiemDinh,
+  xacNhanLayMau,
+  fetchCoQuanKiemDinh,
+  guiYeuCauKiemDinh,
+  fetchLenhVanChuyen,
+  fetchTuyChonVanChuyen,
+  taoLenhVanChuyen,
+  fetchChiTietVanChuyen,
+  huyLenhVanChuyen,
+} from "../../../api/nongdanApi";
 
 const DEFAULT_FARM_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
-
-const API_URL = "http://localhost:3000";
 
 const EMPTY_SEASON_FORM = {
   loai_cay_trong: "",
@@ -77,12 +102,6 @@ const formatQuantity = (value, unit) => {
     return `${(num / 1000).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} Tấn`;
   }
   return `${num.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${unit || ""}`.trim();
-};
-
-// Header gửi kèm token đăng nhập (token được lưu ở trang đăng nhập)
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
 // Giá trị chỉ-đọc trong popup: đậm khi đã có dữ liệu, xám khi chưa có
@@ -139,7 +158,7 @@ const getInspectionStatus = (item) => {
     case "DA_HEN_LICH":
       return { label: "Đã hẹn lịch", tone: "success" };
     case "CHO_LAY_MAU":
-      return { label: "Đã lấy mẫu, đang xét nghiệm", tone: "success" };
+      return { label: "Đang xét nghiệm", tone: "success" };
     case "DA_LAY_MAU":
       return { label: "Đã lấy mẫu", tone: "success" };
     case "DA_CONG_BO":
@@ -366,12 +385,9 @@ const DashboardPage = () => {
     setFarmError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/farmer/farms/user/${maNguoiDung}`,
-      );
-      const data = await response.json();
+      const { ok, data } = await fetchNongTrai(maNguoiDung);
 
-      if (!response.ok) {
+      if (!ok) {
         setFarmError(data.message || "Không thể lấy danh sách nông trại");
         return;
       }
@@ -422,6 +438,24 @@ const DashboardPage = () => {
     setOpenDropdown(id);
   };
 
+  // Menu của thẻ mùa vụ mở ngay dưới nút ⋮ (position: absolute trong thẻ). Thẻ sát đáy màn hình thì
+  // tự cuộn vùng nội dung để thấy đủ menu, thay vì lật menu lên che các thẻ khác.
+  const handleToggleSeasonMenu = (e, id) => {
+    if (openDropdown === id) {
+      setOpenDropdown(null);
+      return;
+    }
+
+    const container = e.currentTarget.closest(".dropdown-container");
+    setOpenDropdown(id);
+    // Đợi menu mở xong (hiệu ứng 0.15s đang dịch/thu nhỏ menu) rồi mới đo để cuộn cho chuẩn
+    setTimeout(() => {
+      container
+        ?.querySelector(".dropdown-menu")
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }, 180);
+  };
+
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (!e.target.closest(".dropdown-container")) {
@@ -438,6 +472,7 @@ const DashboardPage = () => {
   // Menu cố định không đi theo khi cuộn/đổi cỡ cửa sổ nên đóng lại
   useEffect(() => {
     if (openDropdown === null) return;
+    if (!document.querySelector(".dropdown-menu.dropdown-fixed")) return;
 
     const close = () => setOpenDropdown(null);
 
@@ -571,24 +606,9 @@ const DashboardPage = () => {
     setSavingFarm(true);
 
     try {
-      const formData = new FormData();
-      formData.append("ma_nguoi_dung", farmForm.ma_nguoi_dung);
-      formData.append("ten_nong_trai", farmForm.ten_nong_trai.trim());
-      formData.append("dia_diem_nong_trai", farmForm.dia_diem_nong_trai.trim());
-      formData.append("dien_tich_nong_trai", farmForm.dien_tich_nong_trai);
+      const { ok, data } = await themNongTrai(farmForm, anhNongTrai);
 
-      if (anhNongTrai) {
-        formData.append("anh_nong_trai", anhNongTrai);
-      }
-
-      const response = await fetch(`${API_URL}/api/farmer/farms`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Thêm nông trại thất bại");
         return;
       }
@@ -620,7 +640,7 @@ const DashboardPage = () => {
     setAnhNongTrai(null);
 
     if (farm.anh_nong_trai) {
-      setFarmImagePreview(`${API_URL}${farm.anh_nong_trai}`);
+      setFarmImagePreview(fileUrl(farm.anh_nong_trai));
     } else {
       setFarmImagePreview(null);
     }
@@ -648,27 +668,13 @@ const DashboardPage = () => {
     setSavingFarm(true);
 
     try {
-      const formData = new FormData();
-      formData.append("ma_nguoi_dung", farmForm.ma_nguoi_dung);
-      formData.append("ten_nong_trai", farmForm.ten_nong_trai.trim());
-      formData.append("dia_diem_nong_trai", farmForm.dia_diem_nong_trai.trim());
-      formData.append("dien_tich_nong_trai", farmForm.dien_tich_nong_trai);
-
-      if (anhNongTrai) {
-        formData.append("anh_nong_trai", anhNongTrai);
-      }
-
-      const response = await fetch(
-        `${API_URL}/api/farmer/farms/${editingFarm.ma_nong_trai}`,
-        {
-          method: "PUT",
-          body: formData,
-        },
+      const { ok, data } = await capNhatNongTrai(
+        editingFarm.ma_nong_trai,
+        farmForm,
+        anhNongTrai,
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Cập nhật nông trại thất bại");
         return;
       }
@@ -693,16 +699,9 @@ const DashboardPage = () => {
     if (!confirmDelete) return;
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/farmer/farms/${maNongTrai}`,
-        {
-          method: "DELETE",
-        },
-      );
+      const { ok, data } = await xoaNongTrai(maNongTrai);
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Xóa nông trại thất bại");
         return;
       }
@@ -740,27 +739,19 @@ const DashboardPage = () => {
     setLoadingSeasons(true);
     setSeasonError("");
 
-    const query = seasonFarmId
-      ? `?ma_nong_trai=${encodeURIComponent(seasonFarmId)}`
-      : "";
-
     try {
-      const [listRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/api/mua-vu/user/${user.ma_nguoi_dung}${query}`),
-        fetch(
-          `${API_URL}/api/mua-vu/thong-ke/user/${user.ma_nguoi_dung}${query}`,
-        ),
-      ]);
-      const listData = await listRes.json();
-      const statsData = await statsRes.json();
+      const [list, stats] = await fetchMuaVuVaThongKe(
+        user.ma_nguoi_dung,
+        seasonFarmId,
+      );
 
-      if (!listRes.ok) {
-        setSeasonError(listData.message || "Không thể lấy danh sách mùa vụ");
+      if (!list.ok) {
+        setSeasonError(list.data.message || "Không thể lấy danh sách mùa vụ");
         return;
       }
 
-      setSeasons(listData.data || []);
-      if (statsRes.ok) setSeasonStats(statsData.data);
+      setSeasons(list.data.data || []);
+      if (stats.ok) setSeasonStats(stats.data.data);
     } catch (error) {
       console.error("Lỗi lấy danh sách mùa vụ:", error);
       setSeasonError("Không thể kết nối tới backend");
@@ -771,10 +762,9 @@ const DashboardPage = () => {
 
   const fetchMaterialCatalog = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/mua-vu/vat-tu`);
-      const data = await response.json();
+      const { ok, data } = await fetchDanhMucVatTu();
 
-      if (response.ok) setMaterialCatalog(data.data || []);
+      if (ok) setMaterialCatalog(data.data || []);
     } catch (error) {
       console.error("Lỗi lấy danh mục vật tư:", error);
     }
@@ -782,12 +772,9 @@ const DashboardPage = () => {
 
   const fetchPlots = async (maNongTrai) => {
     try {
-      const response = await fetch(
-        `${API_URL}/api/farmer/plots/farm/${maNongTrai}`,
-      );
-      const data = await response.json();
+      const { ok, data } = await fetchThuaDat(maNongTrai);
 
-      setPlots(response.ok ? data.data || [] : []);
+      setPlots(ok ? data.data || [] : []);
     } catch (error) {
       console.error("Lỗi lấy danh sách thửa đất:", error);
       setPlots([]);
@@ -832,9 +819,7 @@ const DashboardPage = () => {
 
     if (!file) {
       resetSeasonImage(
-        editingSeason?.anh_mua_vu
-          ? `${API_URL}${editingSeason.anh_mua_vu}`
-          : null,
+        editingSeason?.anh_mua_vu ? fileUrl(editingSeason.anh_mua_vu) : null,
       );
       return;
     }
@@ -874,10 +859,9 @@ const DashboardPage = () => {
   const handleEditSeason = async (season) => {
     setOpenDropdown(null);
     try {
-      const response = await fetch(`${API_URL}/api/mua-vu/${season.ma_mua_vu}`);
-      const data = await response.json();
+      const { ok, data } = await fetchChiTietMuaVu(season.ma_mua_vu);
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Không thể lấy thông tin mùa vụ");
         return;
       }
@@ -903,9 +887,7 @@ const DashboardPage = () => {
           }),
         ),
       );
-      resetSeasonImage(
-        detail.anh_mua_vu ? `${API_URL}${detail.anh_mua_vu}` : null,
-      );
+      resetSeasonImage(detail.anh_mua_vu ? fileUrl(detail.anh_mua_vu) : null);
       fetchPlots(detail.ma_nong_trai);
       setShowSeasonModal(true);
     } catch (error) {
@@ -968,46 +950,17 @@ const DashboardPage = () => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append("ma_nong_trai", seasonModalFarmId);
-    formData.append("ma_thua_dat", seasonForm.ma_thua_dat);
-    formData.append("loai_cay_trong", seasonForm.loai_cay_trong.trim());
-    formData.append("giong_cay", seasonForm.giong_cay.trim());
-    formData.append("ngay_gieo_trong", seasonForm.ngay_gieo_trong);
-    formData.append(
-      "ngay_thu_hoach_du_kien",
-      seasonForm.ngay_thu_hoach_du_kien,
-    );
-    formData.append(
-      "vat_tu",
-      JSON.stringify(
-        seasonMaterials.map((row) => ({
-          ma_vat_tu: row.ma_vat_tu,
-          lieu_luong: Number(row.lieu_luong),
-          ngay_su_dung: row.ngay_su_dung,
-        })),
-      ),
-    );
-
-    if (seasonImage) {
-      formData.append("anh_mua_vu", seasonImage);
-    }
-
     setSavingSeason(true);
 
     try {
-      const response = await fetch(
-        editingSeason
-          ? `${API_URL}/api/mua-vu/${editingSeason.ma_mua_vu}`
-          : `${API_URL}/api/mua-vu`,
-        {
-          method: editingSeason ? "PUT" : "POST",
-          body: formData,
-        },
-      );
-      const data = await response.json();
+      const { ok, data } = await luuMuaVu(editingSeason?.ma_mua_vu, {
+        maNongTrai: seasonModalFarmId,
+        form: seasonForm,
+        vatTu: seasonMaterials,
+        anhMuaVu: seasonImage,
+      });
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Lưu mùa vụ thất bại");
         return;
       }
@@ -1032,12 +985,9 @@ const DashboardPage = () => {
     if (!window.confirm("Bạn có chắc muốn xóa mùa vụ này?")) return;
 
     try {
-      const response = await fetch(`${API_URL}/api/mua-vu/${maMuaVu}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
+      const { ok, data } = await xoaMuaVu(maMuaVu);
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Xóa mùa vụ thất bại");
         return;
       }
@@ -1054,13 +1004,9 @@ const DashboardPage = () => {
     setOpenDropdown(null);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/mua-vu/${maMuaVu}/danh-dau-san-sang`,
-        { method: "PATCH" },
-      );
-      const data = await response.json();
+      const { ok, data } = await danhDauMuaVuSanSang(maMuaVu);
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Không thể đánh dấu mùa vụ sẵn sàng");
         return;
       }
@@ -1083,22 +1029,15 @@ const DashboardPage = () => {
     setBatchError("");
 
     try {
-      const [listRes, statsRes] = await Promise.all([
-        fetch(`${API_URL}/api/lo-thu-hoach/user/${user.ma_nguoi_dung}`),
-        fetch(
-          `${API_URL}/api/lo-thu-hoach/thong-ke/user/${user.ma_nguoi_dung}`,
-        ),
-      ]);
-      const listData = await listRes.json();
-      const statsData = await statsRes.json();
+      const [list, stats] = await fetchLoThuHoachVaThongKe(user.ma_nguoi_dung);
 
-      if (!listRes.ok) {
-        setBatchError(listData.message || "Không thể lấy danh sách lô");
+      if (!list.ok) {
+        setBatchError(list.data.message || "Không thể lấy danh sách lô");
         return;
       }
 
-      setBatches(listData.data || []);
-      if (statsRes.ok) setBatchStats(statsData.data);
+      setBatches(list.data.data || []);
+      if (stats.ok) setBatchStats(stats.data.data);
     } catch (error) {
       console.error("Lỗi lấy danh sách lô thu hoạch:", error);
       setBatchError("Không thể kết nối tới backend");
@@ -1110,12 +1049,9 @@ const DashboardPage = () => {
   // Chỉ tải mùa vụ đã được đánh dấu "sẵn sàng thu hoạch" để chọn khi tạo lô
   const fetchBatchSeasons = async () => {
     try {
-      const response = await fetch(
-        `${API_URL}/api/mua-vu/user/${user.ma_nguoi_dung}?san_sang=1`,
-      );
-      const data = await response.json();
+      const { ok, data } = await fetchMuaVuSanSang(user.ma_nguoi_dung);
 
-      setBatchSeasons(response.ok ? data.data || [] : []);
+      setBatchSeasons(ok ? data.data || [] : []);
     } catch (error) {
       console.error("Lỗi lấy danh sách mùa vụ:", error);
       setBatchSeasons([]);
@@ -1188,23 +1124,13 @@ const DashboardPage = () => {
     const dangTaoMoi = !editingBatch; // chỉ ký blockchain khi TẠO lô mới
 
     try {
-      const response = await fetch(
-        editingBatch
-          ? `${API_URL}/api/lo-thu-hoach/${editingBatch.ma_lo_nong_san}`
-          : `${API_URL}/api/lo-thu-hoach`,
-        {
-          method: editingBatch ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ma_mua_vu: batchForm.ma_mua_vu,
-            so_luong: Number(batchForm.so_luong),
-            ngay_thu_hoach: batchForm.ngay_thu_hoach,
-          }),
-        },
-      );
-      const data = await response.json();
+      const { ok, data } = await luuLoThuHoach(editingBatch?.ma_lo_nong_san, {
+        maMuaVu: batchForm.ma_mua_vu,
+        soLuong: batchForm.so_luong,
+        ngayThuHoach: batchForm.ngay_thu_hoach,
+      });
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Lưu lô thu hoạch thất bại");
         return;
       }
@@ -1251,12 +1177,9 @@ const DashboardPage = () => {
     setInspectionError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/kiem-dinh/yeu-cau/cua-toi`, {
-        headers: authHeaders(),
-      });
-      const data = await response.json();
+      const { ok, data } = await fetchYeuCauKiemDinh();
 
-      if (!response.ok) {
+      if (!ok) {
         setInspectionError(data.message || "Không thể lấy danh sách kiểm định");
         return;
       }
@@ -1299,15 +1222,9 @@ const DashboardPage = () => {
 
     setConfirmingSample(item.ma_kiem_dinh);
     try {
-      const response = await fetch(
-        `${API_URL}/api/kiem-dinh/yeu-cau/${item.ma_kiem_dinh}/xac-nhan-lay-mau`,
-        { method: "POST", headers: authHeaders() },
-      );
-      const data = await response.json();
-      alert(
-        data.message || (response.ok ? "Đã xác nhận" : "Không thể xác nhận"),
-      );
-      if (response.ok) fetchInspections();
+      const { ok, data } = await xacNhanLayMau(item.ma_kiem_dinh);
+      alert(data.message || (ok ? "Đã xác nhận" : "Không thể xác nhận"));
+      if (ok) fetchInspections();
     } catch (error) {
       console.error("Lỗi xác nhận biên bản lấy mẫu:", error);
       alert("Không thể kết nối tới backend");
@@ -1320,19 +1237,16 @@ const DashboardPage = () => {
     setAuthorityError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/kiem-dinh/co-quan`, {
-        headers: authHeaders(),
-      });
-      const data = await response.json();
+      const { ok, data } = await fetchCoQuanKiemDinh();
 
-      if (!response.ok) {
+      if (!ok) {
         // Thường do chưa có token (cần đăng nhập lại) hoặc token hết hạn
         setAuthorityError(
           `${data.message || "Không thể lấy danh sách cơ quan kiểm định"}. Vui lòng đăng nhập lại.`,
         );
       }
 
-      const list = response.ok ? data.data || [] : [];
+      const list = ok ? data.data || [] : [];
       setAuthorities(list);
 
       // Chỉ có một cơ quan thì chọn sẵn
@@ -1381,17 +1295,12 @@ const DashboardPage = () => {
     setSavingInspection(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/kiem-dinh/yeu-cau`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify({
-          ma_lo_nong_san: inspectionBatch.ma_lo_nong_san,
-          ...inspectionForm,
-        }),
-      });
-      const data = await response.json();
+      const { ok, data } = await guiYeuCauKiemDinh(
+        inspectionBatch.ma_lo_nong_san,
+        inspectionForm,
+      );
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Gửi yêu cầu kiểm định thất bại");
         return;
       }
@@ -1417,12 +1326,9 @@ const DashboardPage = () => {
     setShippingError("");
 
     try {
-      const response = await fetch(`${API_URL}/api/van-chuyen/cua-toi`, {
-        headers: authHeaders(),
-      });
-      const data = await response.json();
+      const { ok, data } = await fetchLenhVanChuyen();
 
-      if (!response.ok) {
+      if (!ok) {
         setShippingError(data.message || "Không thể lấy danh sách vận chuyển");
         return;
       }
@@ -1448,24 +1354,17 @@ const DashboardPage = () => {
     setPartnerError("");
 
     try {
-      const [batchRes, partnerRes] = await Promise.all([
-        fetch(`${API_URL}/api/van-chuyen/lo-san-sang`, {
-          headers: authHeaders(),
-        }),
-        fetch(`${API_URL}/api/van-chuyen/doi-tac`, { headers: authHeaders() }),
-      ]);
-      const batchData = await batchRes.json();
-      const partnerData = await partnerRes.json();
+      const [batchRes, partnerRes] = await fetchTuyChonVanChuyen();
 
       if (!batchRes.ok || !partnerRes.ok) {
         setPartnerError(
-          `${(!batchRes.ok ? batchData : partnerData).message || "Không thể tải dữ liệu"}. Vui lòng đăng nhập lại.`,
+          `${(!batchRes.ok ? batchRes : partnerRes).data.message || "Không thể tải dữ liệu"}. Vui lòng đăng nhập lại.`,
         );
       }
 
-      const batchList = batchRes.ok ? batchData.data || [] : [];
+      const batchList = batchRes.ok ? batchRes.data.data || [] : [];
       const partnerList = partnerRes.ok
-        ? partnerData.data
+        ? partnerRes.data.data
         : { don_vi_van_chuyen: [], ben_nhan: [] };
 
       setReadyBatches(batchList);
@@ -1534,14 +1433,9 @@ const DashboardPage = () => {
     setSavingShipping(true);
 
     try {
-      const response = await fetch(`${API_URL}/api/van-chuyen`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders() },
-        body: JSON.stringify(shippingForm),
-      });
-      const data = await response.json();
+      const { ok, data } = await taoLenhVanChuyen(shippingForm);
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Tạo lệnh vận chuyển thất bại");
         return;
       }
@@ -1559,12 +1453,9 @@ const DashboardPage = () => {
 
   const handleOpenShippingDetail = async (maVanDon) => {
     try {
-      const response = await fetch(`${API_URL}/api/van-chuyen/${maVanDon}`, {
-        headers: authHeaders(),
-      });
-      const data = await response.json();
+      const { ok, data } = await fetchChiTietVanChuyen(maVanDon);
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Không thể lấy chi tiết lệnh vận chuyển");
         return;
       }
@@ -1580,13 +1471,9 @@ const DashboardPage = () => {
     if (!window.confirm("Bạn có chắc muốn hủy lệnh vận chuyển này?")) return;
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/van-chuyen/${maVanDon}/huy`,
-        { method: "PUT", headers: authHeaders() },
-      );
-      const data = await response.json();
+      const { ok, data } = await huyLenhVanChuyen(maVanDon);
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Hủy lệnh vận chuyển thất bại");
         return;
       }
@@ -1609,12 +1496,9 @@ const DashboardPage = () => {
     if (!window.confirm("Bạn có chắc muốn xóa lô thu hoạch này?")) return;
 
     try {
-      const response = await fetch(`${API_URL}/api/lo-thu-hoach/${maLo}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
+      const { ok, data } = await xoaLoThuHoach(maLo);
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Xóa lô thu hoạch thất bại");
         return;
       }
@@ -1651,7 +1535,7 @@ const DashboardPage = () => {
           <div className="avatar-circle" style={{ overflow: "hidden" }}>
             {user?.anh_dai_dien ? (
               <img
-                src={`http://localhost:3000${user.anh_dai_dien}`}
+                src={fileUrl(user.anh_dai_dien)}
                 alt="avatar"
                 style={{
                   width: "100%",
@@ -1848,7 +1732,7 @@ const DashboardPage = () => {
 
               {farms.map((farm) => {
                 const imageUrl = farm.anh_nong_trai
-                  ? `${API_URL}${farm.anh_nong_trai}`
+                  ? fileUrl(farm.anh_nong_trai)
                   : DEFAULT_FARM_IMG;
 
                 return (
@@ -1863,48 +1747,56 @@ const DashboardPage = () => {
                     />
 
                     <div className="farm-details">
-                      <div>
+                      <div className="farm-title-row">
                         <h3 className="farm-name">{farm.ten_nong_trai}</h3>
-                        <span className="tag-badge green">
+                        <span className="farm-code-badge">
                           {farm.ma_nong_trai}
                         </span>
+                      </div>
 
-                        <div className="farm-info-grid">
-                          <div>
-                            <div className="info-label">Diện tích</div>
-                            <div className="info-val">
-                              {farm.dien_tich_nong_trai || 0} ha
-                            </div>
+                      <div className="farm-info-panel">
+                        <div className="farm-info-item">
+                          <div className="info-label">Diện tích</div>
+                          <div className="info-val">
+                            {farm.dien_tich_nong_trai || 0} ha
                           </div>
+                        </div>
 
-                          <div>
-                            <div className="info-label">Địa chỉ</div>
-                            <div className="info-val">
-                              {farm.dia_diem_nong_trai}
-                            </div>
+                        <div className="farm-info-item">
+                          <div className="info-label">Địa chỉ</div>
+                          <div
+                            className="info-val info-ellipsis"
+                            title={farm.dia_diem_nong_trai}
+                          >
+                            {farm.dia_diem_nong_trai}
                           </div>
+                        </div>
 
-                          <div>
-                            <div className="info-label">Người quản lý</div>
-                            <div className="info-val">
-                              {getManagerName(farm.ma_nguoi_dung)}
-                            </div>
+                        <div className="farm-info-item">
+                          <div className="info-label">Người quản lý</div>
+                          <div className="info-val info-ellipsis">
+                            {getManagerName(farm.ma_nguoi_dung)}
                           </div>
+                        </div>
 
-                          <div>
-                            <div className="info-label">Trạng thái</div>
-                            <div className="info-val">
-                              {farm.trang_thai === 1
-                                ? "Đang hoạt động"
-                                : "Ngưng hoạt động"}
-                            </div>
+                        <div className="farm-info-item">
+                          <div className="info-label">Trạng thái</div>
+                          <div
+                            className={`info-val farm-status ${
+                              farm.trang_thai === 1 ? "active" : "inactive"
+                            }`}
+                          >
+                            <span className="farm-status-dot"></span>
+                            {farm.trang_thai === 1
+                              ? "Đang hoạt động"
+                              : "Ngưng hoạt động"}
                           </div>
                         </div>
                       </div>
 
                       <div className="farm-card-buttons">
                         <button
-                          className="btn-update"
+                          className="btn-farm-view"
                           onClick={(e) =>
                             handlechitietnongtrai(e, farm.ma_nong_trai)
                           }
@@ -1913,14 +1805,14 @@ const DashboardPage = () => {
                         </button>
 
                         <button
-                          className="btn-update"
+                          className="btn-farm-edit"
                           onClick={() => handleEditFarm(farm)}
                         >
-                          Sửa
+                          Chỉnh sửa
                         </button>
 
                         <button
-                          className="btn-map"
+                          className="btn-farm-delete"
                           onClick={() => handleDeleteFarm(farm.ma_nong_trai)}
                         >
                           Xóa
@@ -1993,11 +1885,16 @@ const DashboardPage = () => {
               )}
 
               {seasons.map((season) => (
-                <div className="season-card" key={season.ma_mua_vu}>
+                <div
+                  className={`season-card ${
+                    openDropdown === season.ma_mua_vu ? "has-open-menu" : ""
+                  }`}
+                  key={season.ma_mua_vu}
+                >
                   <img
                     src={
                       season.anh_mua_vu
-                        ? `${API_URL}${season.anh_mua_vu}`
+                        ? fileUrl(season.anh_mua_vu)
                         : DEFAULT_FARM_IMG
                     }
                     alt="Crop"
@@ -2080,24 +1977,14 @@ const DashboardPage = () => {
                         className="btn-more-dots"
                         title="Tùy chọn"
                         onClick={(e) =>
-                          handleToggleBatchMenu(e, season.ma_mua_vu)
+                          handleToggleSeasonMenu(e, season.ma_mua_vu)
                         }
                       >
                         <MoreVertical size={18} />
                       </button>
 
                       {openDropdown === season.ma_mua_vu && (
-                        <div
-                          className={`dropdown-menu dropdown-fixed ${
-                            batchMenuPos.up ? "dropdown-up" : ""
-                          }`}
-                          style={{
-                            right: batchMenuPos.right,
-                            ...(batchMenuPos.up
-                              ? { bottom: batchMenuPos.bottom }
-                              : { top: batchMenuPos.top }),
-                          }}
-                        >
+                        <div className="dropdown-menu">
                           <div
                             className="dropdown-item"
                             onClick={(e) =>

@@ -1,922 +1,129 @@
-<!doctype html>
-<html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Agrichain - Quản lý nông trại</title>
-    <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-          Arial, sans-serif;
-      }
-
-      body {
-        background-color: #f7f9fa;
-        color: #333333;
-        height: 100vh;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-      }
-
-      /* ================= HEADER ================= */
-      .dashboard-header {
-        height: 56px;
-        background-color: #278d49;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0 24px;
-        color: #ffffff;
-        flex-shrink: 0;
-      }
-
-      .header-left {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        width: 220px;
-      }
-
-      .header-logo-icon {
-        width: 42px;
-        height: 42px;
-        object-fit: contain;
-      }
-
-      .header-brand-title {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: 1.5px;
-        color: white;
-      }
-
-      .header-search-bar {
-        flex: 1;
-        max-width: 620px;
-        margin: 0 20px;
-      }
-
-      .header-search-bar input {
-        width: 100%;
-        height: 34px;
-        border-radius: 4px;
-        border: none;
-        padding: 0 14px;
-        font-size: 13px;
-        outline: none;
-        background-color: #ffffff;
-        color: #333;
-      }
-
-      .header-profile {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        cursor: pointer;
-      }
-
-      .avatar-circle {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background-color: #14532d;
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 13px;
-        font-weight: 700;
-        border: 1px solid rgba(255, 255, 255, 0.4);
-      }
-
-      .profile-meta {
-        display: flex;
-        flex-direction: column;
-        line-height: 1.2;
-      }
-
-      .profile-name {
-        font-size: 14px;
-        font-weight: 600;
-        color: white;
-      }
-
-      .profile-role {
-        font-size: 11px;
-        color: #d1fae5;
-      }
-
-      /* ================= BODY & SIDEBAR ================= */
-      .dashboard-body {
-        display: flex;
-        flex: 1;
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .dashboard-sidebar {
-        width: 256px;
-        background-color: #f0f2f1;
-        display: flex;
-        flex-direction: column;
-        border-right: 1px solid #e5e7eb;
-        flex-shrink: 0;
-        height: 100%;
-        justify-content: space-between;
-        user-select: none;
-      }
-
-      .sidebar-heading {
-        padding: 16px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #6b7280;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      .sidebar-nav {
-        padding: 0 12px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-
-      .nav-item-btn {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 12px;
-        font-size: 14px;
-        font-weight: 500;
-        border-radius: 8px;
-        border: none;
-        cursor: pointer;
-        background: transparent;
-        color: #374151;
-        text-align: left;
-      }
-
-      .nav-item-btn:hover {
-        background-color: rgba(229, 231, 235, 0.8);
-      }
-
-      .nav-item-btn.active {
-        background-color: #67ac7d;
-        color: #ffffff;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-      }
-
-      .btn-logout {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        width: calc(100% - 24px);
-        margin: 0 12px 10px;
-        padding: 10px 12px;
-        border: 1px solid #fecaca;
-        background: #fef2f2;
-        color: #dc2626;
-        border-radius: 8px;
-        font-size: 13.5px;
-        font-weight: 600;
-        cursor: pointer;
-      }
-
-      .sidebar-footer {
-        padding: 16px;
-        border-top: 1px solid #e5e7eb;
-        font-size: 11px;
-        color: #6b7280;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .pulse-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background-color: #10b981;
-      }
-
-      /* ================= MAIN CONTENT ================= */
-      .dashboard-content {
-        flex: 1;
-        min-height: 0;
-        height: 100%;
-        padding: 0 36px 60px;
-        width: 100%;
-        overflow-y: auto;
-      }
-
-      /* ================= METRICS ROW ================= */
-      .metrics-row {
-        position: sticky;
-        top: 0;
-        z-index: 20;
-        background-color: #f7f9fa;
-        padding-top: 24px;
-        padding-bottom: 20px;
-        display: flex;
-        align-items: stretch;
-        gap: 20px;
-      }
-
-      .metric-card {
-        flex: 1;
-        background-color: #f1f6fd;
-        border: 1px solid #e1eaf5;
-        border-radius: 10px;
-        padding: 18px 22px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        min-height: 120px;
-      }
-
-      .metric-title {
-        font-size: 12px;
-        font-weight: 700;
-        color: #64748b;
-        letter-spacing: 0.4px;
-        text-transform: uppercase;
-      }
-
-      .metric-number {
-        font-size: 32px;
-        font-weight: 700;
-        color: #0f172a;
-      }
-
-      .metric-unit {
-        font-size: 13px;
-        font-weight: 600;
-        color: #278d49;
-        margin-left: 6px;
-      }
-
-      .actions-box {
-        width: 250px;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-
-      .btn-primary-action {
-        height: 42px;
-        background-color: #2e8b57;
-        color: #ffffff;
-        border: none;
-        border-radius: 8px;
-        font-size: 14.5px;
-        font-weight: 600;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s;
-      }
-
-      .btn-primary-action:hover {
-        background-color: #257247;
-      }
-
-      .action-tip {
-        font-size: 11.5px;
-        color: #64748b;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        line-height: 1.35;
-      }
-
-      /* ================= THIẾT KẾ LẠI THẺ NÔNG TRẠI (FARM CARD REDESIGN) ================= */
-      .farm-card {
-        background-color: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 20px 24px;
-        display: flex;
-        align-items: stretch;
-        gap: 24px;
-        margin-bottom: 16px;
-        box-shadow: 0 2px 10px rgba(15, 23, 42, 0.03);
-        transition: all 0.2s ease;
-      }
-
-      .farm-card:hover {
-        border-color: #cbd5e1;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-        transform: translateY(-1px);
-      }
-
-      .farm-image {
-        width: 175px;
-        height: 160px;
-        border-radius: 10px;
-        object-fit: cover;
-        flex-shrink: 0;
-        border: 1px solid #e2e8f0;
-      }
-
-      .farm-details {
-        flex: 1;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-      }
-
-      .farm-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 12px;
-        margin-bottom: 14px;
-      }
-
-      .farm-title-group {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-
-      .farm-name {
-        font-size: 19.5px;
-        font-weight: 700;
-        color: #0f172a;
-        margin: 0;
-      }
-
-      /* Nhãn Mã nông trại & Trạng thái đồng bộ với Thẻ Mùa Vụ */
-      .farm-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        height: 26px;
-        padding: 0 10px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
-        white-space: nowrap;
-      }
-
-      .farm-badge.code {
-        background-color: #eff6ff;
-        color: #1d4ed8;
-        border: 1px solid #bfdbfe;
-        font-weight: 700;
-        letter-spacing: 0.2px;
-      }
-
-      .farm-badge.status-active {
-        background-color: #dcfce7;
-        color: #15803d;
-        border: 1px solid #86efac;
-        border-radius: 999px;
-        padding: 0 12px;
-      }
-
-      .farm-badge.status-active::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background-color: #16a34a;
-      }
-
-      .farm-badge.status-inactive {
-        background-color: #f1f5f9;
-        color: #475569;
-        border: 1px solid #cbd5e1;
-        border-radius: 999px;
-        padding: 0 12px;
-      }
-
-      .farm-badge.status-inactive::before {
-        content: "";
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background-color: #94a3b8;
-      }
-
-      /* Lưới thông tin nông trại */
-      .farm-info-grid {
-        display: grid;
-        grid-template-columns: 150px 200px 1fr;
-        gap: 18px;
-        padding: 12px 0;
-        border-top: 1px dashed #e2e8f0;
-        border-bottom: 1px dashed #e2e8f0;
-        margin-bottom: 14px;
-      }
-
-      .farm-info-item {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        min-width: 0;
-      }
-
-      .info-label {
-        font-size: 11.5px;
-        font-weight: 600;
-        color: #64748b;
-        text-transform: uppercase;
-        letter-spacing: 0.3px;
-      }
-
-      .info-val {
-        font-size: 14px;
-        font-weight: 600;
-        color: #1e293b;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .info-val svg {
-        color: #2e8b57;
-        flex-shrink: 0;
-      }
-
-      /* Hàng nút bấm cuối thẻ */
-      .farm-card-buttons {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .btn-farm-action {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        height: 34px;
-        padding: 0 16px;
-        border-radius: 7px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.15s ease;
-      }
-
-      .btn-farm-action.primary {
-        background-color: #2e8b57;
-        color: #ffffff;
-        border: 1px solid #2e8b57;
-      }
-
-      .btn-farm-action.primary:hover {
-        background-color: #257247;
-        border-color: #257247;
-      }
-
-      .btn-farm-action.edit {
-        background-color: #ffffff;
-        color: #334155;
-        border: 1px solid #cbd5e1;
-      }
-
-      .btn-farm-action.edit:hover {
-        background-color: #f8fafc;
-        color: #0f172a;
-        border-color: #94a3b8;
-      }
-
-      .btn-farm-action.delete {
-        background-color: #fef2f2;
-        color: #dc2626;
-        border: 1px solid #fecaca;
-      }
-
-      .btn-farm-action.delete:hover {
-        background-color: #fee2e2;
-        color: #b91c1c;
-      }
-    </style>
-  </head>
-  <body>
-    <!-- ================= HEADER ================= -->
-    <header class="dashboard-header">
-      <div class="header-left">
-        <img
-          src="https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png"
-          alt="Logo"
-          class="header-logo-icon"
-        />
-        <span class="header-brand-title">AGRICHAIN</span>
+<div class="farm-tab-wrapper">
+  <!-- THỐNG KÊ (METRICS ROW) -->
+  <div class="metrics-row">
+    <div class="metric-card">
+      <div class="metric-title">Tổng diện tích canh tác</div>
+      <div class="metric-number">
+        12.50
+        <span class="metric-unit">Hecta</span>
       </div>
-
-      <div class="header-search-bar">
-        <input type="text" placeholder="Tìm kiếm lô canh tác ..." />
-      </div>
-
-      <div class="header-profile">
-        <div class="avatar-circle">NH</div>
-        <div class="profile-meta">
-          <span class="profile-name">Nguyễn Hoàng</span>
-          <span class="profile-role">Nông dân</span>
-        </div>
-      </div>
-    </header>
-
-    <!-- ================= BODY ================= -->
-    <div class="dashboard-body">
-      <!-- SIDEBAR -->
-      <aside class="dashboard-sidebar">
-        <div>
-          <div class="sidebar-heading">Chức năng canh tác</div>
-          <nav class="sidebar-nav">
-            <button class="nav-item-btn active">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M7 20h10" />
-                <path d="M10 20c5.5-2.5.8-6.4 3-10" />
-                <path
-                  d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"
-                />
-                <path
-                  d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"
-                />
-              </svg>
-              <span>Quản lý nông trại</span>
-            </button>
-
-            <button class="nav-item-btn">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M2 22 16 8" />
-                <path
-                  d="M3.47 12.53 5 11l1.53 1.53a3.5 3.5 0 0 1 0 4.94L5 19l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"
-                />
-                <path
-                  d="M7.47 8.53 9 7l1.53 1.53a3.5 3.5 0 0 1 0 4.94L9 15l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"
-                />
-                <path
-                  d="M11.47 4.53 13 3l1.53 1.53a3.5 3.5 0 0 1 0 4.94L13 11l-1.53-1.53a3.5 3.5 0 0 1 0-4.94Z"
-                />
-                <path d="M20 2h2v2a4 4 0 0 1-4 4h-2V6a4 4 0 0 1 4-4Z" />
-              </svg>
-              <span>Quản lý mùa vụ</span>
-            </button>
-
-            <button class="nav-item-btn">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="m16 16 2 2 4-4" />
-                <path
-                  d="M21 10V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l2-1.14"
-                />
-                <path d="m7.5 4.27 9 5.15" />
-                <polyline points="3.29 7 12 12 20.71 7" />
-                <line x1="12" x2="12" y1="22" y2="12" />
-              </svg>
-              <span>Quản lý lô thu hoạch</span>
-            </button>
-
-            <button class="nav-item-btn">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <rect width="18" height="18" x="3" y="4" rx="2" />
-                <line x1="16" x2="16" y1="2" y2="6" />
-                <line x1="8" x2="8" y1="2" y2="6" />
-                <line x1="3" x2="21" y1="10" y2="10" />
-                <path d="m9 16 2 2 4-4" />
-              </svg>
-              <span>Lịch hẹn kiểm định</span>
-            </button>
-
-            <button class="nav-item-btn">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"
-                />
-                <path d="M15 18H9" />
-                <path
-                  d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"
-                />
-                <circle cx="17" cy="18" r="2" />
-                <circle cx="7" cy="18" r="2" />
-              </svg>
-              <span>Vận chuyển & Bàn giao</span>
-            </button>
-
-            <button class="nav-item-btn">
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path
-                  d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"
-                />
-                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
-              </svg>
-              <span>Ký blockchain</span>
-            </button>
-          </nav>
-        </div>
-
-        <div>
-          <button class="btn-logout">
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" x2="9" y1="12" y2="12" />
-            </svg>
-            Đăng xuất
-          </button>
-          <div class="sidebar-footer">
-            <span class="pulse-dot"></span>
-            <span>Node nông dân: <b>Agri-Farm-Node</b></span>
-          </div>
-        </div>
-      </aside>
-
-      <!-- CONTENT: TAB QUẢN LÝ NÔNG TRẠI -->
-      <main class="dashboard-content">
-        <!-- Thống kê -->
-        <div class="metrics-row">
-          <div class="metric-card">
-            <div class="metric-title">Tổng diện tích canh tác</div>
-            <div class="metric-number">
-              12.50<span class="metric-unit">Hecta</span>
-            </div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-title">Số lô canh tác</div>
-            <div class="metric-number">3</div>
-          </div>
-
-          <div class="metric-card">
-            <div class="metric-title">Số nông trại</div>
-            <div class="metric-number">2</div>
-          </div>
-
-          <div class="actions-box">
-            <button class="btn-primary-action">+ Thêm nông trại</button>
-            <div class="action-tip">
-              <span>🚜</span>
-              Thêm nông trại mới để bắt đầu quản lý mùa vụ
-            </div>
-          </div>
-        </div>
-
-        <!-- Thẻ Nông Trại 1 -->
-        <div class="farm-card">
-          <img
-            src="https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg"
-            alt="Nông Trại Hoàng Nguyễn"
-            class="farm-image"
-          />
-
-          <div class="farm-details">
-            <div>
-              <div class="farm-header">
-                <div class="farm-title-group">
-                  <h3 class="farm-name">Nông Trại Hoàng Nguyễn</h3>
-                  <span class="farm-badge code">#NT001</span>
-                  <span class="farm-badge status-active">Đang hoạt động</span>
-                </div>
-              </div>
-
-              <div class="farm-info-grid">
-                <div class="farm-info-item">
-                  <span class="info-label">Diện tích</span>
-                  <span class="info-val">7.5 ha</span>
-                </div>
-
-                <div class="farm-info-item">
-                  <span class="info-label">Người quản lý</span>
-                  <span class="info-val">Nguyễn Hoàng</span>
-                </div>
-
-                <div class="farm-info-item">
-                  <span class="info-label">Địa chỉ</span>
-                  <span class="info-val">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.2"
-                    >
-                      <path
-                        d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"
-                      />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                    Xã Phong Điền, TP. Cần Thơ
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="farm-card-buttons">
-              <button class="btn-farm-action primary">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                Xem chi tiết
-              </button>
-
-              <button class="btn-farm-action edit">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                  <path d="m15 5 4 4" />
-                </svg>
-                Sửa
-              </button>
-
-              <button class="btn-farm-action delete">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="m15 9-6 6" />
-                  <path d="m9 9 6 6" />
-                </svg>
-                Xóa
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Thẻ Nông Trại 2 -->
-        <div class="farm-card">
-          <img
-            src="https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg"
-            alt="Nông Trại Hoàng Ngọc"
-            class="farm-image"
-          />
-
-          <div class="farm-details">
-            <div>
-              <div class="farm-header">
-                <div class="farm-title-group">
-                  <h3 class="farm-name">Nông Trại Hoàng Ngọc</h3>
-                  <span class="farm-badge code">#NT002</span>
-                  <span class="farm-badge status-active">Đang hoạt động</span>
-                </div>
-              </div>
-
-              <div class="farm-info-grid">
-                <div class="farm-info-item">
-                  <span class="info-label">Diện tích</span>
-                  <span class="info-val">5.0 ha</span>
-                </div>
-
-                <div class="farm-info-item">
-                  <span class="info-label">Người quản lý</span>
-                  <span class="info-val">Nguyễn Hoàng</span>
-                </div>
-
-                <div class="farm-info-item">
-                  <span class="info-label">Địa chỉ</span>
-                  <span class="info-val">
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.2"
-                    >
-                      <path
-                        d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"
-                      />
-                      <circle cx="12" cy="10" r="3" />
-                    </svg>
-                    Phường Thường Thạnh, Quận Cái Răng, TP. Cần Thơ
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="farm-card-buttons">
-              <button class="btn-farm-action primary">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                  <circle cx="12" cy="12" r="3" />
-                </svg>
-                Xem chi tiết
-              </button>
-
-              <button class="btn-farm-action edit">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                  <path d="m15 5 4 4" />
-                </svg>
-                Sửa
-              </button>
-
-              <button class="btn-farm-action delete">
-                <svg
-                  width="15"
-                  height="15"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="m15 9-6 6" />
-                  <path d="m9 9 6 6" />
-                </svg>
-                Xóa
-              </button>
-            </div>
-          </div>
-        </div>
-      </main>
     </div>
-  </body>
-</html>
+
+    <div class="metric-card">
+      <div class="metric-title">Số lô canh tác</div>
+      <div class="metric-number">0</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-title">Số nông trại</div>
+      <div class="metric-number">2</div>
+    </div>
+
+    <div class="actions-box">
+      <button class="btn-primary-action" type="button">+ Thêm nông trại</button>
+      <div class="action-tip">
+        <span>🚜</span>
+        Thêm nông trại mới để bắt đầu quản lý mùa vụ
+      </div>
+    </div>
+  </div>
+
+  <!-- DANH SÁCH NÔNG TRẠI (FARM CARDS) -->
+  <div class="farm-list">
+    <!-- THẺ NÔNG TRẠI 1 -->
+    <div class="farm-card">
+      <img
+        src="https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg"
+        alt="Nông trại Xanh Đà Lạt"
+        class="farm-image"
+      />
+
+      <div class="farm-details">
+        <div>
+          <div class="farm-card-header">
+            <h3 class="farm-name">Nông trại Xanh Đà Lạt</h3>
+            <span class="tag-badge green">NT001</span>
+          </div>
+
+          <div class="farm-info-grid">
+            <div class="info-item">
+              <div class="info-label">Diện tích</div>
+              <div class="info-val">4.5 ha</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Địa chỉ</div>
+              <div class="info-val">Phường 7, TP. Đà Lạt, Lâm Đồng</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Người quản lý</div>
+              <div class="info-val">Nguyễn Văn An</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Trạng thái</div>
+              <div class="info-val status-active">Đang hoạt động</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="farm-card-buttons">
+          <button class="btn-update btn-detail" type="button">
+            Xem chi tiết
+          </button>
+          <button class="btn-update btn-edit" type="button">Sửa</button>
+          <button class="btn-map" type="button">Xóa</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- THẺ NÔNG TRẠI 2 -->
+    <div class="farm-card">
+      <img
+        src="https://res.cloudinary.com/dfnssx2gm/image/upload/v1790604174/bc300a15ff78093fb0042758aec26846_ldrct6.jpg"
+        alt="Nông trại Hữu cơ Mộc Châu"
+        class="farm-image"
+      />
+
+      <div class="farm-details">
+        <div>
+          <div class="farm-card-header">
+            <h3 class="farm-name">Nông trại Hữu cơ Mộc Châu</h3>
+            <span class="tag-badge green">NT002</span>
+          </div>
+
+          <div class="farm-info-grid">
+            <div class="info-item">
+              <div class="info-label">Diện tích</div>
+              <div class="info-val">8.0 ha</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Địa chỉ</div>
+              <div class="info-val">Thị trấn Mộc Châu, Sơn La</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Người quản lý</div>
+              <div class="info-val">Trần Thị Bình</div>
+            </div>
+
+            <div class="info-item">
+              <div class="info-label">Trạng thái</div>
+              <div class="info-val status-active">Đang hoạt động</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="farm-card-buttons">
+          <button class="btn-update btn-detail" type="button">
+            Xem chi tiết
+          </button>
+          <button class="btn-update btn-edit" type="button">Sửa</button>
+          <button class="btn-map" type="button">Xóa</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

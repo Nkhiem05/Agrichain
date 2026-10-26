@@ -32,6 +32,9 @@ import Admin from "../src/view/page/admin/admin";
 import Nhaphanphoi from "../src/view/page/nhaphanphoi/nhaphanphoi";
 import Chitietphanphoi from "../src/view/page/nhaphanphoi/chitietphanphoi";
 
+// Đại lý
+import DaiLyPage from "./view/page/daily/daily";
+
 // user
 import User from "../src/view/page/user/user";
 import Chitietuser from "../src/view/page/user/chitietuser";
@@ -75,6 +78,9 @@ const AppRoutes = () => {
       <Route path="/nha-phan-phoi" element={<Nhaphanphoi />} />
       <Route path="/chi-tiet-phan-phoi" element={<Chitietphanphoi />} />
       <Route path="/chi-tiet-phan-phoi/:maPhieu" element={<Chitietphanphoi />} />
+
+      {/* Đại lý */}
+      <Route path="/dai-ly" element={<DaiLyPage />} />
 
       {/*Profile*/}
       <Route path="/trang-ca-nhan" element={<Trangcanhan />} />

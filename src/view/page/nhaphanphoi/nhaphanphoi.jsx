@@ -37,6 +37,8 @@ import {
   updateDealer,
   toggleDealerStatus,
   fetchDealerHistory,
+  fetchTransporters,
+  fetchDealerAccounts,
 } from "../../../api/nhaphanphoiApi";
 
 const DEFAULT_LOGO_IMG =
@@ -171,9 +173,12 @@ const NhaPhanPhoiPage = () => {
     soLuongXuat: "",
     hinhThuc: "TU_GIAO",
     tenDonViVC: "",
+    maDonViVC: "",
     taiXe: "",
     bienSo: "",
   });
+  // Đơn vị vận chuyển có tài khoản: họ ký lấy hàng / giao hàng lên blockchain
+  const [transporters, setTransporters] = useState([]);
 
   // ==========================================
   // 6. DỮ LIỆU TAB 4: ĐẠI LÝ
@@ -186,7 +191,10 @@ const NhaPhanPhoiPage = () => {
     nguoiLienHe: "",
     sdt: "",
     diaChi: "",
+    maNguoiDung: "",
   });
+  // Tài khoản đại lý (vai trò RETAILER) để gắn với đại lý: đại lý ký nhận hàng bằng tài khoản này
+  const [dealerAccounts, setDealerAccounts] = useState([]);
   const [viewHistoryDealer, setViewHistoryDealer] = useState(null);
   const [dealerHistory, setDealerHistory] = useState([]);
 
@@ -212,16 +220,20 @@ const NhaPhanPhoiPage = () => {
     setLoading(true);
     setErrorMsg("");
     try {
-      const [incoming, inventory, dispatch, dealerList] = await Promise.all([
+      const [incoming, inventory, dispatch, dealerList, transporterList, accountList] = await Promise.all([
         fetchIncomingShipments(),
         fetchInventory(),
         fetchDispatchOrders(),
         fetchDealers(),
+        fetchTransporters().catch(() => null),
+        fetchDealerAccounts().catch(() => null),
       ]);
       setImportOrders(incoming?.data || []);
       setInventoryList(inventory?.data || []);
       setDispatchOrders(dispatch?.data || []);
       setDealers(dealerList?.data || []);
+      setTransporters(transporterList?.data || []);
+      setDealerAccounts(accountList?.data || []);
     } catch (err) {
       setErrorMsg(err.message || "Không thể tải dữ liệu từ máy chủ");
     } finally {
@@ -349,11 +361,17 @@ const NhaPhanPhoiPage = () => {
       .sort((a, b) => new Date(a.han_luu_kho || "9999-12-31") - new Date(b.han_luu_kho || "9999-12-31"));
 
     setDispatchForm({
-      daiLyId: dealers.find((d) => d.trang_thai === "HOAT_DONG")?.ma_dai_ly || "",
+      // Ưu tiên đại lý đã gắn tài khoản (đại lý ký nhận hàng trên blockchain bằng tài khoản đó)
+      daiLyId:
+        (
+          dealers.find((d) => d.trang_thai === "HOAT_DONG" && d.ma_nguoi_dung) ||
+          dealers.find((d) => d.trang_thai === "HOAT_DONG")
+        )?.ma_dai_ly || "",
       maLo: validLots[0]?.ma_lo_nong_san || "",
       soLuongXuat: "",
       hinhThuc: "TU_GIAO",
       tenDonViVC: "",
+      maDonViVC: transporters[0]?.ma_nguoi_dung || "",
       taiXe: "",
       bienSo: "",
     });
@@ -368,8 +386,13 @@ const NhaPhanPhoiPage = () => {
     if (dispatchForm.hinhThuc === "TU_GIAO" && (!dispatchForm.taiXe.trim() || !dispatchForm.bienSo.trim())) {
       return alert("Vui lòng điền tài xế và biển số xe!");
     }
-    if (dispatchForm.hinhThuc === "DV_VAN_CHUYEN" && !dispatchForm.tenDonViVC.trim()) {
-      return alert("Vui lòng nhập tên đơn vị vận chuyển!");
+    if (dispatchForm.hinhThuc === "DV_VAN_CHUYEN") {
+      if (transporters.length > 0 && !dispatchForm.maDonViVC) {
+        return alert("Vui lòng chọn đơn vị vận chuyển!");
+      }
+      if (transporters.length === 0 && !dispatchForm.tenDonViVC.trim()) {
+        return alert("Vui lòng nhập tên đơn vị vận chuyển!");
+      }
     }
 
     try {
@@ -379,12 +402,14 @@ const NhaPhanPhoiPage = () => {
         so_luong_xuat: xuatKg,
         hinh_thuc: dispatchForm.hinhThuc,
         ten_don_vi_van_chuyen: dispatchForm.tenDonViVC.trim() || undefined,
+        ma_don_vi_van_chuyen:
+          dispatchForm.hinhThuc === "DV_VAN_CHUYEN" ? dispatchForm.maDonViVC || undefined : undefined,
         ten_tai_xe: dispatchForm.taiXe.trim() || undefined,
         bien_so_xe: dispatchForm.bienSo.trim() || undefined,
       });
       setShowCreateDispatchModal(false);
       await loadAll();
-      alert(`Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""} thành công!`);
+      alert(`${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}`);
     } catch (err) {
       alert(err.message || "Không thể lập phiếu xuất kho");
     }
@@ -407,6 +432,7 @@ const NhaPhanPhoiPage = () => {
       nguoiLienHe: dealer.nguoi_lien_he || "",
       sdt: dealer.so_dien_thoai || "",
       diaChi: dealer.dia_chi || "",
+      maNguoiDung: dealer.ma_nguoi_dung || "",
     });
     setShowDealerModal(true);
   };
@@ -442,6 +468,7 @@ const NhaPhanPhoiPage = () => {
       nguoi_lien_he: dealerForm.nguoiLienHe.trim() || undefined,
       so_dien_thoai: dealerForm.sdt.trim(),
       dia_chi: dealerForm.diaChi.trim() || undefined,
+      ma_nguoi_dung: dealerForm.maNguoiDung || undefined,
     };
     try {
       if (editingDealer) {
@@ -1006,7 +1033,9 @@ const NhaPhanPhoiPage = () => {
                                           : "warning"
                                   }`}
                                 >
-                                  {DISPATCH_STATUS_LABEL[order.trang_thai] || order.trang_thai}
+                                  {order.trang_thai === "DANG_GIAO" && order.trang_thai_van_don === "CHO_TIEP_NHAN"
+                                    ? "Đã tới nơi - Chờ đại lý nhận"
+                                    : DISPATCH_STATUS_LABEL[order.trang_thai] || order.trang_thai}
                                 </span>
                               </td>
                               <td>
@@ -1034,7 +1063,7 @@ const NhaPhanPhoiPage = () => {
               {activeTab === "blockchain" && (
             <div style={{ maxWidth: 980, paddingTop: 16 }}>
               <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
-                Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận) hoặc từ chối nhận. Các bước của một lô ký theo thứ tự.
+                Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận) hoặc từ chối nhận, khi lập phiếu xuất cho đại lý (tách lô xuất + lệnh giao) và khi tự giao (lấy hàng, tới nơi). Các bước của một lô ký theo thứ tự.
               </p>
               <BlockchainPanel />
             </div>
@@ -1058,7 +1087,7 @@ const NhaPhanPhoiPage = () => {
                         className="btn-primary-action"
                         onClick={() => {
                           setEditingDealer(null);
-                          setDealerForm({ ten: "", nguoiLienHe: "", sdt: "", diaChi: "" });
+                          setDealerForm({ ten: "", nguoiLienHe: "", sdt: "", diaChi: "", maNguoiDung: "" });
                           setShowDealerModal(true);
                         }}
                       >
@@ -1077,6 +1106,7 @@ const NhaPhanPhoiPage = () => {
                           <th>Người Liên Hệ</th>
                           <th>Số Điện Thoại</th>
                           <th>Địa Chỉ</th>
+                          <th>Tài Khoản</th>
                           <th>Trạng Thái</th>
                           <th>Thao Tác</th>
                         </tr>
@@ -1084,7 +1114,7 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {dealers.length === 0 ? (
                           <tr>
-                            <td colSpan={7} style={{ padding: 24, color: "#6b7280" }}>
+                            <td colSpan={8} style={{ padding: 24, color: "#6b7280" }}>
                               Chưa có đại lý nào, bấm "Thêm Đại Lý Mới" để bắt đầu.
                             </td>
                           </tr>
@@ -1099,6 +1129,13 @@ const NhaPhanPhoiPage = () => {
                                 <td>{d.nguoi_lien_he}</td>
                                 <td style={{ color: "#2563eb" }}>{d.so_dien_thoai}</td>
                                 <td>{d.dia_chi}</td>
+                                <td>
+                                  {d.tai_khoan ? (
+                                    <span style={{ fontWeight: 600 }}>{d.tai_khoan}</span>
+                                  ) : (
+                                    <span style={{ color: "#b45309", fontSize: 12.5 }}>Chưa gắn</span>
+                                  )}
+                                </td>
                                 <td>
                                   {d.trang_thai === "HOAT_DONG" ? (
                                     <span className="status-pill success">Đang hợp tác</span>
@@ -1365,7 +1402,7 @@ const NhaPhanPhoiPage = () => {
                     .filter((d) => d.trang_thai === "HOAT_DONG")
                     .map((d) => (
                       <option key={d.ma_dai_ly} value={d.ma_dai_ly}>
-                        {d.ten} ({d.dia_chi})
+                        {d.ten} ({d.dia_chi}){d.ma_nguoi_dung ? "" : " - chưa gắn tài khoản"}
                       </option>
                     ))}
                 </select>
@@ -1447,15 +1484,34 @@ const NhaPhanPhoiPage = () => {
                   </div>
                 </div>
               ) : (
-                <div className="form-group">
-                  <label>Tên Đơn Vị Vận Chuyển Đối Tác (*)</label>
-                  <input
-                    type="text"
-                    placeholder="VD: Giao Hàng Tiết Kiệm / Viettel Post"
-                    value={dispatchForm.tenDonViVC}
-                    onChange={(e) => setDispatchForm({ ...dispatchForm, tenDonViVC: e.target.value })}
-                  />
-                </div>
+                transporters.length > 0 ? (
+                  <div className="form-group">
+                    <label>Đơn Vị Vận Chuyển (*)</label>
+                    <select
+                      value={dispatchForm.maDonViVC}
+                      onChange={(e) => setDispatchForm({ ...dispatchForm, maDonViVC: e.target.value })}
+                    >
+                      {transporters.map((t) => (
+                        <option key={t.ma_nguoi_dung} value={t.ma_nguoi_dung}>
+                          {t.ho_ten} ({t.ma_nguoi_dung})
+                        </option>
+                      ))}
+                    </select>
+                    <small style={{ color: "#6b7280" }}>
+                      Đơn vị vận chuyển xác nhận lấy hàng / giao hàng và ký trên trang Vận chuyển của họ.
+                    </small>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label>Tên Đơn Vị Vận Chuyển Đối Tác (*)</label>
+                    <input
+                      type="text"
+                      placeholder="VD: Giao Hàng Tiết Kiệm / Viettel Post"
+                      value={dispatchForm.tenDonViVC}
+                      onChange={(e) => setDispatchForm({ ...dispatchForm, tenDonViVC: e.target.value })}
+                    />
+                  </div>
+                )
               )}
             </div>
             <div className="modal-footer">
@@ -1515,6 +1571,30 @@ const NhaPhanPhoiPage = () => {
                   value={dealerForm.diaChi}
                   onChange={(e) => setDealerForm({ ...dealerForm, diaChi: e.target.value })}
                 />
+              </div>
+              <div className="form-group">
+                <label>Tài Khoản Đại Lý</label>
+                <select
+                  value={dealerForm.maNguoiDung}
+                  onChange={(e) => setDealerForm({ ...dealerForm, maNguoiDung: e.target.value })}
+                >
+                  <option value="">-- Chưa gắn tài khoản --</option>
+                  {dealerAccounts
+                    .filter(
+                      (a) =>
+                        !a.ma_dai_ly ||
+                        a.ma_dai_ly === editingDealer?.ma_dai_ly ||
+                        a.ma_nguoi_dung === dealerForm.maNguoiDung,
+                    )
+                    .map((a) => (
+                      <option key={a.ma_nguoi_dung} value={a.ma_nguoi_dung}>
+                        {a.ho_ten} ({a.ten_dang_nhap})
+                      </option>
+                    ))}
+                </select>
+                <small style={{ color: "#6b7280" }}>
+                  Đại lý dùng tài khoản này để xác nhận nhận hàng và ký lên blockchain. Bắt buộc khi xuất hàng có ghi blockchain.
+                </small>
               </div>
             </div>
             <div className="modal-footer">

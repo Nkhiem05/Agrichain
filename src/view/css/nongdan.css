@@ -361,36 +361,64 @@
   /* ================= VIEW 1: QUẢN LÝ NÔNG TRẠI ================= */
   .farm-card {
     background-color: #ffffff;
-    border: 1px solid #e8edf3;
-    border-radius: 10px;
-    padding: 20px 24px;
+    border: 1px solid #dfe5ee;
+    border-radius: 16px;
+    padding: 24px 28px;
     display: flex;
-    gap: 24px;
+    align-items: flex-start;
+    gap: 28px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    transition:
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+
+  .farm-card:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
   }
 
   .farm-image {
-    width: 170px;
-    height: 170px;
-    border-radius: 8px;
+    width: 200px;
+    height: 200px;
+    border-radius: 14px;
     object-fit: cover;
     flex-shrink: 0;
   }
 
   .farm-details {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .farm-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
   }
 
   .farm-name {
-    font-size: 20px;
+    font-size: 21px;
     font-weight: 700;
-    color: #111827;
-    margin-bottom: 6px;
+    color: #0f172a;
+  }
+
+  .farm-code-badge {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background-color: #ecfdf5;
+    border: 1px solid #a7f3d0;
+    color: #047857;
+    font-size: 13px;
+    font-weight: 600;
   }
 
   .tag-badge {
@@ -412,50 +440,124 @@
     color: #334155;
   }
 
-  .farm-info-grid {
+  /* Khung xám chứa 4 thông tin của nông trại */
+  .farm-info-panel {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 16px;
-    margin-bottom: 12px;
+    grid-template-columns: 0.8fr 1.5fr 1.3fr 1.2fr;
+    gap: 20px;
+    padding: 18px 22px;
+    background-color: #f8fafc;
+    border: 1px solid #eef2f6;
+    border-radius: 12px;
+  }
+
+  .farm-info-item {
+    min-width: 0;
   }
 
   .info-label {
-    font-size: 13px;
-    color: #6b7280;
-    margin-bottom: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
   }
 
   .info-val {
-    font-size: 14.5px;
+    font-size: 15px;
     font-weight: 600;
-    color: #1f2937;
+    color: #1e293b;
+  }
+
+  .info-ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .farm-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .farm-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background-color: currentColor;
+  }
+
+  .farm-status.active {
+    color: #16a34a;
+  }
+
+  .farm-status.inactive {
+    color: #94a3b8;
   }
 
   .farm-card-buttons {
     display: flex;
+    flex-wrap: wrap;
     gap: 12px;
   }
 
-  .btn-update {
-    background-color: #2e8b57;
-    color: white;
-    border: none;
-    padding: 8px 18px;
-    border-radius: 6px;
-    font-size: 13px;
+  .btn-farm-view,
+  .btn-farm-edit,
+  .btn-farm-delete {
+    height: 42px;
+    padding: 0 22px;
+    border-radius: 8px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    transition:
+      background-color 0.15s ease,
+      border-color 0.15s ease;
   }
 
-  .btn-map {
-    background-color: #bfdbfe;
-    color: #1e40af;
-    border: none;
-    padding: 8px 18px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
+  .btn-farm-view {
+    background-color: #16a34a;
+    border: 1px solid #16a34a;
+    color: #ffffff;
+  }
+
+  .btn-farm-view:hover {
+    background-color: #15803d;
+    border-color: #15803d;
+  }
+
+  .btn-farm-edit {
+    background-color: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    color: #334155;
+  }
+
+  .btn-farm-edit:hover {
+    background-color: #e2e8f0;
+  }
+
+  .btn-farm-delete {
+    background-color: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #dc2626;
+  }
+
+  .btn-farm-delete:hover {
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+  }
+
+  @media (max-width: 1000px) {
+    .farm-card {
+      flex-direction: column;
+    }
+
+    .farm-info-panel {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 
   /* ================= VIEW 2: QUẢN LÝ MÙA VỤ (THẺ MỚI KHÔNG BORDER-LEFT) ================= */
@@ -473,10 +575,16 @@
     transition: all 0.2s ease;
   }
 
+  /* Không dùng transform ở đây: thẻ có transform sẽ thành "hệ quy chiếu" của mọi phần tử
+     position: fixed bên trong (menu ⋮), làm menu lệch khỏi nút và bị các thẻ khác che. */
+  /* Thẻ đang mở menu ⋮ nổi lên trên các thẻ sau nó để menu không bị che */
+  .season-card.has-open-menu {
+    z-index: 50;
+  }
+
   .season-card:hover {
     border-color: #cbd5e1;
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
-    transform: translateY(-1px);
   }
 
   .season-thumbnail {
@@ -827,13 +935,16 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-width: 150px;
+    /* Cùng một chiều rộng cho mọi ô trạng thái, không phụ thuộc độ dài chữ */
+    width: 160px;
     height: 32px;
-    padding: 0 14px;
+    padding: 0 12px;
     border-radius: 6px;
     font-size: 12.5px;
     font-weight: 600;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     box-sizing: border-box;
   }
 
@@ -903,9 +1014,9 @@
   }
 
   .confirmed-sample-badge {
-    background-color: #ecfdf5;
-    color: #047857;
-    border: 1px solid #a7f3d0;
+    background-color: #eef2ff;
+    color: #4338ca;
+    border: 1px solid #c7d2fe;
     cursor: default;
   }
 
@@ -1119,6 +1230,15 @@
     z-index: 1000;
   }
 
+  .dropdown-menu {
+    transform-origin: top right;
+  }
+
+  .dropdown-menu.dropdown-up {
+    transform-origin: bottom right;
+    animation-name: fadeInDropdownUp;
+  }
+
   .dropdown-menu.dropdown-up::before {
     top: auto;
     bottom: -5px;
@@ -1149,14 +1269,47 @@
     background-color: #b91c1c;
   }
 
+  /* Hiệu ứng mở nhẹ của menu ⋮ (trượt nhẹ + hiện dần). Menu mở lên phía trên thì trượt ngược lại. */
   @keyframes fadeInDropdown {
     from {
       opacity: 0;
-      transform: translateY(-4px);
+      transform: translateY(-6px) scale(0.97);
     }
     to {
       opacity: 1;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes fadeInDropdownUp {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Hiệu ứng mở nhẹ của popup biểu mẫu: nền mờ dần, hộp nổi lên */
+  @keyframes modalOverlayIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes modalPopIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
     }
   }
 
@@ -1174,7 +1327,12 @@
     z-index: 1000;
   }
 
+  .modal-overlay {
+    animation: modalOverlayIn 0.18s ease-out;
+  }
+
   .modal-container {
+    animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     background-color: #ffffff;
     width: 100%;
     max-width: 500px;
@@ -1400,5 +1558,13 @@
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #94a3b8;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .dropdown-menu,
+    .modal-overlay,
+    .modal-container {
+      animation: none !important;
+    }
   }
 }

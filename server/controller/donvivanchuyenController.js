@@ -215,6 +215,11 @@ const rejectTrip = async (req, res) => {
         `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ?`,
         [`Đơn vị vận chuyển từ chối: ${lyDo}`, maVanDon],
       );
+      // Phiếu xuất kho cho đại lý (nếu có) bị hủy theo; lô xuất ở lại kho nhà phân phối
+      await connection.execute(
+        `UPDATE phieu_xuat_kho SET trang_thai = 'DA_HUY' WHERE ma_van_don = ? AND trang_thai = 'CHO_XUAT'`,
+        [maVanDon],
+      );
       // Blockchain: đơn vị vận chuyển ký từ chối chuyến (lô ở lại bên gửi)
       await ghiSuKienVanDon(connection, maVanDon, "HANDOVER_REJECTED", maDonVi, {
         ben_tu_choi: "VAN_CHUYEN",
@@ -251,6 +256,11 @@ const confirmPickup = async (req, res) => {
       await connection.execute(
         `UPDATE lenh_van_chuyen SET trang_thai = 'DANG_VAN_CHUYEN', khoi_luong = COALESCE(?, khoi_luong) WHERE ma_van_don = ?`,
         [khoiLuongThucTe, maVanDon],
+      );
+      // Phiếu xuất kho cho đại lý (nếu có) chuyển sang đang giao
+      await connection.execute(
+        `UPDATE phieu_xuat_kho SET trang_thai = 'DANG_GIAO', thoi_gian_xuat = COALESCE(thoi_gian_xuat, NOW()) WHERE ma_van_don = ? AND trang_thai = 'CHO_XUAT'`,
+        [maVanDon],
       );
       // Blockchain: đơn vị vận chuyển ký đã lấy hàng
       await ghiSuKienVanDon(connection, maVanDon, "PICKUP_CONFIRMED", maDonVi);

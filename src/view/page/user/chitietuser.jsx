@@ -6,13 +6,17 @@ import {
   Package,
   Store,
   ArrowLeft,
-  CheckCircle2,
   ShieldCheck,
   AlertCircle,
   Loader2,
 } from "lucide-react";
 import "../../css/chitietuser.css";
 import { fetchChiTietUser } from "../../../api/chitietuserApi";
+import {
+  ChuoiKhoiBadge,
+  ChuoiKhoiChip,
+  XacThucBlockchainCard,
+} from "../xacthucblockchain";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
@@ -105,7 +109,7 @@ const TraceDetailPage = ({ onBack }) => {
     );
   }
 
-  const { batch, blockchain, farming, audit, processing, shipping } = data;
+  const { batch, farming, audit, processing, shipping } = data;
   const latestShipment = shipping && shipping.length > 0 ? shipping[0] : null;
 
   return (
@@ -119,13 +123,8 @@ const TraceDetailPage = ({ onBack }) => {
           </div>
         </div>
 
-        <div className="chain-badge">
-          <span className="pulse-dot"></span>
-          <span>
-            Mainnet Online • Block #
-            {blockchain?.so_thu_tu_su_kien || "18,924,102"}
-          </span>
-        </div>
+        {/* Trạng thái đối chiếu blockchain thật của lô */}
+        <ChuoiKhoiBadge maLo={batch?.ma_lo_nong_san || currentBatchCode} />
       </header>
 
       {/* CHI TIẾT SẢN PHẨM TRUY XUẤT */}
@@ -134,9 +133,7 @@ const TraceDetailPage = ({ onBack }) => {
           <button className="back-btn" onClick={handleBack}>
             <ArrowLeft size={16} /> Quay lại màn hình quét
           </button>
-          <span className="chain-verify-status">
-            <CheckCircle2 size={16} /> Đã Khớp Chữ Ký Chuỗi Khối
-          </span>
+          <ChuoiKhoiChip maLo={batch?.ma_lo_nong_san || currentBatchCode} />
         </div>
 
         <div className="detail-grid">
@@ -180,22 +177,8 @@ const TraceDetailPage = ({ onBack }) => {
               })()}
             </div>
 
-            <div className="blockchain-card">
-              <div className="blockchain-card-header">
-                <span>XÁC THỰC CHUỖI KHỐI</span>
-                <span className="text-verified">100% Verified</span>
-              </div>
-              <p className="tx-hash-label">Transaction Hash:</p>
-              <p className="tx-hash-value">
-                {blockchain?.ma_giao_dich_blockchain ||
-                  batch?.latest_event_hash ||
-                  "0x7c49f821e9ba0029b3014fec6491a381e9b2a74c"}
-              </p>
-              <div className="blockchain-card-footer">
-                <span>Trạng thái: {batch?.integrity_status}</span>
-                <span>AgriChain V2</span>
-              </div>
-            </div>
+            {/* Xác thực thật: đối chiếu dữ liệu với blockchain, từng bước kèm người ký và giao dịch */}
+            <XacThucBlockchainCard maLo={batch?.ma_lo_nong_san || currentBatchCode} />
           </div>
 
           {/* DÒNG ĐỜI SẢN PHẨM */}

@@ -129,3 +129,14 @@ export const fetchDealerHistory = async (maDaiLy) => {
   });
   return parseJson(res);
 };
+
+// 5. Danh sách chọn khi xuất hàng / gắn đại lý (ký blockchain)
+export const fetchTransporters = async () => {
+  const res = await fetch(`${API_URL}/don-vi-van-chuyen`, { headers: authHeaders() });
+  return parseJson(res);
+};
+
+export const fetchDealerAccounts = async () => {
+  const res = await fetch(`${API_URL}/tai-khoan-dai-ly`, { headers: authHeaders() });
+  return parseJson(res);
+};

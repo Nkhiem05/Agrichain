@@ -1,4 +1,4 @@
-const { ghiSuKien, layChiSoKiemDinh } = require("./traceEvent");
+const { ghiSuKien, layChiSoKiemDinh, baoDamSuKienGoc } = require("./traceEvent");
 const { hashNoiDung, sangGram } = require("./canonical");
 
 // Các hàm ghi sự kiện cho từng nghiệp vụ, để controller chỉ cần gọi một dòng.
@@ -117,6 +117,84 @@ const ghiSuKienTuChoiNhanHang = async (executor, maVanDon) => {
   await ghiSuKienVanDon(executor, maVanDon, "RETURN_SHIPPED", v.ma_don_vi_van_chuyen);
   await ghiSuKienVanDon(executor, maVanDon, "RETURN_RECEIVED", v.ma_nguoi_gui);
   return tuChoi;
+};
+
+// Lô mới tạo từ sơ chế / tách / gộp: ghi BATCH_RELATION (cơ sở ký createChild, lấy khối lượng từ lô nguồn).
+// Trả null nếu lô nguồn không được theo dõi trên chain (lô cũ).
+const ghiSuKienLoCon = async (executor, maLoMoi) => {
+  const lot = await baoDamSuKienGoc(executor, maLoMoi);
+  return lot && Number(lot.latest_event_sequence) > 0 ? lot : null;
+};
+
+// Sơ chế đổi giai đoạn: sang "đang đóng gói" -> PROCESSING_DONE; "hoàn tất" -> PROCESSING_DONE + PACKAGING_DONE.
+// Mỗi loại chỉ ghi một lần cho mỗi lô; cơ sở sơ chế ký (hàm step trên hợp đồng).
+const ghiSuKienGiaiDoanSoChe = async (executor, maSoChe, giaiDoan) => {
+  const can =
+    giaiDoan === "DA_HOAN_TAT"
+      ? ["PROCESSING_DONE", "PACKAGING_DONE"]
+      : giaiDoan === "DANG_DONG_GOI"
+        ? ["PROCESSING_DONE"]
+        : [];
+  if (can.length === 0) return [];
+
+  const [rows] = await executor.query(
+    `
+    SELECT sc.ma_so_che, sc.ma_lo_moi, sc.ma_co_so, sc.tieu_de, sc.khu_vuc_so_che, sc.quy_cach_tieu_chuan,
+           DATE_FORMAT(sc.ngay_bat_dau, '%Y-%m-%d') AS ngay_bat_dau,
+           CAST(lo.so_luong_hien_tai AS CHAR) AS so_luong, lo.don_vi_tinh
+    FROM so_che_lo_hang sc
+    JOIN lo_nong_san lo ON lo.ma_lo_nong_san = sc.ma_lo_moi
+    WHERE sc.ma_so_che = ?
+    LIMIT 1
+    `,
+    [maSoChe],
+  );
+  if (rows.length === 0) throw new Error(`Không tìm thấy lô sơ chế ${maSoChe}`);
+  const sc = rows[0];
+
+  const daGhi = [];
+  for (const loai of can) {
+    const [co] = await executor.query(
+      `SELECT 1 FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? AND loai_hoat_dong = ? LIMIT 1`,
+      [sc.ma_lo_moi, loai],
+    );
+    if (co.length > 0) continue;
+    const kq = await ghiSuKien(executor, {
+      maLo: sc.ma_lo_moi,
+      loai,
+      maNguoiKy: sc.ma_co_so,
+      duLieu: {
+        ma_so_che: sc.ma_so_che,
+        tieu_de: sc.tieu_de,
+        khu_vuc_so_che: sc.khu_vuc_so_che,
+        quy_cach_tieu_chuan: sc.quy_cach_tieu_chuan,
+        ngay_bat_dau: sc.ngay_bat_dau,
+        giai_doan: giaiDoan,
+        so_luong: sc.so_luong,
+        don_vi_tinh: sc.don_vi_tinh,
+      },
+      thamSo: {},
+    });
+    if (!kq) break; // lô không được theo dõi trên chain
+    daGhi.push(loai);
+  }
+  return daGhi;
+};
+
+// Xóa các sự kiện CHƯA KÝ của một lô (dùng khi xóa lô sơ chế vừa tạo nhầm).
+// Trả false nếu đã có sự kiện gửi lên chain: khi đó không được xóa lô.
+const xoaSuKienChuaKy = async (executor, maLo) => {
+  const [ev] = await executor.query(
+    `SELECT ma_lich_su, blockchain_sync_status FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ?`,
+    [maLo],
+  );
+  if (ev.some((e) => e.blockchain_sync_status !== "QUEUED")) return false;
+  if (ev.length > 0) {
+    const ids = ev.map((e) => e.ma_lich_su);
+    await executor.query(`DELETE FROM blockchain_outbox WHERE event_id IN (?)`, [ids]);
+    await executor.query(`DELETE FROM lich_su_truy_xuat_lo WHERE ma_lich_su IN (?)`, [ids]);
+  }
+  return true;
 };
 
 // Mã người dùng (trong danh sách) chưa có ví được duyệt: các bước họ phải ký sẽ chờ tới khi có ví
@@ -239,6 +317,9 @@ const ghiSuKienKiemDinh = async (db, maKiemDinh, loai) => {
 module.exports = {
   ghiSuKienVanDon,
   ghiSuKienTuChoiNhanHang,
+  ghiSuKienLoCon,
+  ghiSuKienGiaiDoanSoChe,
+  xoaSuKienChuaKy,
   chuaCoViDuyet,
   ghiSuKienKiemDinh,
   ghiSuKienKiemDinhTrong,
