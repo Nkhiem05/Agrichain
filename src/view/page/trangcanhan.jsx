@@ -11,72 +11,47 @@ import {
   Edit,
   X,
   Camera,
-  LogOut,
   ArrowLeft,
 } from "lucide-react";
 import "../css/trangcanhan.css";
 import BlockchainPanel from "./blockchainpannel"; // MỚI: khối ví blockchain
+import { avatarUrl, fetchHoSo, capNhatHoSo } from "../../api/trangcanhanApi";
 
-const DEFAULT_LOGO_IMG =
-  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
-
-const API_URL = "http://localhost:3000";
-
-// Header gửi kèm token đăng nhập (token được lưu ở trang đăng nhập)
-const authHeaders = () => {
-  const token = localStorage.getItem("token");
-  return token ? { Authorization: `Bearer ${token}` } : {};
+const EMPTY_EDIT_FORM = {
+  ho_ten: "",
+  so_dien_thoai: "",
+  email: "",
+  dia_chi: "",
 };
-
-const avatarUrl = (path) => (path ? `${API_URL}${path}` : null);
 
 const ProfilePage = () => {
   const navigate = useNavigate();
-
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    navigate("/dang-nhap");
-  };
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editForm, setEditForm] = useState({
-    ho_ten: "",
-    so_dien_thoai: "",
-    email: "",
-    dia_chi: "",
-  });
+  const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  const fetchProfile = async () => {
+  const loadProfile = async () => {
     setLoading(true);
     setLoadError("");
     try {
-      const res = await fetch(`${API_URL}/api/trang-ca-nhan`, {
-        headers: authHeaders(),
-      });
-      const data = await res.json();
-      if (!data.success) {
-        setLoadError(data.message || "Không thể lấy hồ sơ cá nhân");
-        return;
-      }
-      setProfile(data.data);
-    } catch (err) {
-      setLoadError("Không thể kết nối tới backend");
+      setProfile(await fetchHoSo());
+    } catch (error) {
+      setLoadError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchProfile();
+    loadProfile();
   }, []);
 
   const handleOpenEdit = () => {
@@ -111,43 +86,11 @@ const ProfilePage = () => {
     setSaveError("");
 
     try {
-      const formData = new FormData();
-      formData.append("ho_ten", editForm.ho_ten.trim());
-      formData.append("so_dien_thoai", editForm.so_dien_thoai.trim());
-      formData.append("email", editForm.email.trim());
-      formData.append("dia_chi", editForm.dia_chi.trim());
-      if (avatarFile) formData.append("anh_dai_dien", avatarFile);
-
-      const res = await fetch(`${API_URL}/api/trang-ca-nhan`, {
-        method: "PUT",
-        headers: authHeaders(),
-        body: formData,
-      });
-      const data = await res.json();
-
-      if (!data.success) {
-        setSaveError(data.message || "Không thể lưu hồ sơ");
-        return;
-      }
-
-      // Đồng bộ lại tên/ảnh đại diện vào localStorage để header các trang
-      // khác cập nhật theo mà không cần đăng nhập lại.
-      if (data.data) {
-        try {
-          const savedUser = JSON.parse(localStorage.getItem("user") || "{}");
-          localStorage.setItem(
-            "user",
-            JSON.stringify({ ...savedUser, ...data.data }),
-          );
-        } catch {
-          // Bỏ qua nếu dữ liệu user cũ bị lỗi định dạng
-        }
-      }
-
+      await capNhatHoSo(editForm, avatarFile);
       setIsEditModalOpen(false);
-      await fetchProfile();
-    } catch (err) {
-      setSaveError("Không thể kết nối tới backend");
+      await loadProfile();
+    } catch (error) {
+      setSaveError(error.message);
     } finally {
       setSaving(false);
     }
@@ -155,50 +98,6 @@ const ProfilePage = () => {
 
   return (
     <div className="profile-dashboard">
-      {/* HEADER */}
-      <header className="dashboard-header">
-        <div className="header-left">
-          <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
-          <span className="header-brand-title">AGRICHAIN</span>
-        </div>
-
-        <div className="header-right-actions">
-          <div
-            className="header-profile"
-            style={{ cursor: "pointer" }}
-            onClick={() => navigate("/trang-ca-nhan")}
-            title="Xem hồ sơ cá nhân"
-          >
-            <div className="avatar-circle">
-              {profile?.anh_dai_dien ? (
-                <img
-                  src={avatarUrl(profile.anh_dai_dien)}
-                  alt="avatar"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                    borderRadius: "50%",
-                  }}
-                />
-              ) : (
-                <span className="avatar-initials">
-                  {(profile?.ho_ten || "ND").slice(0, 2).toUpperCase()}
-                </span>
-              )}
-            </div>
-            <div className="profile-meta">
-              <span className="profile-name">
-                {profile?.ho_ten || "Nông Dân"}
-              </span>
-              <span className="profile-role">
-                {profile?.vai_tro_label || "Nông dân"}
-              </span>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* NỘI DUNG PROFILE */}
       <div className="profile-content-wrap">
         {/* Nút quay lại trang trước */}
@@ -286,16 +185,13 @@ const ProfilePage = () => {
                   <span
                     style={{
                       display: "inline-block",
-                      backgroundColor: "#ecfdf5",
                       color: "#16a34a",
-                      fontSize: "11px",
-                      fontWeight: "700",
-                      padding: "2px 8px",
+                      fontSize: "12px",
                       borderRadius: "4px",
                       marginTop: "6px",
                     }}
                   >
-                    Mã định danh: {profile.ma_nguoi_dung}
+                    Mã định danh: #{profile.ma_nguoi_dung}
                   </span>
                 </div>
               </div>

@@ -14,6 +14,7 @@ import {
   Pencil,
   LogOut,
   Wallet,
+  MapPin,
 } from "lucide-react";
 import "../../css/nongdan.css";
 import BlockchainPanel from "../blockchainpannel";
@@ -160,7 +161,14 @@ const DashboardPage = () => {
   // =========================================================
   // TAB
   // =========================================================
-  const [activeTab, setActiveTab] = usePersistentTab("nongdan", "farm", ["farm","season","batch","inspection","shipping","blockchain"]);
+  const [activeTab, setActiveTab] = usePersistentTab("nongdan", "farm", [
+    "farm",
+    "season",
+    "batch",
+    "inspection",
+    "shipping",
+    "blockchain",
+  ]);
 
   // =========================================================
   // POPUP
@@ -1296,7 +1304,9 @@ const DashboardPage = () => {
         { method: "POST", headers: authHeaders() },
       );
       const data = await response.json();
-      alert(data.message || (response.ok ? "Đã xác nhận" : "Không thể xác nhận"));
+      alert(
+        data.message || (response.ok ? "Đã xác nhận" : "Không thể xác nhận"),
+      );
       if (response.ok) fetchInspections();
     } catch (error) {
       console.error("Lỗi xác nhận biên bản lấy mẫu:", error);
@@ -1775,17 +1785,24 @@ const DashboardPage = () => {
         ==================================================== */}
         <main className="dashboard-content">
           {/* =================================================
-              TAB NÔNG TRẠI
+              TAB BLOCKCHAIN
           ================================================== */}
           {activeTab === "blockchain" && (
-            <div style={{ maxWidth: 980, paddingTop: 16 }}>
-              <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
-                Mỗi bước của lô (chốt thu hoạch, xác nhận lấy mẫu, tạo / hủy lệnh vận chuyển, nhận lại hàng bị trả) cần bạn ký bằng ví MetaMask để ghi lên blockchain.
+            <div className="blockchain-tab-wrapper">
+              <p className="blockchain-tab-desc">
+                Mỗi bước của lô (chốt thu hoạch, xác nhận lấy mẫu, tạo / hủy
+                lệnh vận chuyển, nhận lại hàng bị trả) cần bạn ký bằng ví
+                MetaMask để ghi lên blockchain.
               </p>
-              <BlockchainPanel />
+              <div className="blockchain-panel-full">
+                <BlockchainPanel />
+              </div>
             </div>
           )}
 
+          {/* =================================================
+              TAB NÔNG TRẠI
+          ================================================== */}
           {activeTab === "farm" && (
             <div>
               <div className="metrics-row">
@@ -1917,7 +1934,7 @@ const DashboardPage = () => {
           )}
 
           {/* =================================================
-              TAB MÙA VỤ
+              TAB MÙA VỤ (THẺ MÙA VỤ MỚI, ĐÃ BỎ BORDER-LEFT)
           ================================================== */}
           {activeTab === "season" && (
             <div>
@@ -1995,38 +2012,65 @@ const DashboardPage = () => {
                     <div className="season-header">
                       <h3 className="season-title">{season.loai_cay_trong}</h3>
                       <div className="season-tags">
-                        <span className="tag-badge gray">
+                        <span className="season-badge code">
                           #{season.ma_mua_vu}
                         </span>
-                        <span className="tag-badge green">
+                        <span className="season-badge farm">
+                          <MapPin size={13} />
                           {season.ten_nong_trai}
                         </span>
                         {season.trang_thai_thu_hoach === "DA_SAN_SANG" && (
-                          <span className="tag-badge green">
+                          <span className="season-badge ready">
                             Sẵn sàng thu hoạch
                           </span>
                         )}
                       </div>
                     </div>
 
-                    <div className="season-row-info">
-                      <span>
-                        <strong>Giống:</strong> {season.giong_cay || "—"}
-                      </span>
-                      <span>
-                        <strong>Thửa:</strong>{" "}
-                        {season.ten_thua_dat || "Chưa chọn"}
-                      </span>
-                      <span>
-                        <strong>Ngày bắt đầu:</strong>{" "}
-                        {formatDate(season.ngay_gieo_trong)}
-                      </span>
-                      {season.ngay_thu_hoach_du_kien && (
-                        <span>
-                          <strong>Dự kiến thu hoạch:</strong>{" "}
-                          {formatDate(season.ngay_thu_hoach_du_kien)}
+                    <div className="season-info-grid">
+                      <div className="season-info-item">
+                        <span className="season-info-label">Giống cây</span>
+                        <span
+                          className={`season-info-value ${
+                            !season.giong_cay ? "muted" : ""
+                          }`}
+                        >
+                          {season.giong_cay || "Chưa cập nhật"}
                         </span>
-                      )}
+                      </div>
+
+                      <div className="season-info-item">
+                        <span className="season-info-label">Thửa đất</span>
+                        <span
+                          className={`season-info-value ${
+                            !season.ten_thua_dat ? "muted" : ""
+                          }`}
+                        >
+                          {season.ten_thua_dat || "Chưa chọn"}
+                        </span>
+                      </div>
+
+                      <div className="season-info-item">
+                        <span className="season-info-label">Ngày bắt đầu</span>
+                        <span className="season-info-value">
+                          {formatDate(season.ngay_gieo_trong) || "—"}
+                        </span>
+                      </div>
+
+                      <div className="season-info-item">
+                        <span className="season-info-label">
+                          Dự kiến thu hoạch
+                        </span>
+                        <span
+                          className={`season-info-value ${
+                            !season.ngay_thu_hoach_du_kien ? "muted" : ""
+                          }`}
+                        >
+                          {season.ngay_thu_hoach_du_kien
+                            ? formatDate(season.ngay_thu_hoach_du_kien)
+                            : "Chưa cập nhật"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -2154,7 +2198,7 @@ const DashboardPage = () => {
                 <table className="batch-table">
                   <thead>
                     <tr>
-                      <th>Mã mùa vụ</th>
+                      <th className="col-code">Mã mùa vụ</th>
                       <th>Tên nông trại</th>
                       <th>Mùa vụ</th>
                       <th>Thửa đất</th>
@@ -2184,8 +2228,12 @@ const DashboardPage = () => {
                             isDropdownActive ? "row-has-open-menu" : ""
                           }
                         >
-                          <td>{batch.ma_mua_vu || "—"}</td>
-                          <td>{batch.ten_nong_trai || batch.ma_nong_trai || "—"}</td>
+                          <td className="col-code tracking-code">
+                            {batch.ma_mua_vu || "—"}
+                          </td>
+                          <td>
+                            {batch.ten_nong_trai || batch.ma_nong_trai || "—"}
+                          </td>
                           <td>{batch.loai_cay_trong || "—"}</td>
                           <td>{batch.ten_thua_dat || "—"}</td>
                           <td>
@@ -2348,7 +2396,7 @@ const DashboardPage = () => {
           ================================================== */}
           {activeTab === "inspection" && (
             <div className="inspection-view-wrapper">
-              <div className="inspection-table-card">
+              <div className="inspection-table-card custom-scrollbar">
                 <table className="inspection-table">
                   <thead>
                     <tr>
@@ -2439,21 +2487,23 @@ const DashboardPage = () => {
                             item.ma_nguoi_quan_ly === user?.ma_nguoi_dung ? (
                               item.chu_lo_da_xac_nhan ? (
                                 <span
-                                  style={{ fontSize: 12.5, color: "#047857", fontWeight: 600, display: "inline-block", lineHeight: 1.3 }}
+                                  className="confirmed-sample-badge"
                                   title="Ký xác nhận bằng ví ở Trang cá nhân → Ví blockchain nếu chưa ký"
                                 >
-                                  Đã xác nhận biên bản lấy mẫu
+                                  <CheckCircle2 size={15} />
+                                  Đã xác nhận lấy mẫu
                                 </span>
                               ) : (
                                 <button
                                   type="button"
                                   className="btn-action-retry"
-                                  style={{ whiteSpace: "normal", lineHeight: 1.25, textAlign: "left" }}
                                   title="Xác nhận biên bản lấy mẫu của cơ quan kiểm định"
-                                  disabled={confirmingSample === item.ma_kiem_dinh}
+                                  disabled={
+                                    confirmingSample === item.ma_kiem_dinh
+                                  }
                                   onClick={() => handleConfirmSampling(item)}
                                 >
-                                  <CheckCircle2 size={15} style={{ flexShrink: 0 }} />
+                                  <CheckCircle2 size={15} />
                                   {confirmingSample === item.ma_kiem_dinh
                                     ? "Đang xác nhận..."
                                     : "Xác nhận lấy mẫu"}
@@ -2837,7 +2887,13 @@ const DashboardPage = () => {
                     })}
                   </select>
                   {plots.length === 0 && (
-                    <small style={{ color: "#6b7280", display: "block", marginTop: 4 }}>
+                    <small
+                      style={{
+                        color: "#6b7280",
+                        display: "block",
+                        marginTop: 4,
+                      }}
+                    >
                       Hãy thêm thửa đất ở mục Quản lý nông trại → Xem chi tiết.
                     </small>
                   )}
@@ -2847,7 +2903,13 @@ const DashboardPage = () => {
                         !!plot.ma_mua_vu &&
                         plot.ma_thua_dat !== seasonForm.ma_thua_dat,
                     ) && (
-                      <small style={{ color: "#6b7280", display: "block", marginTop: 4 }}>
+                      <small
+                        style={{
+                          color: "#6b7280",
+                          display: "block",
+                          marginTop: 4,
+                        }}
+                      >
                         Tất cả thửa đất đang có mùa vụ. Hãy thu hoạch/tạo lô cho
                         mùa vụ cũ hoặc thêm thửa đất mới.
                       </small>
