@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  CalendarDays,
+  Sprout,
+  PackageCheck,
+  Maximize2,
+  X,
+} from "lucide-react";
 import "../../css/chitietmuavu.css";
-
-const DEFAULT_LOGO_IMG =
-  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
-
-const API_URL = "http://localhost:3000";
+import {
+  fetchChiTietMuaVu,
+  capNhatLoThuHoach,
+} from "../../../api/chitietmuavuApi";
 
 // "2026-06-18" -> "18/06/2026"
 const formatDate = (value) => {
@@ -36,9 +43,6 @@ const HarvestDetailPage = () => {
   const [searchParams] = useSearchParams();
   const requestedBatch = searchParams.get("lo");
 
-  // State user đồng bộ với header nông dân
-  const [user, setUser] = useState(null);
-
   // State điều khiển mở popup QR Code
   const [showQrModal, setShowQrModal] = useState(false);
 
@@ -54,23 +58,6 @@ const HarvestDetailPage = () => {
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-
-    if (!savedUser) {
-      navigate("/");
-      return;
-    }
-
-    try {
-      setUser(JSON.parse(savedUser));
-    } catch (error) {
-      console.error("Lỗi đọc thông tin người dùng:", error);
-      localStorage.removeItem("user");
-      navigate("/");
-    }
-  }, [navigate]);
-
   const fetchSeason = async () => {
     if (!maMuaVu) {
       setError("Chưa chọn mùa vụ. Hãy mở từ trang Quản lý mùa vụ.");
@@ -82,12 +69,9 @@ const HarvestDetailPage = () => {
     setError("");
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/mua-vu/${encodeURIComponent(maMuaVu)}`,
-      );
-      const data = await response.json();
+      const { ok, data } = await fetchChiTietMuaVu(maMuaVu);
 
-      if (!response.ok) {
+      if (!ok) {
         setError(data.message || "Không thể lấy chi tiết mùa vụ");
         return;
       }
@@ -164,20 +148,12 @@ const HarvestDetailPage = () => {
     setSaving(true);
 
     try {
-      const response = await fetch(
-        `${API_URL}/api/lo-thu-hoach/${encodeURIComponent(batch.ma_lo_nong_san)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            so_luong: Number(harvestForm.so_luong),
-            ngay_thu_hoach: harvestForm.ngay_thu_hoach,
-          }),
-        },
-      );
-      const data = await response.json();
+      const { ok, data } = await capNhatLoThuHoach(batch.ma_lo_nong_san, {
+        soLuong: harvestForm.so_luong,
+        ngayThuHoach: harvestForm.ngay_thu_hoach,
+      });
 
-      if (!response.ok) {
+      if (!ok) {
         alert(data.message || "Lưu thông tin thất bại");
         return;
       }
@@ -195,51 +171,14 @@ const HarvestDetailPage = () => {
   return (
     <div className="chitietmuavu">
       <div className="harvest-layout">
-        {/* 1. HEADER CHUẨN CỦA NÔNG DÂN (ĐÃ BỎ SEARCH BAR) */}
-        <header className="dashboard-header">
-          <div className="header-left">
-            <img
-              src={DEFAULT_LOGO_IMG}
-              alt="Logo"
-              className="header-logo-icon"
-            />
-            <span className="header-brand-title">AGRICHAIN</span>
-          </div>
-
-          <div className="header-profile">
-            <div className="avatar-circle"></div>
-            <div className="profile-meta">
-              <span className="profile-name">{user?.ho_ten || "Nông dân"}</span>
-              <span className="profile-role">Nông dân</span>
-            </div>
-          </div>
-        </header>
-
-        {/* 2. KHUNG CUỘN THEO CHIỀU DỌC */}
+        {/* KHUNG CUỘN THEO CHIỀU DỌC */}
         <div className="harvest-main-scroll">
           <main className="harvest-container">
-            {/* Nút quay lại */}
-            <div className="top-actions">
-              <button
-                className="btn-back"
-                onClick={handleBack}
-                title="Quay lại"
-              >
-                <svg
-                  width="18"
-                  height="18"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2.5}
-                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                  />
-                </svg>
-                <span>Quay lại trang trước</span>
+            {/* Nút quay lại trang trước - Đồng bộ cấu trúc Trang Cá Nhân */}
+            <div className="back-navigation-container">
+              <button type="button" className="btn-back" onClick={handleBack}>
+                <ArrowLeft size={16} />
+                Quay lại trang trước
               </button>
             </div>
 
@@ -258,7 +197,7 @@ const HarvestDetailPage = () => {
                     </p>
                   </div>
 
-                  {/* Bấm vào khối QR để mở popup to (chỉ có khi đã có lô) */}
+                  {/* Bấm vào khối QR để mở popup to */}
                   {batch && (
                     <div
                       className="harvest-qr-wrapper"
@@ -281,7 +220,8 @@ const HarvestDetailPage = () => {
                             setShowQrModal(true);
                           }}
                         >
-                          🔍 Phóng to để quét
+                          <Maximize2 size={13} />
+                          <span>Phóng to để quét</span>
                         </button>
                       </div>
                     </div>
@@ -307,7 +247,9 @@ const HarvestDetailPage = () => {
                   {/* Card: Mùa Vụ */}
                   <div className="info-card">
                     <div className="info-card-header">
-                      <span className="card-icon">🗓️</span>
+                      <span className="card-icon">
+                        <CalendarDays size={18} />
+                      </span>
                       <h4>Mùa Vụ</h4>
                     </div>
                     <div className="info-card-body">
@@ -351,7 +293,9 @@ const HarvestDetailPage = () => {
                   {/* Card: Nông trại */}
                   <div className="info-card">
                     <div className="info-card-header">
-                      <span className="card-icon">🌱</span>
+                      <span className="card-icon">
+                        <Sprout size={18} />
+                      </span>
                       <h4>Nông trại</h4>
                     </div>
                     <div className="info-card-body">
@@ -381,7 +325,9 @@ const HarvestDetailPage = () => {
                   {/* Card: Thu hoạch */}
                   <div className="info-card">
                     <div className="info-card-header">
-                      <span className="card-icon">📦</span>
+                      <span className="card-icon">
+                        <PackageCheck size={18} />
+                      </span>
                       <h4>Thu hoạch</h4>
                     </div>
                     <div className="info-card-body">
@@ -520,28 +466,12 @@ const HarvestDetailPage = () => {
                     </table>
                   </div>
                 </div>
-
-                {/* Action Buttons */}
-                <div className="harvest-actions">
-                  <button className="btn-cancel" onClick={handleBack}>
-                    Hủy
-                  </button>
-                  <button
-                    className="btn-save"
-                    onClick={handleSave}
-                    disabled={!batch || saving}
-                  >
-                    {saving ? "Đang lưu..." : "Lưu thông tin"}
-                  </button>
-                </div>
               </div>
             )}
           </main>
         </div>
 
-        {/* =========================================================
-          POPUP PHÓNG TO MÃ QR ĐỂ QUÉT
-      ========================================================== */}
+        {/* POPUP PHÓNG TO MÃ QR ĐỂ QUÉT */}
         {showQrModal && batch && (
           <div className="modal-overlay" onClick={() => setShowQrModal(false)}>
             <div
@@ -555,7 +485,7 @@ const HarvestDetailPage = () => {
                   className="btn-close-modal"
                   onClick={() => setShowQrModal(false)}
                 >
-                  ✕
+                  <X size={20} />
                 </button>
               </div>
 

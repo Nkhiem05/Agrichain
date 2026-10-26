@@ -9,7 +9,7 @@ const authHeaders = () => {
 };
 
 // Đường dẫn ảnh đại diện lưu trong DB -> URL đầy đủ của backend
-export const avatarUrl = (path) => (path ? `${API_URL}${path}` : null);
+const avatarUrl = (path) => (path ? `${API_URL}${path}` : null);
 
 // Gọi API trang cá nhân. Trả về data khi thành công, ném Error(message) khi thất bại
 // (message lấy từ backend, hoặc LOI_KET_NOI khi không gọi được server).
@@ -32,11 +32,11 @@ const request = async (options, loiMacDinh) => {
 };
 
 // Lấy hồ sơ cá nhân của người đang đăng nhập
-export const fetchHoSo = () => request({}, "Không thể lấy hồ sơ cá nhân");
+const fetchHoSo = () => request({}, "Không thể lấy hồ sơ cá nhân");
 
 // Lưu hồ sơ (kèm ảnh đại diện mới nếu có) rồi đồng bộ tên/ảnh vào localStorage
 // để header các trang khác cập nhật theo mà không cần đăng nhập lại.
-export const capNhatHoSo = async (form, avatarFile) => {
+const capNhatHoSo = async (form, avatarFile) => {
   const formData = new FormData();
   formData.append("ho_ten", form.ho_ten.trim());
   formData.append("so_dien_thoai", form.so_dien_thoai.trim());
@@ -59,3 +59,5 @@ export const capNhatHoSo = async (form, avatarFile) => {
   }
   return data;
 };
+
+export { avatarUrl, fetchHoSo, capNhatHoSo };

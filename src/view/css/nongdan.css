@@ -873,20 +873,6 @@
     text-align: center;
   }
 
-  .inspection-table thead tr {
-    background-color: #ffffff;
-    border-bottom: 1px solid #f1f5f9;
-    color: #475569;
-    font-weight: 600;
-    font-size: 13px;
-  }
-
-  .inspection-table th {
-    padding: 14px 12px;
-    white-space: nowrap;
-    text-align: center;
-  }
-
   .inspection-table tbody tr {
     border-bottom: 1px solid #f8fafc;
     transition: background-color 0.15s ease;
@@ -1078,16 +1064,22 @@
     text-align: center;
   }
 
-  .shipping-table thead tr {
-    background-color: #ffffff;
-    border-bottom: 1px solid #f1f5f9;
-    color: #475569;
-    font-weight: 600;
-    font-size: 13px;
+  /* Tiêu đề bảng Lịch hẹn kiểm định và Vận chuyển & Bàn giao: cùng kiểu với bảng lô thu hoạch
+     (nền xám, chữ đậm, viền dưới đậm). Góc trên bo tròn nhờ khung chứa bảng cắt theo bo góc. */
+  .inspection-table thead,
+  .shipping-table thead {
+    background-color: #d1d5db;
+    color: #374151;
   }
 
+  .inspection-table th,
   .shipping-table th {
-    padding: 16px 14px;
+    background-color: #d1d5db;
+    padding: 13px 14px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #374151;
+    border-bottom: 2px solid #cbd5e1;
     white-space: nowrap;
     text-align: center;
   }

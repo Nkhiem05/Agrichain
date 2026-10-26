@@ -16,7 +16,7 @@ const jsonAuthHeaders = () => ({
 });
 
 // Đường dẫn file lưu trên server (ảnh nông trại, mùa vụ, đại diện) -> URL đầy đủ
-export const fileUrl = (path) => `${API_URL}${path}`;
+const fileUrl = (path) => `${API_URL}${path}`;
 
 const request = async (path, options) => {
   const response = await fetch(`${API_URL}${path}`, options);
@@ -41,22 +41,22 @@ const dungFormNongTrai = (form, anhNongTrai) => {
   return formData;
 };
 
-export const fetchNongTrai = (maNguoiDung) =>
+const fetchNongTrai = (maNguoiDung) =>
   request(`/api/farmer/farms/user/${maNguoiDung}`);
 
-export const themNongTrai = (form, anhNongTrai) =>
+const themNongTrai = (form, anhNongTrai) =>
   request("/api/farmer/farms", {
     method: "POST",
     body: dungFormNongTrai(form, anhNongTrai),
   });
 
-export const capNhatNongTrai = (maNongTrai, form, anhNongTrai) =>
+const capNhatNongTrai = (maNongTrai, form, anhNongTrai) =>
   request(`/api/farmer/farms/${maNongTrai}`, {
     method: "PUT",
     body: dungFormNongTrai(form, anhNongTrai),
   });
 
-export const xoaNongTrai = (maNongTrai) =>
+const xoaNongTrai = (maNongTrai) =>
   request(`/api/farmer/farms/${maNongTrai}`, { method: "DELETE" });
 
 /* =========================================================
@@ -64,7 +64,7 @@ export const xoaNongTrai = (maNongTrai) =>
 ========================================================= */
 
 // Danh sách mùa vụ + thống kê (maNongTrai rỗng = tất cả nông trại). Trả về [danhSach, thongKe]
-export const fetchMuaVuVaThongKe = (maNguoiDung, maNongTrai) => {
+const fetchMuaVuVaThongKe = (maNguoiDung, maNongTrai) => {
   const query = maNongTrai
     ? `?ma_nong_trai=${encodeURIComponent(maNongTrai)}`
     : "";
@@ -75,18 +75,15 @@ export const fetchMuaVuVaThongKe = (maNguoiDung, maNongTrai) => {
   ]);
 };
 
-export const fetchDanhMucVatTu = () => request("/api/mua-vu/vat-tu");
+const fetchDanhMucVatTu = () => request("/api/mua-vu/vat-tu");
 
-export const fetchThuaDat = (maNongTrai) =>
+const fetchThuaDat = (maNongTrai) =>
   request(`/api/farmer/plots/farm/${maNongTrai}`);
 
-export const fetchChiTietMuaVu = (maMuaVu) => request(`/api/mua-vu/${maMuaVu}`);
+const fetchChiTietMuaVu = (maMuaVu) => request(`/api/mua-vu/${maMuaVu}`);
 
 // maMuaVuDangSua rỗng = thêm mới (POST), có giá trị = cập nhật (PUT)
-export const luuMuaVu = (
-  maMuaVuDangSua,
-  { maNongTrai, form, vatTu, anhMuaVu },
-) => {
+const luuMuaVu = (maMuaVuDangSua, { maNongTrai, form, vatTu, anhMuaVu }) => {
   const formData = new FormData();
   formData.append("ma_nong_trai", maNongTrai);
   formData.append("ma_thua_dat", form.ma_thua_dat);
@@ -118,10 +115,10 @@ export const luuMuaVu = (
   );
 };
 
-export const xoaMuaVu = (maMuaVu) =>
+const xoaMuaVu = (maMuaVu) =>
   request(`/api/mua-vu/${maMuaVu}`, { method: "DELETE" });
 
-export const danhDauMuaVuSanSang = (maMuaVu) =>
+const danhDauMuaVuSanSang = (maMuaVu) =>
   request(`/api/mua-vu/${maMuaVu}/danh-dau-san-sang`, { method: "PATCH" });
 
 /* =========================================================
@@ -129,21 +126,18 @@ export const danhDauMuaVuSanSang = (maMuaVu) =>
 ========================================================= */
 
 // Danh sách lô + thống kê. Trả về [danhSach, thongKe]
-export const fetchLoThuHoachVaThongKe = (maNguoiDung) =>
+const fetchLoThuHoachVaThongKe = (maNguoiDung) =>
   Promise.all([
     request(`/api/lo-thu-hoach/user/${maNguoiDung}`),
     request(`/api/lo-thu-hoach/thong-ke/user/${maNguoiDung}`),
   ]);
 
 // Mùa vụ đã đánh dấu "sẵn sàng thu hoạch" để chọn khi tạo lô
-export const fetchMuaVuSanSang = (maNguoiDung) =>
+const fetchMuaVuSanSang = (maNguoiDung) =>
   request(`/api/mua-vu/user/${maNguoiDung}?san_sang=1`);
 
 // maLoDangSua rỗng = tạo lô mới (POST), có giá trị = cập nhật (PUT)
-export const luuLoThuHoach = (
-  maLoDangSua,
-  { maMuaVu, soLuong, ngayThuHoach },
-) =>
+const luuLoThuHoach = (maLoDangSua, { maMuaVu, soLuong, ngayThuHoach }) =>
   request(
     maLoDangSua ? `/api/lo-thu-hoach/${maLoDangSua}` : "/api/lo-thu-hoach",
     {
@@ -157,26 +151,26 @@ export const luuLoThuHoach = (
     },
   );
 
-export const xoaLoThuHoach = (maLo) =>
+const xoaLoThuHoach = (maLo) =>
   request(`/api/lo-thu-hoach/${maLo}`, { method: "DELETE" });
 
 /* =========================================================
    KIỂM ĐỊNH
 ========================================================= */
 
-export const fetchYeuCauKiemDinh = () =>
+const fetchYeuCauKiemDinh = () =>
   request("/api/kiem-dinh/yeu-cau/cua-toi", { headers: authHeaders() });
 
-export const xacNhanLayMau = (maKiemDinh) =>
+const xacNhanLayMau = (maKiemDinh) =>
   request(`/api/kiem-dinh/yeu-cau/${maKiemDinh}/xac-nhan-lay-mau`, {
     method: "POST",
     headers: authHeaders(),
   });
 
-export const fetchCoQuanKiemDinh = () =>
+const fetchCoQuanKiemDinh = () =>
   request("/api/kiem-dinh/co-quan", { headers: authHeaders() });
 
-export const guiYeuCauKiemDinh = (maLo, form) =>
+const guiYeuCauKiemDinh = (maLo, form) =>
   request("/api/kiem-dinh/yeu-cau", {
     method: "POST",
     headers: jsonAuthHeaders(),
@@ -190,28 +184,56 @@ export const guiYeuCauKiemDinh = (maLo, form) =>
    VẬN CHUYỂN & BÀN GIAO
 ========================================================= */
 
-export const fetchLenhVanChuyen = () =>
+const fetchLenhVanChuyen = () =>
   request("/api/van-chuyen/cua-toi", { headers: authHeaders() });
 
 // Lô sẵn sàng + đơn vị vận chuyển và cơ sở nhận hàng. Trả về [loSanSang, doiTac]
-export const fetchTuyChonVanChuyen = () =>
+const fetchTuyChonVanChuyen = () =>
   Promise.all([
     request("/api/van-chuyen/lo-san-sang", { headers: authHeaders() }),
     request("/api/van-chuyen/doi-tac", { headers: authHeaders() }),
   ]);
 
-export const taoLenhVanChuyen = (form) =>
+const taoLenhVanChuyen = (form) =>
   request("/api/van-chuyen", {
     method: "POST",
     headers: jsonAuthHeaders(),
     body: JSON.stringify(form),
   });
 
-export const fetchChiTietVanChuyen = (maVanDon) =>
+const fetchChiTietVanChuyen = (maVanDon) =>
   request(`/api/van-chuyen/${maVanDon}`, { headers: authHeaders() });
 
-export const huyLenhVanChuyen = (maVanDon) =>
+const huyLenhVanChuyen = (maVanDon) =>
   request(`/api/van-chuyen/${maVanDon}/huy`, {
     method: "PUT",
     headers: authHeaders(),
   });
+
+export {
+  fileUrl,
+  fetchNongTrai,
+  themNongTrai,
+  capNhatNongTrai,
+  xoaNongTrai,
+  fetchMuaVuVaThongKe,
+  fetchDanhMucVatTu,
+  fetchThuaDat,
+  fetchChiTietMuaVu,
+  luuMuaVu,
+  xoaMuaVu,
+  danhDauMuaVuSanSang,
+  fetchLoThuHoachVaThongKe,
+  fetchMuaVuSanSang,
+  luuLoThuHoach,
+  xoaLoThuHoach,
+  fetchYeuCauKiemDinh,
+  xacNhanLayMau,
+  fetchCoQuanKiemDinh,
+  guiYeuCauKiemDinh,
+  fetchLenhVanChuyen,
+  fetchTuyChonVanChuyen,
+  taoLenhVanChuyen,
+  fetchChiTietVanChuyen,
+  huyLenhVanChuyen,
+};

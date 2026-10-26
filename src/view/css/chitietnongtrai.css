@@ -449,28 +449,51 @@
     margin-top: 22px;
   }
 
-  .btn-cancel {
-    background: #edf2f7;
+  /* Hai nút Hủy / Lưu của popup thửa đất.
+     Các file CSS của trang khác (.btn-submit ở dangnhap.css, .btn-cancel ở chitietsoche.css)
+     không có phạm vi nên "rò" sang đây, làm nút Lưu cao 48px, rộng 100% và có lề. Vì vậy mỗi
+     thuộc tính bị rò đều được đặt lại ở đây để hai nút luôn cùng chiều cao và gọn gàng. */
+  .modal-actions .btn-cancel,
+  .modal-actions .btn-submit {
+    width: auto;
+    min-width: 96px;
+    height: 40px;
+    margin: 0;
+    padding: 0 20px;
     border: none;
-    padding: 9px 16px;
     border-radius: 6px;
     font-size: 14px;
     font-weight: 600;
-    color: #4a5568;
+    line-height: 1;
     cursor: pointer;
-    align-self: flex-start;
+    box-shadow: none;
+    transition:
+      background-color 0.15s ease,
+      opacity 0.15s ease;
   }
 
-  .btn-submit {
+  .modal-actions .btn-cancel {
+    background: #edf2f7;
+    color: #4a5568;
+  }
+
+  .modal-actions .btn-cancel:hover {
+    background: #e2e8f0;
+  }
+
+  .modal-actions .btn-submit {
+    min-width: 132px;
     background: #279450;
-    border: none;
-    padding: 9px 18px;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
     color: #ffffff;
-    cursor: pointer;
-    align-self: flex-start;
+  }
+
+  .modal-actions .btn-submit:hover:not(:disabled) {
+    background: #1f7a3d;
+  }
+
+  .modal-actions .btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   /* Responsive */
