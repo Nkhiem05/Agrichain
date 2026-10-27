@@ -67,7 +67,10 @@ const ketNoiMetaMask = async (cauHinh) => {
   return { signer, diaChi: await signer.getAddress() };
 };
 
-const BlockchainPanel = () => {
+// thongBaoBangAlert: hiện thông báo kết quả bằng alert (thay vì dòng chữ trong khung ví), khung ví chỉ ghi
+// "Ví đã kết nối / Chưa kết nối ví", và nút ký của sự kiện chưa đủ điều kiện vẫn bấm được: bấm thì alert lý do.
+// Mặc định tắt nên các trang khác dùng khung này không đổi.
+const BlockchainPanel = ({ thongBaoBangAlert = false }) => {
   const [cauHinh, setCauHinh] = useState(null);
   const [thongTin, setThongTin] = useState(null);
   const [choKy, setChoKy] = useState([]);
@@ -75,8 +78,14 @@ const BlockchainPanel = () => {
   const [dangXuLy, setDangXuLy] = useState("");
   const [thongBao, setThongBao] = useState({ loai: "", text: "" });
 
-  const baoLoi = (e) => setThongBao({ loai: "loi", text: loiNgan(e) });
-  const baoOk = (text) => setThongBao({ loai: "ok", text });
+  const baoLoi = (e) => {
+    if (thongBaoBangAlert) alert(loiNgan(e));
+    else setThongBao({ loai: "loi", text: loiNgan(e) });
+  };
+  const baoOk = (text) => {
+    if (thongBaoBangAlert) alert(text);
+    else setThongBao({ loai: "ok", text });
+  };
 
   const taiDuLieu = useCallback(async () => {
     try {
@@ -103,6 +112,15 @@ const BlockchainPanel = () => {
     taiDuLieu();
   }, [taiDuLieu]);
 
+  // Có sự kiện đã gửi giao dịch, đang chờ blockchain/worker xác nhận: tự tải lại để nút ký hiện lại
+  // (khi giao dịch hỏng) hoặc dòng biến mất (khi đã xác nhận)
+  const coDangCho = choKy.some((x) => x.trang_thai === "SUBMITTED");
+  useEffect(() => {
+    if (!coDangCho) return undefined;
+    const timer = setInterval(taiDuLieu, 5000);
+    return () => clearInterval(timer);
+  }, [coDangCho, taiDuLieu]);
+
   if (dangTai || !thongTin || !thongTin.can_vi) return null;
 
   const vi = thongTin.vi;
@@ -115,6 +133,7 @@ const BlockchainPanel = () => {
       await fn();
     } catch (e) {
       baoLoi(e);
+      await taiDuLieu(); // trạng thái sự kiện có thể đã đổi (ví dụ đã gửi giao dịch rồi mới lỗi)
     } finally {
       setDangXuLy("");
     }
@@ -174,6 +193,22 @@ const BlockchainPanel = () => {
     });
 
   const soSanSang = choKy.filter((x) => x.san_sang).length;
+  const viDaKetNoi = laAdmin || vi?.trang_thai_duyet === "DA_DUYET";
+
+  const linkGiaoDich = (it) =>
+    it.tx_hash &&
+    cauHinh?.explorerUrl && (
+      <>
+        {" "}
+        <a
+          href={`${cauHinh.explorerUrl.replace(/\/$/, "")}/tx/${it.tx_hash}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          (xem giao dịch)
+        </a>
+      </>
+    );
 
   return (
     <div className="bc-panel">
@@ -206,7 +241,21 @@ const BlockchainPanel = () => {
 
       {/* Liên kết ví */}
       <div className="bc-row">
-        {vi ? (
+        {thongBaoBangAlert ? (
+          <div>
+            <div className="bc-label">Trạng thái ví</div>
+            {vi && <div className="bc-mono">{vi.dia_chi_vi}</div>}
+            <div
+              className="bc-muted"
+              style={{
+                color: viDaKetNoi ? "#16a34a" : "#b45309",
+                fontWeight: 600,
+              }}
+            >
+              {viDaKetNoi ? "Ví đã kết nối" : "Chưa kết nối ví"}
+            </div>
+          </div>
+        ) : vi ? (
           <div>
             <div className="bc-label">Ví đã liên kết</div>
             <div className="bc-mono">{vi.dia_chi_vi}</div>
@@ -282,32 +331,29 @@ const BlockchainPanel = () => {
                           Lần ký trước: {it.loi_truoc}
                         </div>
                       )}
-                      {it.san_sang ? (
-                        <button
-                          type="button"
-                          className="bc-btn"
-                          onClick={() => ky(it)}
-                          disabled={Boolean(dangXuLy)}
-                        >
-                          {dangXuLy === it.ma_lich_su
-                            ? "Đang ký..."
-                            : "Ký lên blockchain"}
-                        </button>
+                      {it.san_sang || thongBaoBangAlert ? (
+                        <>
+                          <button
+                            type="button"
+                            className="bc-btn"
+                            style={it.san_sang ? undefined : { opacity: 0.5 }}
+                            onClick={() =>
+                              it.san_sang
+                                ? ky(it)
+                                : alert(it.ly_do || "Sự kiện này chưa ký được")
+                            }
+                            disabled={Boolean(dangXuLy)}
+                          >
+                            {dangXuLy === it.ma_lich_su
+                              ? "Đang ký..."
+                              : "Ký lên blockchain"}
+                          </button>
+                          {!it.san_sang && linkGiaoDich(it)}
+                        </>
                       ) : (
                         <span className="bc-muted">
                           {it.ly_do}
-                          {it.tx_hash && cauHinh?.explorerUrl && (
-                            <>
-                              {" "}
-                              <a
-                                href={`${cauHinh.explorerUrl.replace(/\/$/, "")}/tx/${it.tx_hash}`}
-                                target="_blank"
-                                rel="noreferrer"
-                              >
-                                (xem giao dịch)
-                              </a>
-                            </>
-                          )}
+                          {linkGiaoDich(it)}
                         </span>
                       )}
                     </td>

@@ -261,6 +261,14 @@
     margin-right: 0 !important;
   }
 
+  /* Bảng sự kiện chờ ký: cột cuối (nút "Ký lên blockchain") căn sang bên phải,
+     thẳng hàng với nút "Ký tất cả" phía trên. Chỉ áp dụng trong tab Ký blockchain. */
+  .blockchain-panel-full .bc-table th:last-child,
+  .blockchain-panel-full .bc-table td:last-child {
+    text-align: right;
+    padding-right: 0;
+  }
+
   /* ================= METRICS ROW ================= */
   .metrics-row {
     position: sticky;

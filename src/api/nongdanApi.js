@@ -181,6 +181,14 @@ const guiYeuCauKiemDinh = (maLo, form) =>
   });
 
 /* =========================================================
+   BLOCKCHAIN
+========================================================= */
+
+// Các sự kiện của người dùng đang chờ ký lên blockchain (kể cả sự kiện chưa sẵn sàng để ký)
+const fetchSuKienChoKy = () =>
+  request("/api/blockchain/cho-ky", { headers: authHeaders() });
+
+/* =========================================================
    VẬN CHUYỂN & BÀN GIAO
 ========================================================= */
 
@@ -231,6 +239,7 @@ export {
   xacNhanLayMau,
   fetchCoQuanKiemDinh,
   guiYeuCauKiemDinh,
+  fetchSuKienChoKy,
   fetchLenhVanChuyen,
   fetchTuyChonVanChuyen,
   taoLenhVanChuyen,

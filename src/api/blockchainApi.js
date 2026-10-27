@@ -71,7 +71,11 @@ export const baoDaGui = async (maLichSu, txHash) => {
   try {
     const res = await fetch(
       `${API_URL}/su-kien/${encodeURIComponent(maLichSu)}/da-gui`,
-      { method: "POST", headers: jsonHeaders(), body: JSON.stringify({ txHash }) },
+      {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({ txHash }),
+      },
     );
     return await parseJson(res);
   } catch (e) {
@@ -80,14 +84,43 @@ export const baoDaGui = async (maLichSu, txHash) => {
   }
 };
 
+// Chờ biên lai tối đa chừng này; quá hạn thì không treo nút ký nữa mà để worker tự xác nhận
+const THOI_GIAN_CHO_BIEN_LAI_MS = 90_000;
+
 // Ký một sự kiện bằng contract (đã gắn signer MetaMask): gửi -> báo đã gửi -> chờ vào khối -> báo xác nhận.
-// Trả "da-xac-nhan", hoặc "cho-xac-nhan" khi server chưa thấy giao dịch (worker sẽ tự xác nhận sau).
+// Trả "da-xac-nhan", hoặc "cho-xac-nhan" khi chưa xác nhận xong ngay (Outbox worker sẽ tự đối soát sau).
+// Lỗi ở bước gửi (từ chối trong MetaMask, hợp đồng từ chối lúc ước lượng gas...) nghĩa là chưa có giao dịch nào:
+// sự kiện vẫn chờ ký. Từ lúc MetaMask đã gửi, sự kiện chuyển sang "đã gửi" và chỉ quay lại hàng chờ khi
+// worker thấy giao dịch hỏng hoặc mất, nên lỗi mạng khi chờ biên lai không được coi là ký thất bại.
 export const guiVaXacNhanSuKien = async (contract, item) => {
   const tx = await contract[item.ham](...item.args);
-  await baoDaGui(item.ma_lich_su, tx.hash);
-  await tx.wait();
+  let txHash = tx.hash;
+  await baoDaGui(item.ma_lich_su, txHash);
+
   try {
-    await xacNhanSuKien(item.ma_lich_su, tx.hash);
+    await tx.wait(1, THOI_GIAN_CHO_BIEN_LAI_MS);
+  } catch (e) {
+    if (e?.code === "TRANSACTION_REPLACED") {
+      // Tăng tốc (đổi mã giao dịch) vẫn thành công; hủy trong MetaMask thì phải ký lại
+      if (e.reason === "cancelled" || e.receipt?.status !== 1) {
+        throw new Error(
+          "Giao dịch đã bị hủy trong MetaMask. Sự kiện sẽ quay lại danh sách chờ ký sau ít phút, khi đó bạn ký lại",
+        );
+      }
+      txHash = e.replacement.hash;
+      await baoDaGui(item.ma_lich_su, txHash);
+    } else if (e?.code === "CALL_EXCEPTION" || e?.receipt?.status === 0) {
+      throw new Error(
+        "Hợp đồng từ chối giao dịch này. Hệ thống sẽ đưa sự kiện về danh sách chờ ký trong vài giây, khi đó bạn ký lại",
+      );
+    } else {
+      // Mất kết nối / nút RPC chậm: giao dịch đã gửi, worker sẽ tự xác nhận
+      return "cho-xac-nhan";
+    }
+  }
+
+  try {
+    await xacNhanSuKien(item.ma_lich_su, txHash);
     return "da-xac-nhan";
   } catch (e) {
     if (/Chưa thấy giao dịch/.test(e.message)) return "cho-xac-nhan";
@@ -111,13 +144,17 @@ export const xacNhanSuKien = async (maLichSu, txHash) => {
 // Danh sách ví (trangThai: CHO_DUYET | DA_DUYET | TU_CHOI, bỏ trống = tất cả) + ví admin của hợp đồng
 export const fetchDanhSachVi = async (trangThai = "") => {
   const q = trangThai ? `?trang_thai=${encodeURIComponent(trangThai)}` : "";
-  const res = await fetch(`${API_URL}/admin/vi${q}`, { headers: authHeaders() });
+  const res = await fetch(`${API_URL}/admin/vi${q}`, {
+    headers: authHeaders(),
+  });
   return (await parseJson(res)).data;
 };
 
 // Bộ ngưỡng kiểm định trên blockchain (admin ký setThreshold)
 export const fetchNguong = async () => {
-  const res = await fetch(`${API_URL}/admin/nguong`, { headers: authHeaders() });
+  const res = await fetch(`${API_URL}/admin/nguong`, {
+    headers: authHeaders(),
+  });
   return (await parseJson(res)).data;
 };
 
@@ -132,23 +169,33 @@ export const xacNhanNguong = async (maBam, txHash) => {
 
 // Hàng chờ ghi blockchain (Outbox) và worker đối soát
 export const fetchOutbox = async () => {
-  const res = await fetch(`${API_URL}/admin/outbox`, { headers: authHeaders() });
+  const res = await fetch(`${API_URL}/admin/outbox`, {
+    headers: authHeaders(),
+  });
   return (await parseJson(res)).data;
 };
 
 export const chayOutboxNgay = async () => {
-  const res = await fetch(`${API_URL}/admin/outbox/chay`, { method: "POST", headers: jsonHeaders() });
+  const res = await fetch(`${API_URL}/admin/outbox/chay`, {
+    method: "POST",
+    headers: jsonHeaders(),
+  });
   return parseJson(res);
 };
 
 // Đối soát toàn bộ lô với blockchain (tab "Nhật ký & toàn vẹn" của admin)
 export const fetchDoiSoat = async () => {
-  const res = await fetch(`${API_URL}/admin/doi-soat`, { headers: authHeaders() });
+  const res = await fetch(`${API_URL}/admin/doi-soat`, {
+    headers: authHeaders(),
+  });
   return (await parseJson(res)).data;
 };
 
 export const chayDoiSoat = async () => {
-  const res = await fetch(`${API_URL}/admin/doi-soat/chay`, { method: "POST", headers: jsonHeaders() });
+  const res = await fetch(`${API_URL}/admin/doi-soat/chay`, {
+    method: "POST",
+    headers: jsonHeaders(),
+  });
   return parseJson(res);
 };
 
@@ -252,7 +299,6 @@ export const kyCacSuKienDangCho = async () => {
   }
   const contract = new Contract(cauHinh.contractAddress, cauHinh.abi, signer);
 
-  // Sự kiện kế tiếp có thể sẵn sàng sau khi ký xong sự kiện trước: ký lần lượt đến khi hết
   let soDaKy = 0;
   for (let vong = 0; vong < 30 && dsSanSang.length > 0; vong++) {
     for (const item of dsSanSang) {

@@ -1314,4 +1314,38 @@
     opacity: 0.55;
     cursor: not-allowed;
   }
+
+  /* ================= TAB KÝ BLOCKCHAIN (FULL WIDTH & CĂN ĐỀU, GIỐNG TRANG NÔNG DÂN) ================= */
+  .blockchain-tab-wrapper {
+    width: 100%;
+    max-width: 100%;
+    padding-top: 24px;
+    margin: 0 auto;
+  }
+
+  .blockchain-tab-desc {
+    font-size: 14px;
+    color: #4b5563;
+    margin: 0 0 16px;
+    line-height: 1.5;
+  }
+
+  .blockchain-panel-full {
+    width: 100%;
+  }
+
+  .blockchain-panel-full > * {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* Bảng sự kiện chờ ký: cột cuối (nút "Ký lên blockchain") căn sang bên phải,
+     thẳng hàng với nút "Ký tất cả" phía trên. Chỉ áp dụng trong tab Ký blockchain. */
+  .blockchain-panel-full .bc-table th:last-child,
+  .blockchain-panel-full .bc-table td:last-child {
+    text-align: right;
+    padding-right: 0;
+  }
 }

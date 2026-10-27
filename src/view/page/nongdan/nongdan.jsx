@@ -41,6 +41,7 @@ import {
   xacNhanLayMau,
   fetchCoQuanKiemDinh,
   guiYeuCauKiemDinh,
+  fetchSuKienChoKy,
   fetchLenhVanChuyen,
   fetchTuyChonVanChuyen,
   taoLenhVanChuyen,
@@ -1295,6 +1296,21 @@ const DashboardPage = () => {
     setSavingInspection(true);
 
     try {
+      // Lô còn sự kiện chờ ký (chưa lên blockchain) thì chưa được gửi yêu cầu kiểm định
+      const choKy = await fetchSuKienChoKy();
+      const chuaKy =
+        choKy.ok &&
+        (choKy.data.data?.su_kien || []).some(
+          (suKien) => suKien.ma_lo === inspectionBatch.ma_lo_nong_san,
+        );
+
+      if (chuaKy) {
+        alert(
+          `Lô ${inspectionBatch.ma_lo_nong_san} chưa được ký lên blockchain.\nHãy vào tab "Ký blockchain", ký các sự kiện đang chờ của lô này rồi mới gửi yêu cầu kiểm định.`,
+        );
+        return;
+      }
+
       const { ok, data } = await guiYeuCauKiemDinh(
         inspectionBatch.ma_lo_nong_san,
         inspectionForm,
@@ -2086,9 +2102,9 @@ const DashboardPage = () => {
                   <thead>
                     <tr>
                       <th className="col-code">Mã mùa vụ</th>
+                      <th>Mã lô</th>
                       <th>Tên nông trại</th>
                       <th>Mùa vụ</th>
-                      <th>Thửa đất</th>
                       <th>Sản lượng</th>
                       <th>Ngày thu hoạch</th>
                       <th>Thao tác</th>
@@ -2119,10 +2135,14 @@ const DashboardPage = () => {
                             {batch.ma_mua_vu || "—"}
                           </td>
                           <td>
+                            <span className="batch-code-badge">
+                              {batch.ma_lo_nong_san}
+                            </span>
+                          </td>
+                          <td>
                             {batch.ten_nong_trai || batch.ma_nong_trai || "—"}
                           </td>
                           <td>{batch.loai_cay_trong || "—"}</td>
-                          <td>{batch.ten_thua_dat || "—"}</td>
                           <td>
                             {formatQuantity(
                               batch.so_luong_hien_tai,

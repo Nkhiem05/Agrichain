@@ -236,9 +236,6 @@ const ChiTietKiemDinh = () => {
   return (
     <div className="chitietkiemdinh">
       <div className="detail-layout">
-        {/* 1. HEADER */}
-        <DashboardHeader />
-
         {/* 2. NỘI DUNG CHI TIẾT */}
         <div className="detail-content-area">
           <div className="detail-container">

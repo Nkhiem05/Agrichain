@@ -58,18 +58,40 @@ const normalizeStatus = (s) =>
 const BadgeChuLoXacNhan = ({ item }) =>
   item.chu_lo_da_xac_nhan ? (
     <span
-      style={{ fontSize: 12.5, fontWeight: 600, color: "#047857", background: "#ecfdf5", border: "1px solid #a7f3d0", borderRadius: 999, padding: "3px 10px", marginLeft: 8 }}
+      style={{
+        fontSize: 12.5,
+        fontWeight: 600,
+        color: "#047857",
+        background: "#ecfdf5",
+        border: "1px solid #a7f3d0",
+        borderRadius: 999,
+        padding: "3px 10px",
+        marginLeft: 8,
+      }}
     >
       Chủ lô đã xác nhận biên bản lấy mẫu
     </span>
   ) : (
     <span
-      style={{ fontSize: 12.5, fontWeight: 600, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 999, padding: "3px 10px", marginLeft: 8 }}
+      style={{
+        fontSize: 12.5,
+        fontWeight: 600,
+        color: "#b45309",
+        background: "#fffbeb",
+        border: "1px solid #fde68a",
+        borderRadius: 999,
+        padding: "3px 10px",
+        marginLeft: 8,
+      }}
       title="Chủ lô xác nhận ở trang Nông dân → Lịch hẹn kiểm định. Có bước này mới công bố được kết quả."
     >
       Chờ chủ lô xác nhận biên bản lấy mẫu
     </span>
   );
+
+// Nút công bố vẫn bấm được khi chủ lô chưa xác nhận biên bản lấy mẫu: bấm thì báo bằng alert
+const CANH_BAO_CHU_LO_CHUA_XAC_NHAN =
+  'Nông dân (chủ lô) chưa xác nhận lấy mẫu.\nNông dân cần vào trang Nông dân → "Lịch hẹn kiểm định" để xác nhận biên bản lấy mẫu, sau đó bạn mới công bố được kết quả.';
 
 const SCHEDULED_STATUSES = ["DA_HEN_LICH", "DA_HEN"];
 const PENDING_SAMPLE_STATUSES = [
@@ -153,7 +175,14 @@ function Coquankiemdinh() {
   const savedUser = localStorage.getItem("user");
   const user = savedUser ? JSON.parse(savedUser) : null;
   const navigate = useNavigate();
-  const [currentTab, setCurrentTab] = usePersistentTab("kiemdinh", "requests", ["requests","sampling","results","violations","inspectors","blockchain"]);
+  const [currentTab, setCurrentTab] = usePersistentTab("kiemdinh", "requests", [
+    "requests",
+    "sampling",
+    "results",
+    "violations",
+    "inspectors",
+    "blockchain",
+  ]);
 
   const [samplingFilterStatus, setSamplingFilterStatus] = useState("ALL");
 
@@ -377,7 +406,9 @@ function Coquankiemdinh() {
         const valMap = {};
         standards.forEach((std) => {
           // ma_chi_so là mã nhóm (vd KIM_LOAI_NANG, VI_SINH) dùng chung nhiều chất, nên chỉ khớp theo tên chất
-          const found = saved.find((s) => s.ten_chi_so === std.ten_chi_tiet_chat);
+          const found = saved.find(
+            (s) => s.ten_chi_so === std.ten_chi_tiet_chat,
+          );
           valMap[std.ma_nguong] = found ? found.gia_tri : "";
         });
 
@@ -1284,7 +1315,6 @@ function Coquankiemdinh() {
                               {allPassed && (
                                 <button
                                   type="button"
-                                  disabled={!item.chu_lo_da_xac_nhan}
                                   title={
                                     item.chu_lo_da_xac_nhan
                                       ? undefined
@@ -1293,10 +1323,14 @@ function Coquankiemdinh() {
                                   style={
                                     item.chu_lo_da_xac_nhan
                                       ? undefined
-                                      : { opacity: 0.5, cursor: "not-allowed" }
+                                      : { opacity: 0.5 }
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    if (!item.chu_lo_da_xac_nhan) {
+                                      alert(CANH_BAO_CHU_LO_CHUA_XAC_NHAN);
+                                      return;
+                                    }
                                     handleOpenConfirmPublishModal(item);
                                   }}
                                   className="btn-action-publish"
@@ -1311,7 +1345,6 @@ function Coquankiemdinh() {
                                 (item.danh_sach_chi_so || []).length > 0 && (
                                   <button
                                     type="button"
-                                    disabled={!item.chu_lo_da_xac_nhan}
                                     title={
                                       item.chu_lo_da_xac_nhan
                                         ? undefined
@@ -1320,10 +1353,14 @@ function Coquankiemdinh() {
                                     style={
                                       item.chu_lo_da_xac_nhan
                                         ? undefined
-                                        : { opacity: 0.5, cursor: "not-allowed" }
+                                        : { opacity: 0.5 }
                                     }
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      if (!item.chu_lo_da_xac_nhan) {
+                                        alert(CANH_BAO_CHU_LO_CHUA_XAC_NHAN);
+                                        return;
+                                      }
                                       handleOpenFailModal(item);
                                     }}
                                     className="btn-action-revoke"
@@ -1431,8 +1468,8 @@ function Coquankiemdinh() {
                   <h2>Danh Sách Lô Hàng Đã Có Kết Luận Kiểm Định</h2>
                   <p>
                     Lô đạt chuẩn được cấp số chứng nhận và chứng thư; lô không
-                    đạt được lưu kết luận để nông dân và người tiêu dùng tra
-                    cứu qua mã QR.
+                    đạt được lưu kết luận để nông dân và người tiêu dùng tra cứu
+                    qua mã QR.
                   </p>
                 </div>
 
@@ -1453,114 +1490,114 @@ function Coquankiemdinh() {
                     publishedList.map((item) => {
                       const isPassed = item.ket_luan !== "FAILED";
                       return (
-                      <div
-                        className="item-card"
-                        key={item.ma_kiem_dinh}
-                        style={{ cursor: "pointer" }}
-                        onClick={() => {
-                          handleXemChiTietKiemDinh(item.ma_kiem_dinh);
-                        }}
-                      >
-                        <div className="card-left-group">
-                          <div
-                            className={`card-icon-bubble ${
-                              isPassed ? "icon-emerald" : "icon-rose"
-                            }`}
-                          >
-                            {isPassed ? (
-                              <BadgeCheck size={32} />
-                            ) : (
-                              <XCircle size={32} />
-                            )}
-                          </div>
-
-                          <div className="card-content-stack">
-                            <div className="card-header-line">
-                              <h3 className="card-title">
-                                {item.ten_san_pham}{" "}
-                                {isPassed ? "Đạt Chuẩn" : "Không Đạt Chuẩn"}{" "}
-                                {item.tieu_chuan_dang_ky}
-                              </h3>
+                        <div
+                          className="item-card"
+                          key={item.ma_kiem_dinh}
+                          style={{ cursor: "pointer" }}
+                          onClick={() => {
+                            handleXemChiTietKiemDinh(item.ma_kiem_dinh);
+                          }}
+                        >
+                          <div className="card-left-group">
+                            <div
+                              className={`card-icon-bubble ${
+                                isPassed ? "icon-emerald" : "icon-rose"
+                              }`}
+                            >
                               {isPassed ? (
-                                <span className="pill-cert-pass">
-                                  ĐẠT CHUẨN
-                                </span>
+                                <BadgeCheck size={32} />
                               ) : (
-                                <span className="pill-cert-fail">
-                                  KHÔNG ĐẠT
-                                </span>
-                              )}
-                              {isPassed && (
-                                <span className="pill-blue-cert">
-                                  Số CN: {item.so_chung_nhan || "Chưa cấp"}
-                                </span>
+                                <XCircle size={32} />
                               )}
                             </div>
 
-                            <div className="card-meta-wrap">
-                              <p>
-                                Lô được cấp:{" "}
-                                <span className="text-meta-green">
-                                  #{item.ma_lo_nong_san}
-                                </span>
-                              </p>
-                              <p>
-                                Nông trại:{" "}
-                                <span className="text-meta-regular">
-                                  {item.ten_nong_trai || "Chưa rõ"}
-                                </span>
-                              </p>
-                              <p>
-                                Chủ vườn:{" "}
-                                <span className="text-meta-regular">
-                                  {item.ten_chu_vuon || "N/A"}
-                                </span>
-                              </p>
-                              <p>
-                                Ngày công bố:{" "}
-                                <span className="text-meta-regular">
-                                  {new Date(
-                                    item.ngay_cong_bo || item.ngay_nop_don,
-                                  ).toLocaleDateString("vi-VN")}
-                                </span>
-                              </p>
-                              {isPassed && item.hieu_luc_tu && (
+                            <div className="card-content-stack">
+                              <div className="card-header-line">
+                                <h3 className="card-title">
+                                  {item.ten_san_pham}{" "}
+                                  {isPassed ? "Đạt Chuẩn" : "Không Đạt Chuẩn"}{" "}
+                                  {item.tieu_chuan_dang_ky}
+                                </h3>
+                                {isPassed ? (
+                                  <span className="pill-cert-pass">
+                                    ĐẠT CHUẨN
+                                  </span>
+                                ) : (
+                                  <span className="pill-cert-fail">
+                                    KHÔNG ĐẠT
+                                  </span>
+                                )}
+                                {isPassed && (
+                                  <span className="pill-blue-cert">
+                                    Số CN: {item.so_chung_nhan || "Chưa cấp"}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="card-meta-wrap">
                                 <p>
-                                  Hiệu lực:{" "}
-                                  <span className="text-meta-regular">
-                                    {item.hieu_luc_tu
-                                      .split("-")
-                                      .reverse()
-                                      .join("/")}
-                                    {item.hieu_luc_den
-                                      ? ` - ${item.hieu_luc_den
-                                          .split("-")
-                                          .reverse()
-                                          .join("/")}`
-                                      : ""}
+                                  Lô được cấp:{" "}
+                                  <span className="text-meta-green">
+                                    #{item.ma_lo_nong_san}
                                   </span>
                                 </p>
-                              )}
+                                <p>
+                                  Nông trại:{" "}
+                                  <span className="text-meta-regular">
+                                    {item.ten_nong_trai || "Chưa rõ"}
+                                  </span>
+                                </p>
+                                <p>
+                                  Chủ vườn:{" "}
+                                  <span className="text-meta-regular">
+                                    {item.ten_chu_vuon || "N/A"}
+                                  </span>
+                                </p>
+                                <p>
+                                  Ngày công bố:{" "}
+                                  <span className="text-meta-regular">
+                                    {new Date(
+                                      item.ngay_cong_bo || item.ngay_nop_don,
+                                    ).toLocaleDateString("vi-VN")}
+                                  </span>
+                                </p>
+                                {isPassed && item.hieu_luc_tu && (
+                                  <p>
+                                    Hiệu lực:{" "}
+                                    <span className="text-meta-regular">
+                                      {item.hieu_luc_tu
+                                        .split("-")
+                                        .reverse()
+                                        .join("/")}
+                                      {item.hieu_luc_den
+                                        ? ` - ${item.hieu_luc_den
+                                            .split("-")
+                                            .reverse()
+                                            .join("/")}`
+                                        : ""}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="card-actions-row">
-                          {isPassed && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                exportInspectionCertificateWord(item);
-                              }}
-                              className="btn-light"
-                            >
-                              <Download size={16} />
-                              <span>Tải Chứng Thư</span>
-                            </button>
-                          )}
+                          <div className="card-actions-row">
+                            {isPassed && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  exportInspectionCertificateWord(item);
+                                }}
+                                className="btn-light"
+                              >
+                                <Download size={16} />
+                                <span>Tải Chứng Thư</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
-                      </div>
                       );
                     })}
                 </div>
@@ -1647,17 +1684,24 @@ function Coquankiemdinh() {
                 </div>
               </main>
             )}
-            {/* TAB 5: KIỂM ĐỊNH VIÊN */}
+            {/* TAB KÝ BLOCKCHAIN */}
             {currentTab === "blockchain" && (
-              <div style={{ maxWidth: 980, paddingTop: 24 }}>
-                <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
-                  Mỗi bước kiểm định (niêm phong mẫu, công bố Đạt / Không đạt, thu hồi) cần cơ
-                  quan ký bằng ví MetaMask để ghi lên blockchain. Các bước của một lô phải ký theo
-                  thứ tự, nên có bước sẽ chờ chủ lô ký trước.
-                </p>
-                <BlockchainPanel />
-              </div>
+              <main className="view-panel">
+                <div className="blockchain-tab-wrapper">
+                  <p className="blockchain-tab-desc">
+                    Mỗi bước kiểm định (niêm phong mẫu, công bố Đạt / Không đạt,
+                    thu hồi) cần cơ quan ký bằng ví MetaMask để ghi lên
+                    blockchain. Các bước của một lô phải ký theo thứ tự, nên có
+                    bước sẽ chờ chủ lô ký trước.
+                  </p>
+                  <div className="blockchain-panel-full">
+                    <BlockchainPanel thongBaoBangAlert />
+                  </div>
+                </div>
+              </main>
             )}
+
+            {/* TAB 5: KIỂM ĐỊNH VIÊN */}
 
             {currentTab === "inspectors" && (
               <main className="view-panel">
@@ -1764,9 +1808,7 @@ function Coquankiemdinh() {
                         <button
                           type="button"
                           className={
-                            item.trang_thai === 1
-                              ? "btn-reject"
-                              : "btn-primary"
+                            item.trang_thai === 1 ? "btn-reject" : "btn-primary"
                           }
                           onClick={() => handleToggleInspector(item)}
                         >
@@ -2109,7 +2151,9 @@ function Coquankiemdinh() {
                         visualCondition,
                       );
                       if (!ketQua) {
-                        alert("Vui lòng nhập đầy đủ thông tin biên bản lấy mẫu");
+                        alert(
+                          "Vui lòng nhập đầy đủ thông tin biên bản lấy mẫu",
+                        );
                         return;
                       }
                       if (!ketQua.status) {
