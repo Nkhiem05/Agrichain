@@ -7,7 +7,10 @@ const {
   xoaSuKienChuaKy,
   chuaCoViDuyet,
 } = require("../services/blockchain/hook");
-const { layCauHinh } = require("../services/blockchain/chainClient");
+const {
+  layCauHinh,
+  timMaLoChuaCoTrenChain,
+} = require("../services/blockchain/chainClient");
 
 /*
 ==================================================
@@ -41,7 +44,9 @@ const toPositiveNumber = (value) => {
 // Trả về { status, message } cho lỗi nghiệp vụ, còn lại là lỗi 500
 const sendError = (res, err, logMessage, fallbackMessage) => {
   if (err instanceof ApiError) {
-    return res.status(err.status).json({ success: false, message: err.message });
+    return res
+      .status(err.status)
+      .json({ success: false, message: err.message });
   }
 
   if (err.code === "ER_NO_SUCH_TABLE") {
@@ -83,14 +88,23 @@ const getProcessorId = (req) => {
   }
 
   if (user.vai_tro !== "PROCESSOR") {
-    throw new ApiError(403, "Chỉ cơ sở sơ chế / đóng gói mới được dùng chức năng này");
+    throw new ApiError(
+      403,
+      "Chỉ cơ sở sơ chế / đóng gói mới được dùng chức năng này",
+    );
   }
 
   return user.ma_nguoi_dung;
 };
 
 // Mã dạng PREFIXnnn, tự tăng dần, không trùng với mã đã có
-const generateCode = async (connection, table, column, prefix, padLength = 3) => {
+const generateCode = async (
+  connection,
+  table,
+  column,
+  prefix,
+  padLength = 3,
+) => {
   const [rows] = await connection.query(
     `
     SELECT COALESCE(MAX(CAST(SUBSTRING(${column}, ?) AS UNSIGNED)), 0) AS max_no
@@ -207,7 +221,10 @@ const confirmReceive = async (req, res) => {
       }
 
       if (!TRANG_THAI_CO_THE_XU_LY.includes(rows[0].trang_thai)) {
-        throw new ApiError(409, "Lệnh vận chuyển không ở trạng thái có thể tiếp nhận");
+        throw new ApiError(
+          409,
+          "Lệnh vận chuyển không ở trạng thái có thể tiếp nhận",
+        );
       }
 
       // Không nhận nhiều hơn khối lượng lô gửi đi (hợp đồng cũng chặn: hao hụt chỉ được giảm)
@@ -239,7 +256,12 @@ const confirmReceive = async (req, res) => {
 
     return res.json({ success: true, message: "Đã tiếp nhận lô hàng vào kho" });
   } catch (err) {
-    return sendError(res, err, "Lỗi xác nhận tiếp nhận lô:", "Không thể xác nhận tiếp nhận");
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận tiếp nhận lô:",
+      "Không thể xác nhận tiếp nhận",
+    );
   }
 };
 
@@ -274,7 +296,10 @@ const rejectReceive = async (req, res) => {
       }
 
       if (!TRANG_THAI_CO_THE_XU_LY.includes(rows[0].trang_thai)) {
-        throw new ApiError(409, "Lệnh vận chuyển không ở trạng thái có thể từ chối");
+        throw new ApiError(
+          409,
+          "Lệnh vận chuyển không ở trạng thái có thể từ chối",
+        );
       }
 
       await connection.execute(
@@ -287,7 +312,12 @@ const rejectReceive = async (req, res) => {
 
     return res.json({ success: true, message: "Đã từ chối tiếp nhận lô hàng" });
   } catch (err) {
-    return sendError(res, err, "Lỗi từ chối tiếp nhận lô:", "Không thể từ chối tiếp nhận");
+    return sendError(
+      res,
+      err,
+      "Lỗi từ chối tiếp nhận lô:",
+      "Không thể từ chối tiếp nhận",
+    );
   }
 };
 
@@ -384,9 +414,11 @@ const createProcessingBatch = async (req, res) => {
     const quy_cach_tieu_chuan = cleanText(req.body?.quy_cach_tieu_chuan);
     const khoiLuongDauVao = toPositiveNumber(req.body?.khoi_luong_dau_vao);
 
-    if (!ma_lo_nguon) throw new ApiError(400, "Vui lòng chọn lô thu hoạch tiếp nhận");
+    if (!ma_lo_nguon)
+      throw new ApiError(400, "Vui lòng chọn lô thu hoạch tiếp nhận");
     if (!tieu_de) throw new ApiError(400, "Vui lòng nhập tên gọi lô sơ chế");
-    if (!khoiLuongDauVao) throw new ApiError(400, "Khối lượng đưa vào phải lớn hơn 0");
+    if (!khoiLuongDauVao)
+      throw new ApiError(400, "Khối lượng đưa vào phải lớn hơn 0");
 
     let maSoChe;
 
@@ -405,7 +437,10 @@ const createProcessingBatch = async (req, res) => {
           );
 
           if (lots.length === 0) {
-            throw new ApiError(404, "Không tìm thấy lô nguồn thuộc cơ sở của bạn");
+            throw new ApiError(
+              404,
+              "Không tìm thấy lô nguồn thuộc cơ sở của bạn",
+            );
           }
 
           const lot = lots[0];
@@ -416,7 +451,10 @@ const createProcessingBatch = async (req, res) => {
 
           const lenhNguon = await lenhDangChayCuaLo(connection, ma_lo_nguon);
           if (lenhNguon) {
-            throw new ApiError(409, `Lô nguồn đang có lệnh bàn giao ${lenhNguon}, chưa sơ chế được`);
+            throw new ApiError(
+              409,
+              `Lô nguồn đang có lệnh bàn giao ${lenhNguon}, chưa sơ chế được`,
+            );
           }
 
           if (khoiLuongDauVao > Number(lot.so_luong_hien_tai)) {
@@ -426,7 +464,14 @@ const createProcessingBatch = async (req, res) => {
             );
           }
 
-          const newMaLo = await generateCode(connection, "lo_nong_san", "ma_lo_nong_san", "LO");
+          const newMaLo = await timMaLoChuaCoTrenChain(
+            await generateCode(
+              connection,
+              "lo_nong_san",
+              "ma_lo_nong_san",
+              "LO",
+            ),
+          );
 
           await connection.execute(
             `
@@ -434,10 +479,20 @@ const createProcessingBatch = async (req, res) => {
             (ma_lo_nong_san, ma_mua_vu, ma_san_pham, ma_nguoi_quan_ly, so_luong_hien_tai, don_vi_tinh, giai_doan_hien_tai)
             VALUES (?, ?, ?, ?, ?, ?, 'PROCESSED')
             `,
-            [newMaLo, lot.ma_mua_vu, lot.ma_san_pham, maCoSo, khoiLuongDauVao, lot.don_vi_tinh],
+            [
+              newMaLo,
+              lot.ma_mua_vu,
+              lot.ma_san_pham,
+              maCoSo,
+              khoiLuongDauVao,
+              lot.don_vi_tinh,
+            ],
           );
 
-          const conLai = Math.round((Number(lot.so_luong_hien_tai) - khoiLuongDauVao) * 1000) / 1000;
+          const conLai =
+            Math.round(
+              (Number(lot.so_luong_hien_tai) - khoiLuongDauVao) * 1000,
+            ) / 1000;
 
           await connection.execute(
             `
@@ -449,7 +504,12 @@ const createProcessingBatch = async (req, res) => {
             [conLai, conLai, ma_lo_nguon],
           );
 
-          const maLienKet = await generateCode(connection, "lien_ket_nguon_goc_lo", "ma_lien_ket", "LK");
+          const maLienKet = await generateCode(
+            connection,
+            "lien_ket_nguon_goc_lo",
+            "ma_lien_ket",
+            "LK",
+          );
           const relationGroupId = await generateCode(
             connection,
             "lien_ket_nguon_goc_lo",
@@ -463,10 +523,22 @@ const createProcessingBatch = async (req, res) => {
             (ma_lien_ket, relation_group_id, ma_lo_nguon, ma_lo_duoc_tao_ra, loai_lien_ket, so_luong_tham_gia, don_vi_tinh)
             VALUES (?, ?, ?, ?, 'TRANSFORM', ?, ?)
             `,
-            [maLienKet, relationGroupId, ma_lo_nguon, newMaLo, khoiLuongDauVao, lot.don_vi_tinh],
+            [
+              maLienKet,
+              relationGroupId,
+              ma_lo_nguon,
+              newMaLo,
+              khoiLuongDauVao,
+              lot.don_vi_tinh,
+            ],
           );
 
-          const newMaSoChe = await generateCode(connection, "so_che_lo_hang", "ma_so_che", "SC");
+          const newMaSoChe = await generateCode(
+            connection,
+            "so_che_lo_hang",
+            "ma_so_che",
+            "SC",
+          );
 
           await connection.execute(
             `
@@ -474,7 +546,14 @@ const createProcessingBatch = async (req, res) => {
             (ma_so_che, ma_co_so, ma_lo_moi, tieu_de, khu_vuc_so_che, quy_cach_tieu_chuan, ngay_bat_dau)
             VALUES (?, ?, ?, ?, ?, ?, CURDATE())
             `,
-            [newMaSoChe, maCoSo, newMaLo, tieu_de, khu_vuc_so_che, quy_cach_tieu_chuan],
+            [
+              newMaSoChe,
+              maCoSo,
+              newMaLo,
+              tieu_de,
+              khu_vuc_so_che,
+              quy_cach_tieu_chuan,
+            ],
           );
 
           // Blockchain: cơ sở ký tạo lô sơ chế từ lô nguồn (createChild, trừ khối lượng lô nguồn trên chain)
@@ -500,7 +579,12 @@ const createProcessingBatch = async (req, res) => {
   }
 };
 
-const GIAI_DOAN_SO_CHE_HOP_LE = ["DANG_RUA_KHU_KHUAN", "DANG_PHAN_LOAI", "DANG_DONG_GOI", "DA_HOAN_TAT"];
+const GIAI_DOAN_SO_CHE_HOP_LE = [
+  "DANG_RUA_KHU_KHUAN",
+  "DANG_PHAN_LOAI",
+  "DANG_DONG_GOI",
+  "DA_HOAN_TAT",
+];
 
 const updateProcessingStage = async (req, res) => {
   const { maSoChe } = req.params;
@@ -525,7 +609,10 @@ const updateProcessingStage = async (req, res) => {
 
       const lenh = await lenhDangChayCuaLo(connection, rows[0].ma_lo_moi);
       if (lenh) {
-        throw new ApiError(409, `Lô đã có lệnh bàn giao ${lenh}, không đổi giai đoạn sơ chế được nữa`);
+        throw new ApiError(
+          409,
+          `Lô đã có lệnh bàn giao ${lenh}, không đổi giai đoạn sơ chế được nữa`,
+        );
       }
 
       await connection.execute(
@@ -549,9 +636,17 @@ const updateProcessingStage = async (req, res) => {
       await ghiSuKienGiaiDoanSoChe(connection, maSoChe, giaiDoan);
     });
 
-    return res.json({ success: true, message: "Đã cập nhật trạng thái sơ chế" });
+    return res.json({
+      success: true,
+      message: "Đã cập nhật trạng thái sơ chế",
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi cập nhật trạng thái sơ chế:", "Không thể cập nhật trạng thái");
+    return sendError(
+      res,
+      err,
+      "Lỗi cập nhật trạng thái sơ chế:",
+      "Không thể cập nhật trạng thái",
+    );
   }
 };
 
@@ -600,7 +695,10 @@ const updateProcessingBatch = async (req, res) => {
 
       // Lô đã bị tách/gộp/hủy thì thông tin gốc đã nằm trong truy vết, không sửa nữa
       if (rows[0].tinh_trang_su_dung !== "ACTIVE") {
-        throw new ApiError(409, "Lô đã được tách/gộp hoặc không còn khả dụng, không thể sửa thông tin");
+        throw new ApiError(
+          409,
+          "Lô đã được tách/gộp hoặc không còn khả dụng, không thể sửa thông tin",
+        );
       }
 
       // Đã bàn giao vận chuyển thì các bên khác đã nhìn thấy thông tin này
@@ -610,7 +708,10 @@ const updateProcessingBatch = async (req, res) => {
       );
 
       if (shipped.length > 0) {
-        throw new ApiError(409, "Lô đã có lệnh bàn giao vận chuyển, không thể sửa thông tin");
+        throw new ApiError(
+          409,
+          "Lô đã có lệnh bàn giao vận chuyển, không thể sửa thông tin",
+        );
       }
 
       await connection.execute(
@@ -623,9 +724,17 @@ const updateProcessingBatch = async (req, res) => {
       );
     });
 
-    return res.json({ success: true, message: "Đã cập nhật thông tin lô sơ chế" });
+    return res.json({
+      success: true,
+      message: "Đã cập nhật thông tin lô sơ chế",
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi sửa thông tin lô sơ chế:", "Không thể sửa thông tin lô sơ chế");
+    return sendError(
+      res,
+      err,
+      "Lỗi sửa thông tin lô sơ chế:",
+      "Không thể sửa thông tin lô sơ chế",
+    );
   }
 };
 
@@ -653,12 +762,18 @@ const deleteProcessingBatch = async (req, res) => {
       );
 
       if (shipped.length > 0) {
-        throw new ApiError(409, "Lô đã có lệnh bàn giao vận chuyển, không thể xóa");
+        throw new ApiError(
+          409,
+          "Lô đã có lệnh bàn giao vận chuyển, không thể xóa",
+        );
       }
 
       // Đã gửi / ký lên blockchain thì không xóa (trên chain lô sơ chế đã tồn tại và đã trừ khối lượng lô nguồn)
       if (!(await xoaSuKienChuaKy(connection, maLoMoi))) {
-        throw new ApiError(409, "Lô sơ chế đã được ký lên blockchain, không thể xóa");
+        throw new ApiError(
+          409,
+          "Lô sơ chế đã được ký lên blockchain, không thể xóa",
+        );
       }
 
       const [nguon] = await connection.execute(
@@ -666,9 +781,18 @@ const deleteProcessingBatch = async (req, res) => {
         [maLoMoi],
       );
 
-      await connection.execute(`DELETE FROM so_che_lo_hang WHERE ma_so_che = ?`, [maSoChe]);
-      await connection.execute(`DELETE FROM lien_ket_nguon_goc_lo WHERE ma_lo_duoc_tao_ra = ?`, [maLoMoi]);
-      await connection.execute(`DELETE FROM lo_nong_san WHERE ma_lo_nong_san = ?`, [maLoMoi]);
+      await connection.execute(
+        `DELETE FROM so_che_lo_hang WHERE ma_so_che = ?`,
+        [maSoChe],
+      );
+      await connection.execute(
+        `DELETE FROM lien_ket_nguon_goc_lo WHERE ma_lo_duoc_tao_ra = ?`,
+        [maLoMoi],
+      );
+      await connection.execute(
+        `DELETE FROM lo_nong_san WHERE ma_lo_nong_san = ?`,
+        [maLoMoi],
+      );
 
       // Hoàn lại khối lượng cho lô nguồn (TRANSFORM luôn có đúng 1 nguồn)
       if (nguon.length > 0) {
@@ -714,7 +838,12 @@ const getSplitMergeLots = async (req, res) => {
 
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy danh sách lô khả dụng:", "Không thể lấy danh sách lô");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách lô khả dụng:",
+      "Không thể lấy danh sách lô",
+    );
   }
 };
 
@@ -756,7 +885,12 @@ const getSplitMergeLog = async (req, res) => {
 
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy nhật ký tách/gộp lô:", "Không thể lấy nhật ký tách/gộp lô");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy nhật ký tách/gộp lô:",
+      "Không thể lấy nhật ký tách/gộp lô",
+    );
   }
 };
 
@@ -768,7 +902,8 @@ const splitBatch = async (req, res) => {
     const children = Array.isArray(req.body?.children) ? req.body.children : [];
 
     if (!ma_lo_goc) throw new ApiError(400, "Vui lòng chọn lô gốc cần tách");
-    if (children.length < 2) throw new ApiError(400, "Cần ít nhất 2 lô con để tách");
+    if (children.length < 2)
+      throw new ApiError(400, "Cần ít nhất 2 lô con để tách");
 
     const parsedChildren = children.map((c) => ({
       khoi_luong: toPositiveNumber(c.khoi_luong),
@@ -780,7 +915,9 @@ const splitBatch = async (req, res) => {
     }
 
     const tongKhoiLuong =
-      Math.round(parsedChildren.reduce((sum, c) => sum + c.khoi_luong, 0) * 1000) / 1000;
+      Math.round(
+        parsedChildren.reduce((sum, c) => sum + c.khoi_luong, 0) * 1000,
+      ) / 1000;
 
     await withTransaction(async (connection) => {
       const [lots] = await connection.execute(
@@ -794,7 +931,8 @@ const splitBatch = async (req, res) => {
         [ma_lo_goc, maCoSo],
       );
 
-      if (lots.length === 0) throw new ApiError(404, "Không tìm thấy lô gốc thuộc cơ sở của bạn");
+      if (lots.length === 0)
+        throw new ApiError(404, "Không tìm thấy lô gốc thuộc cơ sở của bạn");
 
       const lot = lots[0];
       if (lot.tinh_trang_su_dung !== "ACTIVE") {
@@ -802,7 +940,10 @@ const splitBatch = async (req, res) => {
       }
       const lenhGoc = await lenhDangChayCuaLo(connection, ma_lo_goc);
       if (lenhGoc) {
-        throw new ApiError(409, `Lô gốc đang có lệnh bàn giao ${lenhGoc}, chưa tách được`);
+        throw new ApiError(
+          409,
+          `Lô gốc đang có lệnh bàn giao ${lenhGoc}, chưa tách được`,
+        );
       }
       if (tongKhoiLuong > Number(lot.so_luong_hien_tai)) {
         throw new ApiError(
@@ -819,7 +960,9 @@ const splitBatch = async (req, res) => {
       );
 
       for (const child of parsedChildren) {
-        const newMaLo = await generateCode(connection, "lo_nong_san", "ma_lo_nong_san", "LO");
+        const newMaLo = await timMaLoChuaCoTrenChain(
+          await generateCode(connection, "lo_nong_san", "ma_lo_nong_san", "LO"),
+        );
 
         await connection.execute(
           `
@@ -827,10 +970,24 @@ const splitBatch = async (req, res) => {
           (ma_lo_nong_san, ma_mua_vu, ma_san_pham, ma_nguoi_quan_ly, so_luong_hien_tai, don_vi_tinh, giai_doan_hien_tai, ghi_chu)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
           `,
-          [newMaLo, lot.ma_mua_vu, lot.ma_san_pham, maCoSo, child.khoi_luong, lot.don_vi_tinh, lot.giai_doan_hien_tai, child.pham_cap],
+          [
+            newMaLo,
+            lot.ma_mua_vu,
+            lot.ma_san_pham,
+            maCoSo,
+            child.khoi_luong,
+            lot.don_vi_tinh,
+            lot.giai_doan_hien_tai,
+            child.pham_cap,
+          ],
         );
 
-        const maLienKet = await generateCode(connection, "lien_ket_nguon_goc_lo", "ma_lien_ket", "LK");
+        const maLienKet = await generateCode(
+          connection,
+          "lien_ket_nguon_goc_lo",
+          "ma_lien_ket",
+          "LK",
+        );
 
         await connection.execute(
           `
@@ -838,14 +995,23 @@ const splitBatch = async (req, res) => {
           (ma_lien_ket, relation_group_id, ma_lo_nguon, ma_lo_duoc_tao_ra, loai_lien_ket, so_luong_tham_gia, don_vi_tinh)
           VALUES (?, ?, ?, ?, 'SPLIT', ?, ?)
           `,
-          [maLienKet, relationGroupId, ma_lo_goc, newMaLo, child.khoi_luong, lot.don_vi_tinh],
+          [
+            maLienKet,
+            relationGroupId,
+            ma_lo_goc,
+            newMaLo,
+            child.khoi_luong,
+            lot.don_vi_tinh,
+          ],
         );
 
         // Blockchain: mỗi lô con một lần ký createChild (lấy đúng phần khối lượng của nó từ lô gốc)
         await ghiSuKienLoCon(connection, newMaLo);
       }
 
-      const conLai = Math.round((Number(lot.so_luong_hien_tai) - tongKhoiLuong) * 1000) / 1000;
+      const conLai =
+        Math.round((Number(lot.so_luong_hien_tai) - tongKhoiLuong) * 1000) /
+        1000;
 
       await connection.execute(
         `
@@ -858,7 +1024,9 @@ const splitBatch = async (req, res) => {
       );
     });
 
-    return res.status(201).json({ success: true, message: "Đã tách lô thành công" });
+    return res
+      .status(201)
+      .json({ success: true, message: "Đã tách lô thành công" });
   } catch (err) {
     return sendError(res, err, "Lỗi tách lô:", "Không thể tách lô");
   }
@@ -873,7 +1041,8 @@ const mergeBatch = async (req, res) => {
       : [];
     const tieu_de = cleanText(req.body?.tieu_de);
 
-    if (maLoNguonList.length < 2) throw new ApiError(400, "Cần chọn ít nhất 2 lô để gộp");
+    if (maLoNguonList.length < 2)
+      throw new ApiError(400, "Cần chọn ít nhất 2 lô để gộp");
 
     await withTransaction(async (connection) => {
       const [lots] = await connection.query(
@@ -887,7 +1056,10 @@ const mergeBatch = async (req, res) => {
       );
 
       if (lots.length !== maLoNguonList.length) {
-        throw new ApiError(404, "Có lô không tồn tại hoặc không thuộc cơ sở của bạn");
+        throw new ApiError(
+          404,
+          "Có lô không tồn tại hoặc không thuộc cơ sở của bạn",
+        );
       }
 
       if (lots.some((l) => l.tinh_trang_su_dung !== "ACTIVE")) {
@@ -895,7 +1067,11 @@ const mergeBatch = async (req, res) => {
       }
       for (const l of lots) {
         const lenh = await lenhDangChayCuaLo(connection, l.ma_lo_nong_san);
-        if (lenh) throw new ApiError(409, `Lô ${l.ma_lo_nong_san} đang có lệnh bàn giao ${lenh}, chưa gộp được`);
+        if (lenh)
+          throw new ApiError(
+            409,
+            `Lô ${l.ma_lo_nong_san} đang có lệnh bàn giao ${lenh}, chưa gộp được`,
+          );
       }
 
       const maSanPham = lots[0].ma_san_pham;
@@ -905,9 +1081,13 @@ const mergeBatch = async (req, res) => {
 
       const donViTinh = lots[0].don_vi_tinh;
       const tongKhoiLuong =
-        Math.round(lots.reduce((sum, l) => sum + Number(l.so_luong_hien_tai), 0) * 1000) / 1000;
+        Math.round(
+          lots.reduce((sum, l) => sum + Number(l.so_luong_hien_tai), 0) * 1000,
+        ) / 1000;
 
-      const newMaLo = await generateCode(connection, "lo_nong_san", "ma_lo_nong_san", "LO");
+      const newMaLo = await timMaLoChuaCoTrenChain(
+        await generateCode(connection, "lo_nong_san", "ma_lo_nong_san", "LO"),
+      );
 
       await connection.execute(
         `
@@ -915,7 +1095,16 @@ const mergeBatch = async (req, res) => {
         (ma_lo_nong_san, ma_mua_vu, ma_san_pham, ma_nguoi_quan_ly, so_luong_hien_tai, don_vi_tinh, giai_doan_hien_tai, ghi_chu)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `,
-        [newMaLo, lots[0].ma_mua_vu, maSanPham, maCoSo, tongKhoiLuong, donViTinh, lots[0].giai_doan_hien_tai, tieu_de],
+        [
+          newMaLo,
+          lots[0].ma_mua_vu,
+          maSanPham,
+          maCoSo,
+          tongKhoiLuong,
+          donViTinh,
+          lots[0].giai_doan_hien_tai,
+          tieu_de,
+        ],
       );
 
       const relationGroupId = await generateCode(
@@ -926,7 +1115,12 @@ const mergeBatch = async (req, res) => {
       );
 
       for (const lot of lots) {
-        const maLienKet = await generateCode(connection, "lien_ket_nguon_goc_lo", "ma_lien_ket", "LK");
+        const maLienKet = await generateCode(
+          connection,
+          "lien_ket_nguon_goc_lo",
+          "ma_lien_ket",
+          "LK",
+        );
 
         await connection.execute(
           `
@@ -934,7 +1128,14 @@ const mergeBatch = async (req, res) => {
           (ma_lien_ket, relation_group_id, ma_lo_nguon, ma_lo_duoc_tao_ra, loai_lien_ket, so_luong_tham_gia, don_vi_tinh)
           VALUES (?, ?, ?, ?, 'MERGE', ?, ?)
           `,
-          [maLienKet, relationGroupId, lot.ma_lo_nong_san, newMaLo, lot.so_luong_hien_tai, donViTinh],
+          [
+            maLienKet,
+            relationGroupId,
+            lot.ma_lo_nong_san,
+            newMaLo,
+            lot.so_luong_hien_tai,
+            donViTinh,
+          ],
         );
 
         await connection.execute(
@@ -947,7 +1148,9 @@ const mergeBatch = async (req, res) => {
       await ghiSuKienLoCon(connection, newMaLo);
     });
 
-    return res.status(201).json({ success: true, message: "Đã gộp lô thành công" });
+    return res
+      .status(201)
+      .json({ success: true, message: "Đã gộp lô thành công" });
   } catch (err) {
     return sendError(res, err, "Lỗi gộp lô:", "Không thể gộp lô");
   }
@@ -1098,7 +1301,12 @@ const getShipments = async (req, res) => {
 
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy danh sách bàn giao:", "Không thể lấy danh sách bàn giao");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách bàn giao:",
+      "Không thể lấy danh sách bàn giao",
+    );
   }
 };
 
@@ -1118,12 +1326,19 @@ const getShipmentById = async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy vận đơn" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy vận đơn" });
     }
 
     return res.json({ success: true, data: rows[0] });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy chi tiết vận đơn:", "Không thể lấy chi tiết vận đơn");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy chi tiết vận đơn:",
+      "Không thể lấy chi tiết vận đơn",
+    );
   }
 };
 
@@ -1153,14 +1368,23 @@ const createShipment = async (req, res) => {
     let dia_chi_giao_hang = cleanText(req.body?.dia_chi_giao_hang);
     const ghi_chu = cleanText(req.body?.ghi_chu);
 
-    if (!ma_lo_nong_san) throw new ApiError(400, "Vui lòng chọn lô hàng cần bàn giao");
-    if (!ma_don_vi_van_chuyen) throw new ApiError(400, "Vui lòng chọn đơn vị vận chuyển");
+    if (!ma_lo_nong_san)
+      throw new ApiError(400, "Vui lòng chọn lô hàng cần bàn giao");
+    if (!ma_don_vi_van_chuyen)
+      throw new ApiError(400, "Vui lòng chọn đơn vị vận chuyển");
     if (!ma_ben_nhan && !dia_chi_giao_hang)
-      throw new ApiError(400, "Vui lòng chọn nhà phân phối nhận hàng hoặc nhập điểm giao hàng");
+      throw new ApiError(
+        400,
+        "Vui lòng chọn nhà phân phối nhận hàng hoặc nhập điểm giao hàng",
+      );
     // Có blockchain thì bên nhận phải là tài khoản (ký nhận hàng bằng ví), không giao tới địa chỉ tự do
     if (!ma_ben_nhan && layCauHinh().daCauHinh)
-      throw new ApiError(400, "Lô được truy xuất trên blockchain nên phải chọn nhà phân phối có tài khoản (bên nhận phải ký nhận hàng)");
-    if (!ten_tai_xe) throw new ApiError(400, "Vui lòng nhập tên tài xế tiếp nhận");
+      throw new ApiError(
+        400,
+        "Lô được truy xuất trên blockchain nên phải chọn nhà phân phối có tài khoản (bên nhận phải ký nhận hàng)",
+      );
+    if (!ten_tai_xe)
+      throw new ApiError(400, "Vui lòng nhập tên tài xế tiếp nhận");
     if (!bien_so_xe) throw new ApiError(400, "Vui lòng nhập biển số xe");
 
     let maVanDon;
@@ -1180,7 +1404,10 @@ const createShipment = async (req, res) => {
           );
 
           if (lots.length === 0) {
-            throw new ApiError(404, "Không tìm thấy lô hàng thuộc cơ sở của bạn");
+            throw new ApiError(
+              404,
+              "Không tìm thấy lô hàng thuộc cơ sở của bạn",
+            );
           }
 
           if (lots[0].tinh_trang_su_dung !== "ACTIVE") {
@@ -1193,7 +1420,10 @@ const createShipment = async (req, res) => {
           );
 
           if (existing.length > 0) {
-            throw new ApiError(409, `Lô đã có lệnh bàn giao ${existing[0].ma_van_don}`);
+            throw new ApiError(
+              409,
+              `Lô đã có lệnh bàn giao ${existing[0].ma_van_don}`,
+            );
           }
 
           const [transporters] = await connection.execute(
@@ -1244,7 +1474,12 @@ const createShipment = async (req, res) => {
           );
 
           // Blockchain: cơ sở sơ chế ký tạo lệnh bàn giao (gắn ví vận chuyển + ví nhà phân phối)
-          await ghiSuKienVanDon(connection, newCode, "TRANSPORT_ORDERED", maCoSo);
+          await ghiSuKienVanDon(
+            connection,
+            newCode,
+            "TRANSPORT_ORDERED",
+            maCoSo,
+          );
 
           return newCode;
         });
@@ -1263,7 +1498,11 @@ const createShipment = async (req, res) => {
         `SELECT ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan FROM lenh_van_chuyen WHERE ma_van_don = ?`,
         [maVanDon],
       );
-      const thieu = await chuaCoViDuyet(db, [lenh.ma_nguoi_gui, lenh.ma_don_vi_van_chuyen, lenh.ma_ben_nhan]);
+      const thieu = await chuaCoViDuyet(db, [
+        lenh.ma_nguoi_gui,
+        lenh.ma_don_vi_van_chuyen,
+        lenh.ma_ben_nhan,
+      ]);
       if (thieu.length > 0) {
         canhBaoVi = `. Lưu ý: ${thieu.join(", ")} chưa có ví blockchain được duyệt nên các bước ký của lệnh này sẽ chờ`;
       }
@@ -1277,7 +1516,12 @@ const createShipment = async (req, res) => {
       data: { ma_van_don: maVanDon },
     });
   } catch (err) {
-    return sendError(res, err, "Lỗi tạo lệnh bàn giao:", "Không thể tạo lệnh bàn giao");
+    return sendError(
+      res,
+      err,
+      "Lỗi tạo lệnh bàn giao:",
+      "Không thể tạo lệnh bàn giao",
+    );
   }
 };
 
@@ -1306,7 +1550,9 @@ const getBatchDetail = async (req, res) => {
     );
 
     if (scRows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy lô sơ chế" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy lô sơ chế" });
     }
 
     const batch = scRows[0];
@@ -1336,7 +1582,8 @@ const getBatchDetail = async (req, res) => {
       );
 
       if (upstream.length > 0) {
-        lineageType = upstream[0].loai_lien_ket === "MERGE" ? "MERGED" : "SPLIT";
+        lineageType =
+          upstream[0].loai_lien_ket === "MERGE" ? "MERGED" : "SPLIT";
         lineageSources = upstream;
       } else {
         lineageType = "ORIGINAL";
@@ -1377,7 +1624,12 @@ const getBatchDetail = async (req, res) => {
       },
     });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy chi tiết lô sơ chế:", "Không thể lấy chi tiết lô sơ chế");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy chi tiết lô sơ chế:",
+      "Không thể lấy chi tiết lô sơ chế",
+    );
   }
 };
 

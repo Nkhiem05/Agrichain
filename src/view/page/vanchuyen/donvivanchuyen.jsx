@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import "../../css/donvivanchuyen.css";
 import BlockchainPanel from "../blockchainpannel";
+import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
 import {
   fetchMyTrips,
   acceptTrip,
@@ -40,7 +41,11 @@ const STATUS_LABEL = {
   CHO_CHAP_NHAN: { text: "Chờ chấp nhận", tone: "purple", icon: Clock },
   CHO_LAY_HANG: { text: "Chờ lấy hàng", tone: "amber", icon: PackageSearch },
   DANG_VAN_CHUYEN: { text: "Đang vận chuyển", tone: "blue", icon: Navigation },
-  CHO_TIEP_NHAN: { text: "Đã đến nơi - Chờ bên nhận xác nhận", tone: "emerald", icon: ClipboardCheck },
+  CHO_TIEP_NHAN: {
+    text: "Đã đến nơi - Chờ bên nhận xác nhận",
+    tone: "emerald",
+    icon: ClipboardCheck,
+  },
   HOAN_THANH: { text: "Đã hoàn thành", tone: "success", icon: CheckCircle2 },
   TU_CHOI: { text: "Đã từ chối", tone: "danger", icon: XCircle },
   DA_HUY: { text: "Đã hủy", tone: "danger", icon: XCircle },
@@ -63,10 +68,39 @@ const formatWeight = (value, unit) => {
 const tripRoute = (t) =>
   `${t.ten_nguoi_gui || "—"} ➔ ${t.ten_ben_nhan || t.dia_chi_giao_hang || "—"}`;
 
+// Bước vận chuyển đã bấm nhưng còn chờ ký: chuyến giữ nguyên bước cũ cho tới khi ký xong
+const TEN_CHO_KY = {
+  LAY_HANG: "Chờ ký lấy hàng",
+  DEN_NOI: "Chờ ký đến nơi",
+  TU_CHOI: "Chờ ký từ chối",
+};
+
+const BadgeChoKy = ({ text }) => (
+  <span
+    style={{
+      display: "inline-block",
+      fontSize: 12.5,
+      fontWeight: 600,
+      color: "#b45309",
+      background: "#fffbeb",
+      border: "1px solid #fde68a",
+      borderRadius: 999,
+      padding: "3px 10px",
+      marginLeft: 8,
+    }}
+  >
+    {text}
+  </span>
+);
+
 export default function AgriChainLogistics() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  const [currentTab, setCurrentTab] = usePersistentTab("vanchuyen", "shipping", ["shipping","pickup","delivery","blockchain"]);
+  const [currentTab, setCurrentTab] = usePersistentTab(
+    "vanchuyen",
+    "shipping",
+    ["shipping", "pickup", "delivery", "blockchain"],
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
 
@@ -75,7 +109,10 @@ export default function AgriChainLogistics() {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [acceptModalTrip, setAcceptModalTrip] = useState(null);
-  const [acceptForm, setAcceptForm] = useState({ ten_tai_xe: "", bien_so_xe: "" });
+  const [acceptForm, setAcceptForm] = useState({
+    ten_tai_xe: "",
+    bien_so_xe: "",
+  });
 
   const [rejectModalTrip, setRejectModalTrip] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -122,11 +159,71 @@ export default function AgriChainLogistics() {
     if (user) loadTrips();
   }, [user, loadTrips]);
 
+  // Tải lại danh sách không hiện màn hình "Đang tải" (dùng khi chờ giao dịch được xác nhận)
+  const taiLaiNgam = useCallback(async () => {
+    try {
+      const res = await fetchMyTrips();
+      setTrips(res?.data || []);
+    } catch {
+      /* giữ danh sách cũ */
+    }
+  }, []);
+
+  // Có chuyến đã bấm bước nhưng còn chờ ký / chờ blockchain xác nhận: tự cập nhật để chuyến chuyển bước khi ký xong
+  const coChuyenChoKy = trips.some((t) => t.cho_ky);
+  useEffect(() => {
+    if (!coChuyenChoKy) return undefined;
+    const timer = setInterval(taiLaiNgam, 5000);
+    return () => clearInterval(timer);
+  }, [coChuyenChoKy, taiLaiNgam]);
+
+  // Mở MetaMask để đơn vị vận chuyển ký sự kiện của bước vừa bấm. Chuyến chỉ chuyển sang bước tiếp theo SAU KHI ký xong;
+  // chưa ký được (từ chối, thiếu điều kiện...) thì chuyến giữ nguyên và bấm lại nút để ký lại.
+  const kySauThaoTac = async (loiBao) => {
+    try {
+      const kq = await kyCacSuKienDangCho();
+      if (kq.soDaKy > 0) {
+        await loadTrips();
+        alert(
+          `${loiBao}\nĐã ký ${kq.soDaKy} sự kiện lên blockchain, chuyến đã chuyển sang bước tiếp theo.`,
+        );
+      } else {
+        alert(
+          `${loiBao}\nChưa ký được: ${kq.lyDo}.\nChuyến giữ nguyên bước hiện tại; bấm lại nút để ký.`,
+        );
+      }
+    } catch (loi) {
+      const lyDo =
+        loi?.code === "ACTION_REJECTED" || loi?.code === 4001
+          ? "bạn đã từ chối trong MetaMask"
+          : loi?.reason || loi?.shortMessage || loi?.message;
+      alert(
+        `${loiBao}\nChưa ký được (${lyDo}).\nChuyến giữ nguyên bước hiện tại; bấm lại nút để ký.`,
+      );
+    }
+    await loadTrips();
+  };
+
+  // Bước chỉ làm được sau khi bên gửi đã ký lệnh vận chuyển lên blockchain
+  const chanNeuBenGuiChuaKy = (trip) => {
+    if (!trip.chua_ky_lenh) return false;
+    alert(
+      `Bên gửi (${trip.ten_nguoi_gui || "—"}) chưa ký lệnh vận chuyển ${trip.ma_van_don} lên blockchain.\nHãy chờ bên gửi ký xong rồi mới thực hiện bước này.${
+        trip.ly_do_chua_ky_lenh ? `\n\n${trip.ly_do_chua_ky_lenh}` : ""
+      }`,
+    );
+    return true;
+  };
+
   // ==================== CHẤP NHẬN / TỪ CHỐI ====================
 
   const handleOpenAccept = (trip) => {
+    if (chanNeuBenGuiChuaKy(trip)) return;
     setAcceptModalTrip(trip);
-    setAcceptForm({ ten_tai_xe: trip.ten_tai_xe || "", bien_so_xe: trip.bien_so_xe || "" });
+    setAcceptForm({
+      ten_tai_xe: trip.ten_tai_xe || "",
+      bien_so_xe: trip.bien_so_xe || "",
+    });
   };
 
   const handleSubmitAccept = async () => {
@@ -135,7 +232,11 @@ export default function AgriChainLogistics() {
       return;
     }
     try {
-      await acceptTrip(acceptModalTrip.ma_van_don, acceptForm.ten_tai_xe.trim(), acceptForm.bien_so_xe.trim());
+      await acceptTrip(
+        acceptModalTrip.ma_van_don,
+        acceptForm.ten_tai_xe.trim(),
+        acceptForm.bien_so_xe.trim(),
+      );
       setAcceptModalTrip(null);
       await loadTrips();
       alert(`Đã chấp nhận chuyến ${acceptModalTrip.ma_van_don}!`);
@@ -144,7 +245,13 @@ export default function AgriChainLogistics() {
     }
   };
 
-  const handleOpenReject = (trip) => {
+  const handleOpenReject = async (trip) => {
+    if (chanNeuBenGuiChuaKy(trip)) return;
+    if (trip.cho_ky === "TU_CHOI") {
+      // Đã gửi yêu cầu từ chối trước đó nhưng chưa ký: ký lại
+      await kySauThaoTac(`Chuyến ${trip.ma_van_don} đang chờ ký từ chối.`);
+      return;
+    }
     setRejectModalTrip(trip);
     setRejectReason("");
   };
@@ -155,9 +262,15 @@ export default function AgriChainLogistics() {
       return;
     }
     try {
-      await rejectTrip(rejectModalTrip.ma_van_don, rejectReason.trim());
+      const kq = await rejectTrip(
+        rejectModalTrip.ma_van_don,
+        rejectReason.trim(),
+      );
+      const ma = rejectModalTrip.ma_van_don;
       setRejectModalTrip(null);
       await loadTrips();
+      if (kq?.cho_ky) await kySauThaoTac(`Chuyến ${ma}: ${kq.message}`);
+      else alert(kq?.message || "Đã từ chối chuyến vận chuyển");
     } catch (err) {
       alert(err.message || "Không thể từ chối chuyến");
     }
@@ -165,7 +278,15 @@ export default function AgriChainLogistics() {
 
   // ==================== LẤY HÀNG ====================
 
-  const handleOpenPickup = (trip) => {
+  const handleOpenPickup = async (trip) => {
+    if (chanNeuBenGuiChuaKy(trip)) return;
+    if (trip.cho_ky === "LAY_HANG") {
+      // Đã gửi yêu cầu lấy hàng trước đó nhưng chưa ký: ký lại
+      await kySauThaoTac(
+        `Chuyến ${trip.ma_van_don} đang chờ ký xác nhận lấy hàng.`,
+      );
+      return;
+    }
     setPickupModalTrip(trip);
     setPickupWeight(String(Math.round(Number(trip.khoi_luong))));
   };
@@ -177,10 +298,12 @@ export default function AgriChainLogistics() {
       return;
     }
     try {
-      await confirmPickup(pickupModalTrip.ma_van_don, value);
+      const kq = await confirmPickup(pickupModalTrip.ma_van_don, value);
+      const ma = pickupModalTrip.ma_van_don;
       setPickupModalTrip(null);
       await loadTrips();
-      alert(`Đã xác nhận lấy hàng chuyến ${pickupModalTrip.ma_van_don}, xe bắt đầu vận chuyển!`);
+      if (kq?.cho_ky) await kySauThaoTac(`Chuyến ${ma}: ${kq.message}`);
+      else alert(`Đã xác nhận lấy hàng chuyến ${ma}, xe bắt đầu vận chuyển!`);
     } catch (err) {
       alert(err.message || "Không thể xác nhận lấy hàng");
     }
@@ -189,11 +312,25 @@ export default function AgriChainLogistics() {
   // ==================== ĐẾN NƠI ====================
 
   const handleConfirmArrival = async (trip) => {
-    if (!window.confirm(`Xác nhận xe đã đến điểm giao cho chuyến ${trip.ma_van_don}?`)) return;
+    if (trip.cho_ky === "DEN_NOI") {
+      // Đã gửi yêu cầu xác nhận đến nơi trước đó nhưng chưa ký: ký lại
+      await kySauThaoTac(
+        `Chuyến ${trip.ma_van_don} đang chờ ký xác nhận đến nơi.`,
+      );
+      return;
+    }
+    if (
+      !window.confirm(
+        `Xác nhận xe đã đến điểm giao cho chuyến ${trip.ma_van_don}?`,
+      )
+    )
+      return;
     try {
-      await confirmArrival(trip.ma_van_don);
+      const kq = await confirmArrival(trip.ma_van_don);
       await loadTrips();
-      alert("Đã xác nhận đến nơi. Chờ bên nhận xác nhận tiếp nhận.");
+      if (kq?.cho_ky)
+        await kySauThaoTac(`Chuyến ${trip.ma_van_don}: ${kq.message}`);
+      else alert("Đã xác nhận đến nơi. Chờ bên nhận xác nhận tiếp nhận.");
     } catch (err) {
       alert(err.message || "Không thể xác nhận đến nơi");
     }
@@ -217,15 +354,29 @@ export default function AgriChainLogistics() {
   const exportToCsv = (dataList, filename = "chuyen_xe_logistics.csv") => {
     if (!dataList || !dataList.length) return;
     const headers = [
-      "Mã Chuyến", "Mã Lô", "Sản Phẩm", "Người Gửi", "Bên Nhận", "Tài Xế", "Biển Số",
-      "Khối Lượng", "Trạng Thái",
+      "Mã Chuyến",
+      "Mã Lô",
+      "Sản Phẩm",
+      "Người Gửi",
+      "Bên Nhận",
+      "Tài Xế",
+      "Biển Số",
+      "Khối Lượng",
+      "Trạng Thái",
     ];
     const rows = dataList.map((t) => [
-      t.ma_van_don, t.ma_lo_nong_san, `"${t.ten_san_pham}"`, `"${t.ten_nguoi_gui || ""}"`,
-      `"${t.ten_ben_nhan || t.dia_chi_giao_hang || ""}"`, `"${t.ten_tai_xe || ""}"`,
-      t.bien_so_xe || "", `"${formatWeight(t.khoi_luong, t.don_vi_tinh)}"`, t.trang_thai,
+      t.ma_van_don,
+      t.ma_lo_nong_san,
+      `"${t.ten_san_pham}"`,
+      `"${t.ten_nguoi_gui || ""}"`,
+      `"${t.ten_ben_nhan || t.dia_chi_giao_hang || ""}"`,
+      `"${t.ten_tai_xe || ""}"`,
+      t.bien_so_xe || "",
+      `"${formatWeight(t.khoi_luong, t.don_vi_tinh)}"`,
+      t.trang_thai,
     ]);
-    const csvContent = "﻿" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const csvContent =
+      "﻿" + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -248,7 +399,8 @@ export default function AgriChainLogistics() {
       t.ma_lo_nong_san.toLowerCase().includes(term) ||
       t.ten_san_pham.toLowerCase().includes(term);
 
-    const matchesStatus = statusFilter === "all" ? true : t.trang_thai === statusFilter;
+    const matchesStatus =
+      statusFilter === "all" ? true : t.trang_thai === statusFilter;
 
     return matchesSearch && matchesStatus;
   });
@@ -258,7 +410,9 @@ export default function AgriChainLogistics() {
     ["DANG_VAN_CHUYEN", "CHO_TIEP_NHAN", "HOAN_THANH"].includes(t.trang_thai),
   );
   const deliveryTrips = trips.filter((t) => t.trang_thai === "DANG_VAN_CHUYEN");
-  const deliveryHistory = trips.filter((t) => ["CHO_TIEP_NHAN", "HOAN_THANH"].includes(t.trang_thai));
+  const deliveryHistory = trips.filter((t) =>
+    ["CHO_TIEP_NHAN", "HOAN_THANH"].includes(t.trang_thai),
+  );
 
   if (!user) return null;
 
@@ -267,7 +421,11 @@ export default function AgriChainLogistics() {
       <div className="app-container">
         <header className="dashboard-header">
           <div className="header-left">
-            <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
+            <img
+              src={DEFAULT_LOGO_IMG}
+              alt="Logo"
+              className="header-logo-icon"
+            />
             <span className="header-brand-title">AGRICHAIN</span>
           </div>
 
@@ -291,14 +449,21 @@ export default function AgriChainLogistics() {
                 <img
                   src={`http://localhost:3000${user.anh_dai_dien}`}
                   alt="avatar"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    borderRadius: "50%",
+                  }}
                 />
               ) : (
                 (user.ho_ten || "VC").slice(0, 2).toUpperCase()
               )}
             </div>
             <div className="profile-meta">
-              <span className="profile-name">{user.ho_ten || "Đơn vị vận chuyển"}</span>
+              <span className="profile-name">
+                {user.ho_ten || "Đơn vị vận chuyển"}
+              </span>
               <span className="profile-role">Đơn vị vận chuyển</span>
             </div>
           </div>
@@ -340,11 +505,23 @@ export default function AgriChainLogistics() {
               </button>
             </nav>
 
-            <div style={{ padding: "0 12px 12px 12px", display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div
+              style={{
+                padding: "0 12px 12px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px",
+              }}
+            >
               <button
                 onClick={() => exportToCsv(trips)}
                 className="btn-secondary"
-                style={{ width: "100%", justifyContent: "center", fontSize: "11px", padding: "6px" }}
+                style={{
+                  width: "100%",
+                  justifyContent: "center",
+                  fontSize: "11px",
+                  padding: "6px",
+                }}
               >
                 <FileSpreadsheet size={14} />
                 <span>Xuất file Excel/CSV</span>
@@ -352,7 +529,12 @@ export default function AgriChainLogistics() {
               <button
                 onClick={() => exportToJson(trips)}
                 className="btn-secondary"
-                style={{ width: "100%", justifyContent: "center", fontSize: "11px", padding: "6px" }}
+                style={{
+                  width: "100%",
+                  justifyContent: "center",
+                  fontSize: "11px",
+                  padding: "6px",
+                }}
               >
                 <Download size={14} />
                 <span>Export Dữ Liệu JSON</span>
@@ -396,32 +578,57 @@ export default function AgriChainLogistics() {
 
           <div className="main-wrapper no-scrollbar">
             {errorMsg && (
-              <div style={{ background: "#fef2f2", color: "#dc2626", padding: "12px 16px", borderRadius: "8px", margin: "16px" }}>
+              <div
+                style={{
+                  background: "#fef2f2",
+                  color: "#dc2626",
+                  padding: "12px 16px",
+                  borderRadius: "8px",
+                  margin: "16px",
+                }}
+              >
                 {errorMsg}
               </div>
             )}
 
             {loading ? (
-              <div style={{ padding: "48px", textAlign: "center", color: "#6b7280" }}>Đang tải dữ liệu...</div>
+              <div
+                style={{
+                  padding: "48px",
+                  textAlign: "center",
+                  color: "#6b7280",
+                }}
+              >
+                Đang tải dữ liệu...
+              </div>
             ) : (
               <>
                 {currentTab === "blockchain" && (
-            <div style={{ maxWidth: 980, paddingTop: 16 }}>
-              <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
-                Đơn vị vận chuyển ký các bước: lấy hàng, giao tới nơi, từ chối chuyến, chở trả hàng bị từ chối. Các bước của một lô ký theo thứ tự.
-              </p>
-              <BlockchainPanel />
-            </div>
-          )}
+                  <div className="blockchain-tab-wrapper">
+                    <p className="blockchain-tab-desc">
+                      Đơn vị vận chuyển ký các bước: lấy hàng, giao tới nơi, từ
+                      chối chuyến, chở trả hàng bị từ chối. Các bước của một lô
+                      ký theo thứ tự, nên có bước phải chờ bên gửi ký tạo lệnh
+                      trước.
+                    </p>
+                    <div className="blockchain-panel-full">
+                      <BlockchainPanel thongBaoBangAlert />
+                    </div>
+                  </div>
+                )}
 
-          {/* TAB 1: QUẢN LÝ VẬN CHUYỂN */}
+                {/* TAB 1: QUẢN LÝ VẬN CHUYỂN */}
                 {currentTab === "shipping" && (
                   <main className="view-container">
                     <div className="metrics-row">
                       <div className="metric-card">
                         <div className="metric-title">Đơn chờ chấp nhận</div>
                         <div className="metric-number">
-                          {trips.filter((t) => t.trang_thai === "CHO_CHAP_NHAN").length}
+                          {
+                            trips.filter(
+                              (t) => t.trang_thai === "CHO_CHAP_NHAN",
+                            ).length
+                          }
                           <span className="metric-unit">ĐƠN CHỜ NHẬN</span>
                         </div>
                       </div>
@@ -429,7 +636,10 @@ export default function AgriChainLogistics() {
                       <div className="metric-card">
                         <div className="metric-title">Đơn chờ lấy hàng</div>
                         <div className="metric-number">
-                          {trips.filter((t) => t.trang_thai === "CHO_LAY_HANG").length}
+                          {
+                            trips.filter((t) => t.trang_thai === "CHO_LAY_HANG")
+                              .length
+                          }
                           <span className="metric-unit">ĐƠN SẴN SÀNG</span>
                         </div>
                       </div>
@@ -437,18 +647,32 @@ export default function AgriChainLogistics() {
                       <div className="metric-card">
                         <div className="metric-title">Chuyến xe đang chạy</div>
                         <div className="metric-number">
-                          {trips.filter((t) => t.trang_thai === "DANG_VAN_CHUYEN").length}
-                          <span className="metric-unit">CHUYẾN ĐANG LĂN BÁNH</span>
+                          {
+                            trips.filter(
+                              (t) => t.trang_thai === "DANG_VAN_CHUYEN",
+                            ).length
+                          }
+                          <span className="metric-unit">
+                            CHUYẾN ĐANG LĂN BÁNH
+                          </span>
                         </div>
                       </div>
 
                       <div className="actions-box">
-                        <select className="filter-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                        <select
+                          className="filter-select"
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                        >
                           <option value="all">-- Tất cả trạng thái --</option>
                           <option value="CHO_CHAP_NHAN">Chờ chấp nhận</option>
                           <option value="CHO_LAY_HANG">Chờ lấy hàng</option>
-                          <option value="DANG_VAN_CHUYEN">Đang vận chuyển</option>
-                          <option value="CHO_TIEP_NHAN">Chờ bên nhận xác nhận</option>
+                          <option value="DANG_VAN_CHUYEN">
+                            Đang vận chuyển
+                          </option>
+                          <option value="CHO_TIEP_NHAN">
+                            Chờ bên nhận xác nhận
+                          </option>
                           <option value="HOAN_THANH">Đã hoàn thành</option>
                           <option value="TU_CHOI">Đã từ chối</option>
                         </select>
@@ -457,13 +681,26 @@ export default function AgriChainLogistics() {
 
                     <div className="shipment-list-scroll">
                       {filteredTrips.length === 0 ? (
-                        <div className="section-card" style={{ textAlign: "center", padding: "40px", color: "#6b7280" }}>
-                          <AlertCircle size={36} style={{ margin: "0 auto 10px", color: "#9ca3af" }} />
-                          Không có chuyến vận chuyển nào phù hợp với bộ lọc hiện tại.
+                        <div
+                          className="section-card"
+                          style={{
+                            textAlign: "center",
+                            padding: "40px",
+                            color: "#6b7280",
+                          }}
+                        >
+                          <AlertCircle
+                            size={36}
+                            style={{ margin: "0 auto 10px", color: "#9ca3af" }}
+                          />
+                          Không có chuyến vận chuyển nào phù hợp với bộ lọc hiện
+                          tại.
                         </div>
                       ) : (
                         filteredTrips.map((trip) => {
-                          const statusInfo = STATUS_LABEL[trip.trang_thai] || STATUS_LABEL.CHO_CHAP_NHAN;
+                          const statusInfo =
+                            STATUS_LABEL[trip.trang_thai] ||
+                            STATUS_LABEL.CHO_CHAP_NHAN;
                           const StatusIcon = statusInfo.icon;
 
                           return (
@@ -485,51 +722,91 @@ export default function AgriChainLogistics() {
                                 <div className="trip-details">
                                   <div className="trip-header-line">
                                     <h3>{trip.ten_san_pham}</h3>
-                                    <span className="tag-gray">#{trip.ma_van_don}</span>
-                                    <span className="tag-green">Mã lô: {trip.ma_lo_nong_san}</span>
+                                    <span className="tag-gray">
+                                      #{trip.ma_van_don}
+                                    </span>
+                                    <span className="tag-green">
+                                      Mã lô: {trip.ma_lo_nong_san}
+                                    </span>
                                   </div>
 
                                   <div className="trip-meta-row">
                                     <p>
                                       Xe tải & Tài xế:{" "}
                                       <span className="meta-val">
-                                        {trip.bien_so_xe || "Chưa phân công"} ({trip.ten_tai_xe || "Chưa phân công"})
+                                        {trip.bien_so_xe || "Chưa phân công"} (
+                                        {trip.ten_tai_xe || "Chưa phân công"})
                                       </span>
                                     </p>
                                     <p>
-                                      Lộ trình: <span className="meta-val">{tripRoute(trip)}</span>
+                                      Lộ trình:{" "}
+                                      <span className="meta-val">
+                                        {tripRoute(trip)}
+                                      </span>
                                     </p>
                                     <p>
                                       Khối lượng hàng:{" "}
-                                      <span className="highlight-weight">{formatWeight(trip.khoi_luong, trip.don_vi_tinh)}</span>
+                                      <span className="highlight-weight">
+                                        {formatWeight(
+                                          trip.khoi_luong,
+                                          trip.don_vi_tinh,
+                                        )}
+                                      </span>
                                     </p>
                                     <p>
-                                      Thời gian xuất: <span className="meta-val">{trip.thoi_gian_xuat}</span>
+                                      Thời gian xuất:{" "}
+                                      <span className="meta-val">
+                                        {trip.thoi_gian_xuat}
+                                      </span>
                                     </p>
                                   </div>
 
                                   <div>
-                                    <span className={`status-badge-${statusInfo.tone}`}>
-                                      <StatusIcon size={13} style={{ marginRight: "4px" }} />
+                                    <span
+                                      className={`status-badge-${statusInfo.tone}`}
+                                    >
+                                      <StatusIcon
+                                        size={13}
+                                        style={{ marginRight: "4px" }}
+                                      />
                                       {statusInfo.text}
                                     </span>
+                                    {trip.cho_ky && (
+                                      <BadgeChoKy
+                                        text={TEN_CHO_KY[trip.cho_ky]}
+                                      />
+                                    )}
+                                    {trip.chua_ky_lenh && (
+                                      <BadgeChoKy text="Chờ bên gửi ký lệnh" />
+                                    )}
                                   </div>
                                 </div>
                               </div>
 
                               <div className="actions-vertical">
-                                <button onClick={() => setDetailTrip(trip)} className="btn-action-detail">
+                                <button
+                                  onClick={() => setDetailTrip(trip)}
+                                  className="btn-action-detail"
+                                >
                                   <Eye size={15} />
                                   <span>Xem chi tiết</span>
                                 </button>
 
                                 {trip.trang_thai === "CHO_CHAP_NHAN" && (
                                   <>
-                                    <button onClick={() => handleOpenAccept(trip)} className="btn-primary" style={{ backgroundColor: "#7c3aed" }}>
+                                    <button
+                                      onClick={() => handleOpenAccept(trip)}
+                                      className="btn-primary"
+                                      style={{ backgroundColor: "#7c3aed" }}
+                                    >
                                       <CheckCircle2 size={16} />
                                       <span>Chấp nhận vận chuyển</span>
                                     </button>
-                                    <button onClick={() => handleOpenReject(trip)} className="btn-secondary" style={{ color: "#dc2626" }}>
+                                    <button
+                                      onClick={() => handleOpenReject(trip)}
+                                      className="btn-secondary"
+                                      style={{ color: "#dc2626" }}
+                                    >
                                       <XCircle size={16} />
                                       <span>Từ chối</span>
                                     </button>
@@ -537,14 +814,20 @@ export default function AgriChainLogistics() {
                                 )}
 
                                 {trip.trang_thai === "CHO_LAY_HANG" && (
-                                  <button onClick={() => handleOpenPickup(trip)} className="btn-primary">
+                                  <button
+                                    onClick={() => handleOpenPickup(trip)}
+                                    className="btn-primary"
+                                  >
                                     <ArrowUpRight size={16} />
                                     <span>Xác nhận lấy hàng đi</span>
                                   </button>
                                 )}
 
                                 {trip.trang_thai === "DANG_VAN_CHUYEN" && (
-                                  <button onClick={() => handleConfirmArrival(trip)} className="btn-primary">
+                                  <button
+                                    onClick={() => handleConfirmArrival(trip)}
+                                    className="btn-primary"
+                                  >
                                     <CheckCircle size={14} />
                                     <span>Xác nhận đã đến nơi</span>
                                   </button>
@@ -560,31 +843,69 @@ export default function AgriChainLogistics() {
 
                 {/* TAB 2: XÁC NHẬN LẤY HÀNG ĐI */}
                 {currentTab === "pickup" && (
-                  <main className="view-container" style={{ overflowY: "auto", paddingBottom: "36px" }}>
+                  <main
+                    className="view-container"
+                    style={{ overflowY: "auto", paddingBottom: "36px" }}
+                  >
                     <div className="section-header-box">
                       <div>
                         <h2>Biên Bản Nhận Hàng & Xuất Phát</h2>
-                        <p>Các chuyến đã được chấp nhận, đang chờ xe đến lấy hàng tại điểm gửi.</p>
+                        <p>
+                          Các chuyến đã được chấp nhận, đang chờ xe đến lấy hàng
+                          tại điểm gửi.
+                        </p>
                       </div>
                     </div>
 
                     {pickupTrips.length === 0 ? (
-                      <div className="section-card" style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>
+                      <div
+                        className="section-card"
+                        style={{
+                          textAlign: "center",
+                          padding: "32px",
+                          color: "#6b7280",
+                        }}
+                      >
                         Không có chuyến nào đang chờ lấy hàng.
                       </div>
                     ) : (
                       pickupTrips.map((trip) => (
-                        <div className="section-card" key={trip.ma_van_don} style={{ marginBottom: "12px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div
+                          className="section-card"
+                          key={trip.ma_van_don}
+                          style={{ marginBottom: "12px" }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
                             <div>
                               <p style={{ fontWeight: 700, color: "#1f2937" }}>
-                                {trip.ten_san_pham} (#{trip.ma_lo_nong_san} - {formatWeight(trip.khoi_luong, trip.don_vi_tinh)})
+                                {trip.ten_san_pham} (#{trip.ma_lo_nong_san} -{" "}
+                                {formatWeight(
+                                  trip.khoi_luong,
+                                  trip.don_vi_tinh,
+                                )}
+                                )
                               </p>
                               <p style={{ color: "#6b7280", fontSize: "13px" }}>
-                                Lấy từ: {trip.ten_nguoi_gui} ➔ Tài xế {trip.ten_tai_xe} ({trip.bien_so_xe})
+                                Lấy từ: {trip.ten_nguoi_gui} ➔ Tài xế{" "}
+                                {trip.ten_tai_xe} ({trip.bien_so_xe})
+                                {trip.cho_ky && (
+                                  <BadgeChoKy text={TEN_CHO_KY[trip.cho_ky]} />
+                                )}
+                                {trip.chua_ky_lenh && (
+                                  <BadgeChoKy text="Chờ bên gửi ký lệnh" />
+                                )}
                               </p>
                             </div>
-                            <button onClick={() => handleOpenPickup(trip)} className="btn-primary">
+                            <button
+                              onClick={() => handleOpenPickup(trip)}
+                              className="btn-primary"
+                            >
                               <ArrowUpRight size={16} />
                               <span>Xác nhận lấy hàng</span>
                             </button>
@@ -594,21 +915,39 @@ export default function AgriChainLogistics() {
                     )}
 
                     <div className="section-card" style={{ marginTop: "16px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "14px", color: "#1f2937", marginBottom: "10px" }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "14px",
+                          color: "#1f2937",
+                          marginBottom: "10px",
+                        }}
+                      >
                         Lịch sử các chuyến đã lấy hàng
                       </div>
                       {pickupHistory.length === 0 ? (
-                        <p style={{ color: "#9ca3af", fontSize: "13px" }}>Chưa có chuyến nào.</p>
+                        <p style={{ color: "#9ca3af", fontSize: "13px" }}>
+                          Chưa có chuyến nào.
+                        </p>
                       ) : (
                         pickupHistory.map((t) => (
                           <div
                             key={t.ma_van_don}
-                            style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f3f4f6", fontSize: "13px" }}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              padding: "8px 0",
+                              borderBottom: "1px solid #f3f4f6",
+                              fontSize: "13px",
+                            }}
                           >
                             <span>
-                              {t.ten_san_pham} (#{t.ma_lo_nong_san}) - {formatWeight(t.khoi_luong, t.don_vi_tinh)}
+                              {t.ten_san_pham} (#{t.ma_lo_nong_san}) -{" "}
+                              {formatWeight(t.khoi_luong, t.don_vi_tinh)}
                             </span>
-                            <span style={{ color: "#6b7280" }}>{STATUS_LABEL[t.trang_thai]?.text}</span>
+                            <span style={{ color: "#6b7280" }}>
+                              {STATUS_LABEL[t.trang_thai]?.text}
+                            </span>
                           </div>
                         ))
                       )}
@@ -618,39 +957,81 @@ export default function AgriChainLogistics() {
 
                 {/* TAB 3: XÁC NHẬN GIAO HÀNG ĐẾN */}
                 {currentTab === "delivery" && (
-                  <main className="view-container" style={{ overflowY: "auto", paddingBottom: "36px" }}>
+                  <main
+                    className="view-container"
+                    style={{ overflowY: "auto", paddingBottom: "36px" }}
+                  >
                     <div className="section-header-box">
                       <div>
                         <h2>Xác Nhận Đến Điểm Giao</h2>
                         <p>
-                          Khi xe đến nơi, bấm xác nhận để báo cho bên nhận biết hàng đã tới — bên nhận sẽ tự
-                          xác nhận tiếp nhận ở trang của họ.
+                          Khi xe đến nơi, bấm xác nhận để báo cho bên nhận biết
+                          hàng đã tới — bên nhận sẽ tự xác nhận tiếp nhận ở
+                          trang của họ.
                         </p>
                       </div>
                     </div>
 
                     {deliveryTrips.length === 0 ? (
-                      <div className="section-card" style={{ textAlign: "center", padding: "32px", color: "#6b7280" }}>
+                      <div
+                        className="section-card"
+                        style={{
+                          textAlign: "center",
+                          padding: "32px",
+                          color: "#6b7280",
+                        }}
+                      >
                         Không có chuyến nào đang trên đường.
                       </div>
                     ) : (
                       deliveryTrips.map((trip) => (
-                        <div className="section-card" key={trip.ma_van_don} style={{ marginBottom: "12px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div
+                          className="section-card"
+                          key={trip.ma_van_don}
+                          style={{ marginBottom: "12px" }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
                             <div>
-                              <h3 style={{ fontWeight: 700, fontSize: "15px", color: "#1f2937" }}>
-                                #{trip.ma_van_don} - {trip.ten_san_pham} ({trip.ma_lo_nong_san})
+                              <h3
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: "15px",
+                                  color: "#1f2937",
+                                }}
+                              >
+                                #{trip.ma_van_don} - {trip.ten_san_pham} (
+                                {trip.ma_lo_nong_san})
                               </h3>
-                              <p style={{ fontSize: "12.5px", color: "#6b7280" }}>
-                                Điểm giao: {trip.ten_ben_nhan || trip.dia_chi_giao_hang || "—"}
+                              <p
+                                style={{ fontSize: "12.5px", color: "#6b7280" }}
+                              >
+                                Điểm giao:{" "}
+                                {trip.ten_ben_nhan ||
+                                  trip.dia_chi_giao_hang ||
+                                  "—"}
+                                {trip.cho_ky && (
+                                  <BadgeChoKy text={TEN_CHO_KY[trip.cho_ky]} />
+                                )}
                               </p>
                             </div>
                             <div style={{ display: "flex", gap: "8px" }}>
-                              <button onClick={() => setDetailTrip(trip)} className="btn-action-detail">
+                              <button
+                                onClick={() => setDetailTrip(trip)}
+                                className="btn-action-detail"
+                              >
                                 <Eye size={15} />
                                 <span>Xem chi tiết</span>
                               </button>
-                              <button onClick={() => handleConfirmArrival(trip)} className="btn-primary">
+                              <button
+                                onClick={() => handleConfirmArrival(trip)}
+                                className="btn-primary"
+                              >
                                 <Check size={16} />
                                 <span>Xác nhận đã đến nơi</span>
                               </button>
@@ -661,21 +1042,39 @@ export default function AgriChainLogistics() {
                     )}
 
                     <div className="section-card" style={{ marginTop: "16px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "14px", color: "#1f2937", marginBottom: "10px" }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "14px",
+                          color: "#1f2937",
+                          marginBottom: "10px",
+                        }}
+                      >
                         Các chuyến đã đến nơi / hoàn thành
                       </div>
                       {deliveryHistory.length === 0 ? (
-                        <p style={{ color: "#9ca3af", fontSize: "13px" }}>Chưa có chuyến nào.</p>
+                        <p style={{ color: "#9ca3af", fontSize: "13px" }}>
+                          Chưa có chuyến nào.
+                        </p>
                       ) : (
                         deliveryHistory.map((t) => (
                           <div
                             key={t.ma_van_don}
-                            style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f3f4f6", fontSize: "13px" }}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              padding: "8px 0",
+                              borderBottom: "1px solid #f3f4f6",
+                              fontSize: "13px",
+                            }}
                           >
                             <span>
-                              {t.ten_san_pham} (#{t.ma_lo_nong_san}) - {formatWeight(t.khoi_luong, t.don_vi_tinh)}
+                              {t.ten_san_pham} (#{t.ma_lo_nong_san}) -{" "}
+                              {formatWeight(t.khoi_luong, t.don_vi_tinh)}
                             </span>
-                            <span style={{ color: "#6b7280" }}>{STATUS_LABEL[t.trang_thai]?.text}</span>
+                            <span style={{ color: "#6b7280" }}>
+                              {STATUS_LABEL[t.trang_thai]?.text}
+                            </span>
                           </div>
                         ))
                       )}
@@ -693,22 +1092,33 @@ export default function AgriChainLogistics() {
             <div className="modal-content">
               <div className="modal-header">
                 <h3>
-                  <CheckCircle2 size={20} color="#2e8b57" /> Chấp Nhận Chuyến Vận Chuyển
+                  <CheckCircle2 size={20} color="#2e8b57" /> Chấp Nhận Chuyến
+                  Vận Chuyển
                 </h3>
-                <button className="modal-close-btn" onClick={() => setAcceptModalTrip(null)}>
+                <button
+                  className="modal-close-btn"
+                  onClick={() => setAcceptModalTrip(null)}
+                >
                   <X size={20} />
                 </button>
               </div>
               <div className="modal-body">
                 <p style={{ color: "#4b5563" }}>
-                  Chuyến #{acceptModalTrip.ma_van_don}: <b>{acceptModalTrip.ten_san_pham}</b> ({acceptModalTrip.ma_lo_nong_san})
+                  Chuyến #{acceptModalTrip.ma_van_don}:{" "}
+                  <b>{acceptModalTrip.ten_san_pham}</b> (
+                  {acceptModalTrip.ma_lo_nong_san})
                 </p>
                 <div className="form-group">
                   <label>Tài xế phụ trách (*)</label>
                   <input
                     type="text"
                     value={acceptForm.ten_tai_xe}
-                    onChange={(e) => setAcceptForm({ ...acceptForm, ten_tai_xe: e.target.value })}
+                    onChange={(e) =>
+                      setAcceptForm({
+                        ...acceptForm,
+                        ten_tai_xe: e.target.value,
+                      })
+                    }
                     className="form-input"
                     placeholder="Nguyễn Văn Hùng"
                   />
@@ -718,14 +1128,22 @@ export default function AgriChainLogistics() {
                   <input
                     type="text"
                     value={acceptForm.bien_so_xe}
-                    onChange={(e) => setAcceptForm({ ...acceptForm, bien_so_xe: e.target.value })}
+                    onChange={(e) =>
+                      setAcceptForm({
+                        ...acceptForm,
+                        bien_so_xe: e.target.value,
+                      })
+                    }
                     className="form-input"
                     placeholder="65C-128.45"
                   />
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setAcceptModalTrip(null)}>
+                <button
+                  className="btn-cancel"
+                  onClick={() => setAcceptModalTrip(null)}
+                >
                   Hủy
                 </button>
                 <button className="btn-primary" onClick={handleSubmitAccept}>
@@ -742,15 +1160,20 @@ export default function AgriChainLogistics() {
             <div className="modal-content">
               <div className="modal-header">
                 <h3 style={{ color: "#dc2626" }}>
-                  <XCircle size={20} color="#dc2626" /> Từ Chối Chuyến Vận Chuyển
+                  <XCircle size={20} color="#dc2626" /> Từ Chối Chuyến Vận
+                  Chuyển
                 </h3>
-                <button className="modal-close-btn" onClick={() => setRejectModalTrip(null)}>
+                <button
+                  className="modal-close-btn"
+                  onClick={() => setRejectModalTrip(null)}
+                >
                   <X size={20} />
                 </button>
               </div>
               <div className="modal-body">
                 <p style={{ color: "#4b5563" }}>
-                  Chuyến #{rejectModalTrip.ma_van_don}: <b>{rejectModalTrip.ten_san_pham}</b>
+                  Chuyến #{rejectModalTrip.ma_van_don}:{" "}
+                  <b>{rejectModalTrip.ten_san_pham}</b>
                 </p>
                 <div className="form-group">
                   <label>Lý do từ chối (*)</label>
@@ -764,10 +1187,17 @@ export default function AgriChainLogistics() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setRejectModalTrip(null)}>
+                <button
+                  className="btn-cancel"
+                  onClick={() => setRejectModalTrip(null)}
+                >
                   Đóng
                 </button>
-                <button className="btn-primary" style={{ backgroundColor: "#dc2626" }} onClick={handleSubmitReject}>
+                <button
+                  className="btn-primary"
+                  style={{ backgroundColor: "#dc2626" }}
+                  onClick={handleSubmitReject}
+                >
                   Xác Nhận Từ Chối
                 </button>
               </div>
@@ -781,15 +1211,21 @@ export default function AgriChainLogistics() {
             <div className="modal-content">
               <div className="modal-header">
                 <h3>
-                  <PackageCheck size={20} color="#2e8b57" /> Xác Nhận Lấy Hàng Lên Xe
+                  <PackageCheck size={20} color="#2e8b57" /> Xác Nhận Lấy Hàng
+                  Lên Xe
                 </h3>
-                <button className="modal-close-btn" onClick={() => setPickupModalTrip(null)}>
+                <button
+                  className="modal-close-btn"
+                  onClick={() => setPickupModalTrip(null)}
+                >
                   <X size={20} />
                 </button>
               </div>
               <div className="modal-body">
                 <p style={{ color: "#4b5563" }}>
-                  Chuyến: <b>#{pickupModalTrip.ma_van_don}</b> | Lô hàng: <b>{pickupModalTrip.ten_san_pham}</b> ({pickupModalTrip.ma_lo_nong_san})
+                  Chuyến: <b>#{pickupModalTrip.ma_van_don}</b> | Lô hàng:{" "}
+                  <b>{pickupModalTrip.ten_san_pham}</b> (
+                  {pickupModalTrip.ma_lo_nong_san})
                 </p>
                 <div className="form-group">
                   <label>Khối lượng thực nhận (kg)</label>
@@ -802,7 +1238,10 @@ export default function AgriChainLogistics() {
                 </div>
               </div>
               <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setPickupModalTrip(null)}>
+                <button
+                  className="btn-cancel"
+                  onClick={() => setPickupModalTrip(null)}
+                >
                   Đóng
                 </button>
                 <button className="btn-primary" onClick={handleSubmitPickup}>
@@ -819,38 +1258,56 @@ export default function AgriChainLogistics() {
             <div className="modal-content lg">
               <div className="modal-header">
                 <h3>
-                  <Eye size={20} color="#2563eb" /> Chi Tiết Chuyến Vận Chuyển #{detailTrip.ma_van_don}
+                  <Eye size={20} color="#2563eb" /> Chi Tiết Chuyến Vận Chuyển #
+                  {detailTrip.ma_van_don}
                 </h3>
-                <button className="modal-close-btn" onClick={() => setDetailTrip(null)}>
+                <button
+                  className="modal-close-btn"
+                  onClick={() => setDetailTrip(null)}
+                >
                   <X size={20} />
                 </button>
               </div>
               <div className="modal-body">
-                <div className="form-grid-2 readonly-grid" style={{ gap: "14px" }}>
+                <div
+                  className="form-grid-2 readonly-grid"
+                  style={{ gap: "14px" }}
+                >
                   <div className="readonly-item">
                     <label>Mã chuyến</label>
-                    <span style={{ fontWeight: 700, color: "#1d4ed8" }}>#{detailTrip.ma_van_don}</span>
+                    <span style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                      #{detailTrip.ma_van_don}
+                    </span>
                   </div>
                   <div className="readonly-item">
                     <label>Mã lô nông sản</label>
-                    <span className="tag-green" style={{ width: "fit-content" }}>
+                    <span
+                      className="tag-green"
+                      style={{ width: "fit-content" }}
+                    >
                       #{detailTrip.ma_lo_nong_san}
                     </span>
                   </div>
                   <div className="readonly-item">
                     <label>Tên nông sản / hàng hóa</label>
-                    <span style={{ fontWeight: 600, color: "#1f2937" }}>{detailTrip.ten_san_pham}</span>
+                    <span style={{ fontWeight: 600, color: "#1f2937" }}>
+                      {detailTrip.ten_san_pham}
+                    </span>
                   </div>
                   <div className="readonly-item">
                     <label>Khối lượng</label>
                     <span style={{ fontWeight: 600, color: "#047857" }}>
-                      {formatWeight(detailTrip.khoi_luong, detailTrip.don_vi_tinh)}
+                      {formatWeight(
+                        detailTrip.khoi_luong,
+                        detailTrip.don_vi_tinh,
+                      )}
                     </span>
                   </div>
                   <div className="readonly-item">
                     <label>Phương tiện & Tài xế</label>
                     <span>
-                      {detailTrip.bien_so_xe || "Chưa phân công"} - {detailTrip.ten_tai_xe || "Chưa phân công"}
+                      {detailTrip.bien_so_xe || "Chưa phân công"} -{" "}
+                      {detailTrip.ten_tai_xe || "Chưa phân công"}
                     </span>
                   </div>
                   <div className="readonly-item">
@@ -859,7 +1316,11 @@ export default function AgriChainLogistics() {
                   </div>
                   <div className="readonly-item">
                     <label>Bên nhận / Điểm giao</label>
-                    <span>{detailTrip.ten_ben_nhan || detailTrip.dia_chi_giao_hang || "—"}</span>
+                    <span>
+                      {detailTrip.ten_ben_nhan ||
+                        detailTrip.dia_chi_giao_hang ||
+                        "—"}
+                    </span>
                   </div>
                   <div className="readonly-item">
                     <label>Thời gian xuất</label>
@@ -870,12 +1331,17 @@ export default function AgriChainLogistics() {
                 {detailTrip.ghi_chu && (
                   <div className="readonly-item" style={{ marginTop: "6px" }}>
                     <label>Ghi chú</label>
-                    <span style={{ color: "#4b5563", fontSize: "13px" }}>{detailTrip.ghi_chu}</span>
+                    <span style={{ color: "#4b5563", fontSize: "13px" }}>
+                      {detailTrip.ghi_chu}
+                    </span>
                   </div>
                 )}
               </div>
               <div className="modal-footer">
-                <button className="btn-cancel" onClick={() => setDetailTrip(null)}>
+                <button
+                  className="btn-cancel"
+                  onClick={() => setDetailTrip(null)}
+                >
                   Đóng
                 </button>
               </div>

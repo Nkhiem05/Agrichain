@@ -69,7 +69,7 @@ const BadgeChuLoXacNhan = ({ item }) =>
         marginLeft: 8,
       }}
     >
-      Chủ lô đã xác nhận biên bản lấy mẫu
+      Chủ lô đã ký xác nhận biên bản lấy mẫu
     </span>
   ) : (
     <span
@@ -83,15 +83,52 @@ const BadgeChuLoXacNhan = ({ item }) =>
         padding: "3px 10px",
         marginLeft: 8,
       }}
-      title="Chủ lô xác nhận ở trang Nông dân → Lịch hẹn kiểm định. Có bước này mới công bố được kết quả."
+      title='Chủ lô ký xác nhận ở trang Nông dân → tab "Ký blockchain". Có bước này mới công bố được kết quả.'
     >
-      Chờ chủ lô xác nhận biên bản lấy mẫu
+      Chờ chủ lô ký xác nhận biên bản lấy mẫu
     </span>
   );
 
-// Nút công bố vẫn bấm được khi chủ lô chưa xác nhận biên bản lấy mẫu: bấm thì báo bằng alert
+// Nút công bố vẫn bấm được khi chủ lô chưa ký xác nhận biên bản lấy mẫu: bấm thì báo bằng alert
 const CANH_BAO_CHU_LO_CHUA_XAC_NHAN =
-  'Nông dân (chủ lô) chưa xác nhận lấy mẫu.\nNông dân cần vào trang Nông dân → "Lịch hẹn kiểm định" để xác nhận biên bản lấy mẫu, sau đó bạn mới công bố được kết quả.';
+  'Nông dân (chủ lô) chưa ký xác nhận biên bản lấy mẫu.\nNông dân cần vào trang Nông dân → "Ký blockchain" để ký, sau đó bạn mới công bố được kết quả.';
+
+// Chưa ký blockchain thì không nhập chỉ số / không công bố: nút vẫn bấm được nhưng chỉ hiện alert
+const CANH_BAO_CHUA_KY_LAY_MAU =
+  'Biên bản lấy mẫu chưa được ký lên blockchain.\nHãy vào mục "Ký blockchain" ký biên bản lấy mẫu trước, rồi mới nhập chỉ số xét nghiệm.';
+const CANH_BAO_CHUA_KY_LAY_MAU_CONG_BO =
+  'Biên bản lấy mẫu của cơ quan chưa được ký lên blockchain.\nHãy vào mục "Ký blockchain" ký trước, rồi mới công bố được kết quả.';
+
+// Lý do chưa công bố được (null = được công bố). da_ky_lay_mau do server trả về, thiếu thì coi như không chặn.
+const canhBaoTruocCongBo = (item) => {
+  if (item.cho_ky_cong_bo) return CANH_BAO_DA_GUI_CONG_BO;
+  if (!item.chu_lo_da_xac_nhan) return CANH_BAO_CHU_LO_CHUA_XAC_NHAN;
+  if (item.da_ky_lay_mau === false) return CANH_BAO_CHUA_KY_LAY_MAU_CONG_BO;
+  return null;
+};
+
+// Công bố / thu hồi chỉ có hiệu lực sau khi cơ quan ký lên blockchain: lúc bấm chỉ tạo yêu cầu chờ ký
+const CANH_BAO_DA_GUI_CONG_BO =
+  'Đã gửi yêu cầu công bố cho hồ sơ này, đang chờ cơ quan ký.\nHãy vào mục "Ký blockchain" để ký; hồ sơ chỉ chuyển sang "Công bố chứng nhận" sau khi ký xong.';
+const CANH_BAO_DA_GUI_THU_HOI =
+  'Đã gửi yêu cầu thu hồi cho chứng nhận này, đang chờ cơ quan ký.\nHãy vào mục "Ký blockchain" để ký; chứng nhận chỉ bị thu hồi sau khi ký xong.';
+
+const BadgeChoKy = ({ text }) => (
+  <span
+    style={{
+      fontSize: 12.5,
+      fontWeight: 600,
+      color: "#b45309",
+      background: "#fffbeb",
+      border: "1px solid #fde68a",
+      borderRadius: 999,
+      padding: "3px 10px",
+      marginLeft: 8,
+    }}
+  >
+    {text}
+  </span>
+);
 
 const SCHEDULED_STATUSES = ["DA_HEN_LICH", "DA_HEN"];
 const PENDING_SAMPLE_STATUSES = [
@@ -383,6 +420,16 @@ function Coquankiemdinh() {
 
   // Mở popup và gửi yêu cầu đến server tải các tiêu chuẩn của bảng ngưỡng kiểm định chuẩn
   const handleOpenPublishModal = async (item) => {
+    if (item.da_ky_lay_mau === false) {
+      alert(CANH_BAO_CHUA_KY_LAY_MAU);
+      return;
+    }
+    if (item.cho_ky_cong_bo) {
+      alert(
+        'Đã gửi yêu cầu công bố cho hồ sơ này nên chỉ số xét nghiệm đã khóa, không sửa được nữa.\nHãy vào mục "Ký blockchain" để ký.',
+      );
+      return;
+    }
     setCode(item.ma_kiem_dinh);
     setStandardIndicators([]);
     setIndicatorValues({});
@@ -429,6 +476,16 @@ function Coquankiemdinh() {
   };
 
   const handleOpenRevokeModal = (item) => {
+    if (item.cho_ky_thu_hoi) {
+      alert(CANH_BAO_DA_GUI_THU_HOI);
+      return;
+    }
+    if (item.cho_ky_cong_bo) {
+      alert(
+        "Hồ sơ đang chờ ký công bố nên chưa thu hồi được. Hãy ký công bố xong rồi mới thu hồi chứng nhận.",
+      );
+      return;
+    }
     setRevokeItem(item);
     setCode(item.ma_kiem_dinh);
     setRevokeReason("Phát hiện tồn dư chất cấm vượt ngưỡng kiểm định an toàn");
@@ -453,7 +510,9 @@ function Coquankiemdinh() {
         return;
       }
       alert(
-        `Đã kích hoạt thu hồi lô #${revokeItem.ma_lo_nong_san} thành công!`,
+        ketQua.cho_ky
+          ? `Lô #${revokeItem.ma_lo_nong_san}: ${ketQua.message}`
+          : `Đã kích hoạt thu hồi lô #${revokeItem.ma_lo_nong_san} thành công!`,
       );
       setModalRevokeOpen(false);
       fetchSamplingRequests();
@@ -478,9 +537,13 @@ function Coquankiemdinh() {
         return;
       }
       alert(
-        `Đã công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!${
-          result.so_chung_nhan ? ` Số chứng nhận: ${result.so_chung_nhan}` : ""
-        }\nVào mục "Ký blockchain" để ký công bố.`,
+        result.cho_ky
+          ? `Lô #${selectedPublishItem.ma_lo_nong_san}: ${result.message}`
+          : `Đã công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!${
+              result.so_chung_nhan
+                ? ` Số chứng nhận: ${result.so_chung_nhan}`
+                : ""
+            }`,
       );
       setModalConfirmPublishOpen(false);
       fetchSamplingRequests();
@@ -510,7 +573,9 @@ function Coquankiemdinh() {
         return;
       }
       alert(
-        `Đã công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.\nVào mục "Ký blockchain" để ký công bố.`,
+        result.cho_ky
+          ? `Lô #${failItem.ma_lo_nong_san}: ${result.message}`
+          : `Đã công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.`,
       );
       setModalFailOpen(false);
       fetchSamplingRequests();
@@ -1293,6 +1358,9 @@ function Coquankiemdinh() {
                                       : "Trạng thái: Không đạt chuẩn kiểm định"}
                                   </span>
                                   <BadgeChuLoXacNhan item={item} />
+                                  {item.cho_ky_cong_bo && (
+                                    <BadgeChoKy text="Chờ ký công bố" />
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1316,19 +1384,20 @@ function Coquankiemdinh() {
                                 <button
                                   type="button"
                                   title={
-                                    item.chu_lo_da_xac_nhan
-                                      ? undefined
-                                      : "Chờ chủ lô xác nhận biên bản lấy mẫu"
+                                    canhBaoTruocCongBo(item)
+                                      ? "Chưa đủ điều kiện công bố"
+                                      : undefined
                                   }
                                   style={
-                                    item.chu_lo_da_xac_nhan
-                                      ? undefined
-                                      : { opacity: 0.5 }
+                                    canhBaoTruocCongBo(item)
+                                      ? { opacity: 0.5 }
+                                      : undefined
                                   }
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    if (!item.chu_lo_da_xac_nhan) {
-                                      alert(CANH_BAO_CHU_LO_CHUA_XAC_NHAN);
+                                    const canhBao = canhBaoTruocCongBo(item);
+                                    if (canhBao) {
+                                      alert(canhBao);
                                       return;
                                     }
                                     handleOpenConfirmPublishModal(item);
@@ -1346,19 +1415,20 @@ function Coquankiemdinh() {
                                   <button
                                     type="button"
                                     title={
-                                      item.chu_lo_da_xac_nhan
-                                        ? undefined
-                                        : "Chờ chủ lô xác nhận biên bản lấy mẫu"
+                                      canhBaoTruocCongBo(item)
+                                        ? "Chưa đủ điều kiện công bố"
+                                        : undefined
                                     }
                                     style={
-                                      item.chu_lo_da_xac_nhan
-                                        ? undefined
-                                        : { opacity: 0.5 }
+                                      canhBaoTruocCongBo(item)
+                                        ? { opacity: 0.5 }
+                                        : undefined
                                     }
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      if (!item.chu_lo_da_xac_nhan) {
-                                        alert(CANH_BAO_CHU_LO_CHUA_XAC_NHAN);
+                                      const canhBao = canhBaoTruocCongBo(item);
+                                      if (canhBao) {
+                                        alert(canhBao);
                                         return;
                                       }
                                       handleOpenFailModal(item);
@@ -1532,6 +1602,9 @@ function Coquankiemdinh() {
                                     Số CN: {item.so_chung_nhan || "Chưa cấp"}
                                   </span>
                                 )}
+                                {isPassed && item.cho_ky_thu_hoi && (
+                                  <BadgeChoKy text="Chờ ký thu hồi" />
+                                )}
                               </div>
 
                               <div className="card-meta-wrap">
@@ -1594,6 +1667,24 @@ function Coquankiemdinh() {
                               >
                                 <Download size={16} />
                                 <span>Tải Chứng Thư</span>
+                              </button>
+                            )}
+                            {isPassed && (
+                              <button
+                                type="button"
+                                style={
+                                  item.cho_ky_thu_hoi
+                                    ? { opacity: 0.5 }
+                                    : undefined
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenRevokeModal(item);
+                                }}
+                                className="btn-action-revoke"
+                              >
+                                <ShieldAlert size={15} />
+                                <span>Thu hồi</span>
                               </button>
                             )}
                           </div>
@@ -1692,7 +1783,8 @@ function Coquankiemdinh() {
                     Mỗi bước kiểm định (niêm phong mẫu, công bố Đạt / Không đạt,
                     thu hồi) cần cơ quan ký bằng ví MetaMask để ghi lên
                     blockchain. Các bước của một lô phải ký theo thứ tự, nên có
-                    bước sẽ chờ chủ lô ký trước.
+                    bước sẽ chờ bước trước của lô được ký (ví dụ chủ lô ký xác
+                    nhận biên bản lấy mẫu).
                   </p>
                   <div className="blockchain-panel-full">
                     <BlockchainPanel thongBaoBangAlert />

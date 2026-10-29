@@ -286,9 +286,17 @@ export const kyCacSuKienDangCho = async () => {
     };
   }
 
-  let dsSanSang = (await fetchChoKy()).su_kien.filter((x) => x.san_sang);
+  const choKy = (await fetchChoKy()).su_kien;
+  let dsSanSang = choKy.filter((x) => x.san_sang);
   if (dsSanSang.length === 0) {
-    return { soDaKy: 0, lyDo: "không có sự kiện nào sẵn sàng để ký" };
+    // Nói rõ vì sao chưa ký được: không có sự kiện nào (lô không được theo dõi trên chain), hoặc có nhưng đang chờ bước trước
+    return {
+      soDaKy: 0,
+      lyDo:
+        choKy.length === 0
+          ? "không có sự kiện nào cần ký (lô này không được theo dõi trên blockchain)"
+          : `sự kiện của bạn chưa ký được: ${choKy[0].ly_do || "đang chờ điều kiện"}`,
+    };
   }
 
   const { signer, diaChi } = await ketNoiMetaMask(cauHinh);

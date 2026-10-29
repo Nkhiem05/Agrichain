@@ -1,5 +1,8 @@
 const db = require("../config/db");
 const { baoDamSuKienGoc } = require("../services/blockchain/traceEvent");
+const {
+  timMaLoChuaCoTrenChain,
+} = require("../services/blockchain/chainClient");
 
 /*
 ==================================================
@@ -457,11 +460,14 @@ const createBatch = async (req, res) => {
             season.loai_cay_trong,
           );
 
-          const newCode = await generateCode(
-            connection,
-            "lo_nong_san",
-            "ma_lo_nong_san",
-            "LO",
+          // bỏ qua mã lô đã có trên blockchain (hợp đồng từ chối ký lô trùng mã)
+          const newCode = await timMaLoChuaCoTrenChain(
+            await generateCode(
+              connection,
+              "lo_nong_san",
+              "ma_lo_nong_san",
+              "LO",
+            ),
           );
 
           await connection.execute(

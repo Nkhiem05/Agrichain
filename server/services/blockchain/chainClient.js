@@ -82,6 +82,33 @@ const layTrangThaiLoTrenChain = async (maLo) => {
   };
 };
 
+// Lô được lưu trên chain theo keccak256(mã lô). Mã đã có trên chain (lô chốt ở lần chạy trước với database khác,
+// hoặc database của người khác dùng chung hợp đồng) bị hợp đồng từ chối "lo da ton tai" khi ký.
+// Từ mã database gợi ý (vd LO017), tăng dần tới mã còn trống trên chain. Chưa cấu hình / không đọc được chain: giữ nguyên mã.
+const timMaLoChuaCoTrenChain = async (maLo) => {
+  if (!layCauHinh().daCauHinh) return maLo;
+  const m = /^(.*?)(\d+)$/.exec(maLo);
+  if (!m) return maLo;
+  const [, tienTo, soChu] = m;
+  let so = Number(soChu);
+  for (let i = 0; i < 200; i++) {
+    const ma = `${tienTo}${String(so).padStart(soChu.length, "0")}`;
+    let tren;
+    try {
+      tren = await layTrangThaiLoTrenChain(ma);
+    } catch (err) {
+      console.warn(
+        `Không kiểm tra được mã lô ${ma} trên blockchain:`,
+        err.shortMessage || err.message,
+      );
+      return ma;
+    }
+    if (!tren?.tonTai) return ma;
+    so++;
+  }
+  throw new Error("Không tìm được mã lô còn trống trên blockchain");
+};
+
 // Ví admin của hợp đồng (ví đã deploy hoặc ví được transferAdmin)
 const adminTrenChain = async () => {
   const c = layContract();
@@ -92,7 +119,8 @@ const adminTrenChain = async () => {
 // Tìm lý do không đọc được hợp đồng: sai RPC, sai chainId, sai địa chỉ, hay địa chỉ là hợp đồng cũ (không phải v2)
 const chanDoanHopDong = async () => {
   const c = layContract();
-  if (!c) return "Chưa cấu hình địa chỉ hợp đồng (BLOCKCHAIN_CONTRACT_ADDRESS hoặc blockchain/deployed-agrichain.json)";
+  if (!c)
+    return "Chưa cấu hình địa chỉ hợp đồng (BLOCKCHAIN_CONTRACT_ADDRESS hoặc blockchain/deployed-agrichain.json)";
   const { provider, contract, cfg } = c;
   let chainIdRpc;
   try {
@@ -126,12 +154,24 @@ const nguongTrenChain = async (maBam) => {
 // Giao dịch đã vào khối và thành công, gửi tới đúng hợp đồng
 const kiemTraGiaoDichHopDong = async (txHash) => {
   const c = layContract();
-  if (!c) return { ok: false, lyDo: "Chưa cấu hình contract blockchain trên server" };
+  if (!c)
+    return { ok: false, lyDo: "Chưa cấu hình contract blockchain trên server" };
   const receipt = await c.provider.getTransactionReceipt(txHash);
-  if (!receipt) return { ok: false, lyDo: "Chưa thấy giao dịch trên blockchain, hãy thử lại sau vài giây" };
-  if (receipt.status !== 1) return { ok: false, lyDo: "Giao dịch thất bại trên blockchain" };
-  if (!receipt.to || getAddress(receipt.to) !== getAddress(c.cfg.contractAddress))
-    return { ok: false, lyDo: "Giao dịch không gửi tới hợp đồng AgriChain đang cấu hình" };
+  if (!receipt)
+    return {
+      ok: false,
+      lyDo: "Chưa thấy giao dịch trên blockchain, hãy thử lại sau vài giây",
+    };
+  if (receipt.status !== 1)
+    return { ok: false, lyDo: "Giao dịch thất bại trên blockchain" };
+  if (
+    !receipt.to ||
+    getAddress(receipt.to) !== getAddress(c.cfg.contractAddress)
+  )
+    return {
+      ok: false,
+      lyDo: "Giao dịch không gửi tới hợp đồng AgriChain đang cấu hình",
+    };
   return { ok: true };
 };
 
@@ -159,9 +199,15 @@ const timGiaoDichSuKien = async (maLo, eventHash, soKhoi = 100) => {
     Math.max(0, moiNhat - soKhoi + 1),
     moiNhat,
   );
-  const log = logs.find((l) => String(l.args.eventHash).toLowerCase() === eventHash.toLowerCase());
+  const log = logs.find(
+    (l) => String(l.args.eventHash).toLowerCase() === eventHash.toLowerCase(),
+  );
   return log
-    ? { txHash: log.transactionHash.toLowerCase(), signer: String(log.args.signer).toLowerCase(), soBlock: log.blockNumber }
+    ? {
+        txHash: log.transactionHash.toLowerCase(),
+        signer: String(log.args.signer).toLowerCase(),
+        soBlock: log.blockNumber,
+      }
     : null;
 };
 
@@ -218,6 +264,7 @@ module.exports = {
   layCauHinh,
   layContract,
   layTrangThaiLoTrenChain,
+  timMaLoChuaCoTrenChain,
   adminTrenChain,
   chanDoanHopDong,
   nguongTrenChain,

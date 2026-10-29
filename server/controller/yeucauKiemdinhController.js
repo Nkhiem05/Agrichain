@@ -1,5 +1,5 @@
 const db = require("../config/db");
-const { ghiSuKienKiemDinhTrong } = require("../services/blockchain/hook");
+const { layCauHinh } = require("../services/blockchain/chainClient");
 
 /*
 ==================================================
@@ -76,14 +76,23 @@ const getFarmerId = (req) => {
   }
 
   if (user.vai_tro !== "FARMER_COOP") {
-    throw new ApiError(403, "Chỉ nông dân/hợp tác xã mới được gửi yêu cầu kiểm định");
+    throw new ApiError(
+      403,
+      "Chỉ nông dân/hợp tác xã mới được gửi yêu cầu kiểm định",
+    );
   }
 
   return user.ma_nguoi_dung;
 };
 
 // Sinh mã dạng PREFIX001... (mã kiểm định) hoặc PREFIX-1001... (mã hồ sơ)
-const generateCode = async (connection, column, prefix, minDigits, floor = 0) => {
+const generateCode = async (
+  connection,
+  column,
+  prefix,
+  minDigits,
+  floor = 0,
+) => {
   const [rows] = await connection.query(
     `
     SELECT COALESCE(MAX(CAST(SUBSTRING(${column}, ?) AS UNSIGNED)), 0) AS max_no
@@ -152,14 +161,14 @@ const createRequest = async (req, res) => {
     }
 
     if (!TIEU_CHUAN.includes(tieu_chuan)) {
-      throw new ApiError(400, "Tiêu chuẩn phải là VIETGAP, GLOBALGAP hoặc ORGANIC");
+      throw new ApiError(
+        400,
+        "Tiêu chuẩn phải là VIETGAP, GLOBALGAP hoặc ORGANIC",
+      );
     }
 
     if (noi_dung_de_nghi && noi_dung_de_nghi.length > MAX_NOI_DUNG) {
-      throw new ApiError(
-        400,
-        `Nội dung đề nghị tối đa ${MAX_NOI_DUNG} ký tự`,
-      );
+      throw new ApiError(400, `Nội dung đề nghị tối đa ${MAX_NOI_DUNG} ký tự`);
     }
 
     // Mã kiểm định/hồ sơ do server sinh; thử lại nếu 2 request cùng lúc sinh trùng mã
@@ -396,6 +405,32 @@ const getMyRequests = async (req, res) => {
       [maNguoiDung, maNguoiDung],
     );
 
+    // Hồ sơ được theo dõi trên chain: chủ lô chỉ tính là đã xác nhận biên bản lấy mẫu khi đã KÝ lên blockchain
+    if (layCauHinh().daCauHinh && rows.length > 0) {
+      const [ev] = await db.query(
+        `
+        SELECT loai_hoat_dong, blockchain_sync_status,
+               JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_kiem_dinh')) AS ma_kiem_dinh
+        FROM lich_su_truy_xuat_lo
+        WHERE loai_hoat_dong IN ('SAMPLING_SEALED', 'SAMPLING_CONFIRMED')
+          AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_kiem_dinh')) IN (?)
+        `,
+        [rows.map((r) => r.ma_kiem_dinh)],
+      );
+      rows.forEach((r) => {
+        const cua = ev.filter((e) => e.ma_kiem_dinh === r.ma_kiem_dinh);
+        if (cua.some((e) => e.loai_hoat_dong === "SAMPLING_SEALED")) {
+          r.chu_lo_da_xac_nhan = cua.some(
+            (e) =>
+              e.loai_hoat_dong === "SAMPLING_CONFIRMED" &&
+              e.blockchain_sync_status === "CONFIRMED",
+          )
+            ? 1
+            : 0;
+        }
+      });
+    }
+
     return res.json({ success: true, data: rows });
   } catch (err) {
     // Chưa có bảng kiểm định thì coi như chưa có yêu cầu nào
@@ -412,60 +447,14 @@ const getMyRequests = async (req, res) => {
   }
 };
 
-// Chủ lô xác nhận biên bản lấy mẫu (mã niêm phong, khối lượng, phương pháp) đúng với thực tế.
-// Ghi SAMPLING_CONFIRMED vào hàng chờ ký; chủ lô ký bằng ví của mình. Có bước này cơ quan mới công bố được.
-const confirmSampling = async (req, res) => {
-  try {
-    const maNguoiDung = getFarmerId(req);
-    const maKiemDinh = cleanText(req.params.maKiemDinh);
-
-    await withTransaction(async (connection) => {
-      const [rows] = await connection.query(
-        `
-        SELECT kd.trang_thai_ho_so, kd.chu_lo_da_xac_nhan, kd.ma_niem_phong, kd.khoi_luong_mau,
-               lo.ma_nguoi_quan_ly
-        FROM kiem_dinh_lo_hang kd
-        JOIN lo_nong_san lo ON lo.ma_lo_nong_san = kd.ma_lo_nong_san
-        WHERE kd.ma_kiem_dinh = ?
-        FOR UPDATE
-        `,
-        [maKiemDinh],
-      );
-      if (rows.length === 0) throw new ApiError(404, "Không tìm thấy hồ sơ kiểm định");
-      const kd = rows[0];
-      if (kd.ma_nguoi_quan_ly !== maNguoiDung) {
-        throw new ApiError(403, "Chỉ chủ lô đang giữ lô mới xác nhận được biên bản lấy mẫu");
-      }
-      if (!["CHO_LAY_MAU", "DA_LAY_MAU"].includes(kd.trang_thai_ho_so) || !kd.ma_niem_phong) {
-        throw new ApiError(409, "Cơ quan kiểm định chưa lập biên bản lấy mẫu cho hồ sơ này");
-      }
-      if (kd.chu_lo_da_xac_nhan) {
-        throw new ApiError(409, "Bạn đã xác nhận biên bản lấy mẫu này rồi");
-      }
-
-      await connection.query(
-        `UPDATE kiem_dinh_lo_hang SET chu_lo_da_xac_nhan = 1 WHERE ma_kiem_dinh = ?`,
-        [maKiemDinh],
-      );
-      // Hồ sơ lập trước khi có bước niêm phong trên chain: bổ sung sự kiện niêm phong (cơ quan ký) trước
-      await ghiSuKienKiemDinhTrong(connection, maKiemDinh, "SAMPLING_SEALED");
-      await ghiSuKienKiemDinhTrong(connection, maKiemDinh, "SAMPLING_CONFIRMED");
-    });
-
-    return res.json({
-      success: true,
-      message:
-        "Đã xác nhận biên bản lấy mẫu. Hãy ký xác nhận bằng ví ở mục Ví blockchain (Trang cá nhân)",
-    });
-  } catch (err) {
-    return sendError(
-      res,
-      err,
-      "Lỗi xác nhận biên bản lấy mẫu:",
-      "Không thể xác nhận biên bản lấy mẫu",
-    );
-  }
-};
+// Chủ lô KHÔNG còn nút xác nhận riêng: sự kiện xác nhận biên bản lấy mẫu tự xuất hiện trong tab "Ký blockchain" của
+// nông dân khi cơ quan niêm phong mẫu, và việc ký chính là xác nhận. Giữ endpoint cũ để không lỗi route.
+const confirmSampling = async (req, res) =>
+  res.status(410).json({
+    success: false,
+    message:
+      'Chủ lô xác nhận biên bản lấy mẫu bằng cách ký ở tab "Ký blockchain", không còn nút xác nhận riêng.',
+  });
 
 module.exports = {
   getAuthorities,

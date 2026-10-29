@@ -1,5 +1,9 @@
-const { ghiSuKien, layChiSoKiemDinh, baoDamSuKienGoc } = require("./traceEvent");
-const { hashNoiDung, sangGram } = require("./canonical");
+const {
+  ghiSuKien,
+  layChiSoKiemDinh,
+  baoDamSuKienGoc,
+} = require("./traceEvent");
+const { hashNoiDung, sangGram, certIdMoiCuaHoSo } = require("./canonical");
 
 // Các hàm ghi sự kiện cho từng nghiệp vụ, để controller chỉ cần gọi một dòng.
 
@@ -21,12 +25,15 @@ const LOAI_SAU_LENH = [
 ];
 
 // Sự kiện của một lệnh vận chuyển (lenh_van_chuyen). Gọi bên trong transaction của controller.
+// ketQuaTam (tùy chọn): thay đổi của chuyến CHƯA áp dụng (chuyến chỉ chuyển bước sau khi sự kiện được ký),
+// lưu trong tham_so.ap_dung của hàng chờ; ghiNhan.js áp dụng khi sự kiện xác nhận trên chain.
 const ghiSuKienVanDon = async (
   executor,
   maVanDon,
   loai,
   maNguoiKy,
   duLieuThem = {},
+  ketQuaTam = null,
 ) => {
   const [rows] = await executor.query(
     `
@@ -88,15 +95,25 @@ const ghiSuKienVanDon = async (
     loai === "TRANSPORT_ORDERED"
       ? thamSoLenh
       : loai === "STOCK_IN_CONFIRMED"
-        ? { khoi_luong_nhan_gram: sangGram(v.khoi_luong_nhan || v.khoi_luong, v.don_vi_tinh) }
+        ? {
+            khoi_luong_nhan_gram: sangGram(
+              v.khoi_luong_nhan || v.khoi_luong,
+              v.don_vi_tinh,
+            ),
+          }
         : {};
 
   return ghiSuKien(executor, {
     maLo: v.ma_lo_nong_san,
     loai,
     maNguoiKy,
-    duLieu: loai === "STOCK_IN_CONFIRMED" ? { ...duLieu, khoi_luong_nhan: v.khoi_luong_nhan || v.khoi_luong } : duLieu,
-    thamSo,
+    duLieu:
+      loai === "STOCK_IN_CONFIRMED"
+        ? { ...duLieu, khoi_luong_nhan: v.khoi_luong_nhan || v.khoi_luong }
+        : duLieu,
+    thamSo: ketQuaTam
+      ? { ...thamSo, ma_van_don: v.ma_van_don, ap_dung: ketQuaTam }
+      : thamSo,
   });
 };
 
@@ -110,11 +127,23 @@ const ghiSuKienTuChoiNhanHang = async (executor, maVanDon) => {
     `SELECT ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan FROM lenh_van_chuyen WHERE ma_van_don = ? LIMIT 1`,
     [maVanDon],
   );
-  if (rows.length === 0) throw new Error(`Không tìm thấy lệnh vận chuyển ${maVanDon}`);
+  if (rows.length === 0)
+    throw new Error(`Không tìm thấy lệnh vận chuyển ${maVanDon}`);
   const v = rows[0];
-  const tuChoi = await ghiSuKienVanDon(executor, maVanDon, "HANDOVER_REJECTED", v.ma_ben_nhan, { ben_tu_choi: "BEN_NHAN" });
+  const tuChoi = await ghiSuKienVanDon(
+    executor,
+    maVanDon,
+    "HANDOVER_REJECTED",
+    v.ma_ben_nhan,
+    { ben_tu_choi: "BEN_NHAN" },
+  );
   if (!tuChoi) return null; // lô không được theo dõi trên chain
-  await ghiSuKienVanDon(executor, maVanDon, "RETURN_SHIPPED", v.ma_don_vi_van_chuyen);
+  await ghiSuKienVanDon(
+    executor,
+    maVanDon,
+    "RETURN_SHIPPED",
+    v.ma_don_vi_van_chuyen,
+  );
   await ghiSuKienVanDon(executor, maVanDon, "RETURN_RECEIVED", v.ma_nguoi_gui);
   return tuChoi;
 };
@@ -191,8 +220,14 @@ const xoaSuKienChuaKy = async (executor, maLo) => {
   if (ev.some((e) => e.blockchain_sync_status !== "QUEUED")) return false;
   if (ev.length > 0) {
     const ids = ev.map((e) => e.ma_lich_su);
-    await executor.query(`DELETE FROM blockchain_outbox WHERE event_id IN (?)`, [ids]);
-    await executor.query(`DELETE FROM lich_su_truy_xuat_lo WHERE ma_lich_su IN (?)`, [ids]);
+    await executor.query(
+      `DELETE FROM blockchain_outbox WHERE event_id IN (?)`,
+      [ids],
+    );
+    await executor.query(
+      `DELETE FROM lich_su_truy_xuat_lo WHERE ma_lich_su IN (?)`,
+      [ids],
+    );
   }
   return true;
 };
@@ -223,9 +258,36 @@ const daCoSuKienKiemDinh = async (executor, maKiemDinh, loai) => {
   return rows.length > 0;
 };
 
+// certId đã gắn cho hồ sơ ở sự kiện đầu tiên của nó. Trả undefined nếu hồ sơ có sự kiện từ trước khi có cách đặt id mới
+// (khi đó dùng cách cũ keccak256(mã hồ sơ), đúng với id đã ghi trên chain), và null nếu hồ sơ chưa có sự kiện nào.
+const layCertIdDaGan = async (executor, maKiemDinh) => {
+  const [rows] = await executor.query(
+    `
+    SELECT JSON_UNQUOTE(JSON_EXTRACT(o.payload, '$.tham_so.cert_id')) AS cert_id
+    FROM lich_su_truy_xuat_lo ls
+    JOIN blockchain_outbox o ON o.event_id = ls.ma_lich_su
+    WHERE JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_kiem_dinh')) = ?
+    ORDER BY ls.so_thu_tu_su_kien
+    LIMIT 1
+    `,
+    [maKiemDinh],
+  );
+  if (rows.length === 0) return null;
+  return rows[0].cert_id || undefined;
+};
+
 // Sự kiện kiểm định, gọi BÊN TRONG transaction của controller (lỗi sẽ ném ra để rollback cả nghiệp vụ).
 // Trả null nếu sự kiện đã có hoặc lô không được theo dõi.
-const ghiSuKienKiemDinhTrong = async (connection, maKiemDinh, loai) => {
+// ketQuaTam (tùy chọn): kết quả công bố / thu hồi CHƯA áp dụng vào hồ sơ (hồ sơ chỉ đổi trạng thái sau khi sự kiện được ký):
+//   hoSo   : giá trị dùng dựng dữ liệu sự kiện, ghi đè lên hàng hồ sơ (so_chung_nhan, ket_luan, hieu_luc_tu, hieu_luc_den,
+//            ly_do_thu_hoi, phien_ban_nguong)
+//   apDung : thay đổi sẽ áp dụng vào hồ sơ khi sự kiện xác nhận trên chain, lưu trong tham_so.ap_dung của hàng chờ
+const ghiSuKienKiemDinhTrong = async (
+  connection,
+  maKiemDinh,
+  loai,
+  ketQuaTam = null,
+) => {
   if (await daCoSuKienKiemDinh(connection, maKiemDinh, loai)) return null;
 
   const [rows] = await connection.query(
@@ -245,8 +307,10 @@ const ghiSuKienKiemDinhTrong = async (connection, maKiemDinh, loai) => {
     `,
     [maKiemDinh],
   );
-  if (rows.length === 0) throw new Error(`Không tìm thấy hồ sơ kiểm định ${maKiemDinh}`);
+  if (rows.length === 0)
+    throw new Error(`Không tìm thấy hồ sơ kiểm định ${maKiemDinh}`);
   const kd = rows[0];
+  if (ketQuaTam?.hoSo) Object.assign(kd, ketQuaTam.hoSo);
 
   // Biên bản lấy mẫu: cơ quan niêm phong, chủ lô ký xác nhận đúng nội dung này
   const duLieu = {
@@ -274,6 +338,13 @@ const ghiSuKienKiemDinhTrong = async (connection, maKiemDinh, loai) => {
     });
   }
 
+  // Hồ sơ mới: đặt certId riêng (gắn mã lô). Hồ sơ đã có sự kiện: dùng lại id của sự kiện đầu.
+  const certDaGan = await layCertIdDaGan(connection, maKiemDinh);
+  const certId =
+    certDaGan === null
+      ? certIdMoiCuaHoSo(kd.ma_kiem_dinh, kd.ma_lo_nong_san)
+      : certDaGan;
+
   return ghiSuKien(connection, {
     maLo: kd.ma_lo_nong_san,
     loai,
@@ -283,6 +354,8 @@ const ghiSuKienKiemDinhTrong = async (connection, maKiemDinh, loai) => {
     // hợp đồng v2: chứng nhận gắn theo mã hồ sơ; công bố phải kèm bộ ngưỡng đã ghi trên chain
     thamSo: {
       ma_kiem_dinh: kd.ma_kiem_dinh,
+      ...(certId ? { cert_id: certId } : {}),
+      ...(ketQuaTam?.apDung ? { ap_dung: ketQuaTam.apDung } : {}),
       ...(loai === "CERTIFICATE_ISSUED"
         ? { het_han: hanChungNhanUnix(kd.hieu_luc_den) }
         : {}),

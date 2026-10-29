@@ -17,6 +17,12 @@ dotenv.config({
 // Ví dùng để deploy lên Monad (key nằm trong .env, KHÔNG commit)
 const accounts = process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [];
 
+// Dùng chung nút RPC với server (BLOCKCHAIN_RPC_URL trong .env) để deploy và chạy app luôn cùng một đường mạng.
+// Một số mạng/nhà mạng không phân giải được tên miền testnet-rpc.monad.xyz (lỗi ENOTFOUND): khi đó đổi
+// BLOCKCHAIN_RPC_URL sang nút khác (ví dụ nút đang dùng trong MetaMask).
+const monadRpcUrl =
+  process.env.BLOCKCHAIN_RPC_URL || "https://testnet-rpc.monad.xyz";
+
 export default defineConfig({
   plugins: [hardhatEthers],
   // Bật optimizer: hợp đồng v2 khi không tối ưu dài ~26,9 KB, vượt giới hạn 24 KB của EVM
@@ -28,7 +34,7 @@ export default defineConfig({
     localhost: { type: "http", url: "http://127.0.0.1:8545" },
     monadTestnet: {
       type: "http",
-      url: "https://testnet-rpc.monad.xyz",
+      url: monadRpcUrl,
       chainId: 10143,
       accounts,
     },

@@ -1,5 +1,10 @@
 const db = require("../config/db");
-const { ghiSuKienVanDon } = require("../services/blockchain/hook");
+const {
+  ghiSuKienVanDon,
+  chuaCoViDuyet,
+} = require("../services/blockchain/hook");
+const { apDungKetQuaVanDon } = require("../services/blockchain/ghiNhan");
+const { layCauHinh } = require("../services/blockchain/chainClient");
 
 /*
 ==================================================
@@ -11,6 +16,8 @@ Luồng trạng thái do đơn vị vận chuyển điều khiển:
   CHO_LAY_HANG  -> (xác nhận lấy hàng) -> DANG_VAN_CHUYEN
   DANG_VAN_CHUYEN -> (xác nhận đã đến nơi) -> CHO_TIEP_NHAN
   CHO_TIEP_NHAN -> (bên nhận tự xác nhận, không phải đơn vị vận chuyển) -> HOAN_THANH
+Có blockchain: mỗi bước của đơn vị vận chuyển (từ chối / lấy hàng / đến nơi) chỉ tạo sự kiện chờ ký; chuyến chỉ chuyển
+sang bước sau khi đơn vị vận chuyển ký xong (xem ghiNhan.js). Và các bước này chỉ làm được sau khi bên gửi đã ký lệnh.
 ==================================================
 */
 
@@ -36,14 +43,17 @@ const toPositiveNumber = (value) => {
 
 const sendError = (res, err, logMessage, fallbackMessage) => {
   if (err instanceof ApiError) {
-    return res.status(err.status).json({ success: false, message: err.message });
+    return res
+      .status(err.status)
+      .json({ success: false, message: err.message });
   }
 
   if (err.code === "ER_NO_SUCH_TABLE" && /lenh_van_chuyen/.test(err.message)) {
     console.error("Thiếu bảng lenh_van_chuyen:", err.message);
     return res.status(500).json({
       success: false,
-      message: "CSDL chưa có bảng lệnh vận chuyển (chạy file server/migration/lenh_van_chuyen.sql)",
+      message:
+        "CSDL chưa có bảng lệnh vận chuyển (chạy file server/migration/lenh_van_chuyen.sql)",
     });
   }
 
@@ -75,10 +85,126 @@ const getTransporterId = (req) => {
   }
 
   if (user.vai_tro !== "TRANSPORTER") {
-    throw new ApiError(403, "Chỉ đơn vị vận chuyển mới được dùng chức năng này");
+    throw new ApiError(
+      403,
+      "Chỉ đơn vị vận chuyển mới được dùng chức năng này",
+    );
   }
 
   return user.ma_nguoi_dung;
+};
+
+const CHUA_KY_LENH =
+  "Bên gửi chưa ký lệnh vận chuyển lên blockchain. Hãy chờ bên gửi ký xong rồi mới thực hiện bước này.";
+
+// Trạng thái ký của sự kiện tạo lệnh (bên gửi ký): null = lệnh chưa có sự kiện (lệnh cũ), hoặc trạng thái đồng bộ của nó
+const trangThaiKyLenh = async (executor, maVanDon) => {
+  const [rows] = await executor.query(
+    `
+    SELECT blockchain_sync_status AS st FROM lich_su_truy_xuat_lo
+    WHERE loai_hoat_dong = 'TRANSPORT_ORDERED'
+      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) = ?
+    LIMIT 1
+    `,
+    [maVanDon],
+  );
+  return rows.length > 0 ? rows[0].st : null;
+};
+
+// Các bước của đơn vị vận chuyển chỉ làm được sau khi bên gửi đã ký lệnh lên chain
+const canBenGuiDaKy = async (executor, maVanDon) => {
+  if (!layCauHinh().daCauHinh) return;
+  const st = await trangThaiKyLenh(executor, maVanDon);
+  if (st && st !== "CONFIRMED") throw new ApiError(409, CHUA_KY_LENH);
+};
+
+// Một bước vận chuyển có ký: tạo sự kiện chờ ký kèm thay đổi sẽ áp dụng sau khi ký (apDung).
+// Trả true nếu đang chờ ký (chuyến chưa đổi trạng thái); false nếu không có gì để ký và đã áp dụng ngay.
+const thucHienBuocCoKy = async (
+  connection,
+  maVanDon,
+  loai,
+  maNguoiKy,
+  duLieuThem,
+  apDung,
+) => {
+  const [dangCho] = await connection.query(
+    `
+    SELECT ma_lich_su FROM lich_su_truy_xuat_lo
+    WHERE loai_hoat_dong = ? AND blockchain_sync_status <> 'CONFIRMED'
+      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) = ?
+    LIMIT 1
+    `,
+    [loai, maVanDon],
+  );
+  if (dangCho.length > 0) return true; // đã gửi yêu cầu trước đó, đang chờ ký
+
+  const suKien = await ghiSuKienVanDon(
+    connection,
+    maVanDon,
+    loai,
+    maNguoiKy,
+    duLieuThem,
+    apDung,
+  );
+  if (!layCauHinh().daCauHinh || !suKien) {
+    await apDungKetQuaVanDon(connection, maVanDon, apDung);
+    return false;
+  }
+  return true;
+};
+
+// Gắn cờ cho mỗi chuyến: cho_ky = bước đã bấm đang chờ ký (LAY_HANG | DEN_NOI | TU_CHOI);
+// chua_ky_lenh = bên gửi chưa ký lệnh vận chuyển
+const ganCoKy = async (executor, rows, maDonVi) => {
+  rows.forEach((r) => {
+    r.cho_ky = null;
+    r.chua_ky_lenh = false;
+    r.ly_do_chua_ky_lenh = "";
+  });
+  if (rows.length === 0 || !layCauHinh().daCauHinh) return;
+  const [ev] = await executor.query(
+    `
+    SELECT ls.loai_hoat_dong AS loai,
+           JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) AS ma_van_don,
+           JSON_UNQUOTE(JSON_EXTRACT(o.payload, '$.tham_so.ap_dung.hanh_dong')) AS hanh_dong
+    FROM lich_su_truy_xuat_lo ls
+    JOIN blockchain_outbox o ON o.event_id = ls.ma_lich_su
+    WHERE ls.blockchain_sync_status <> 'CONFIRMED'
+      AND ls.loai_hoat_dong IN ('TRANSPORT_ORDERED', 'PICKUP_CONFIRMED', 'DELIVERY_CONFIRMED', 'HANDOVER_REJECTED')
+      AND JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) IN (?)
+    `,
+    [rows.map((r) => r.ma_van_don)],
+  );
+  rows.forEach((r) => {
+    ev.filter((e) => e.ma_van_don === r.ma_van_don).forEach((e) => {
+      if (e.loai === "TRANSPORT_ORDERED") r.chua_ky_lenh = true;
+      else if (e.hanh_dong) r.cho_ky = e.hanh_dong;
+    });
+  });
+
+  // Lệnh chưa ký: thường do bên gửi chưa ký được vì một bên (nhất là bên nhận) chưa có ví được duyệt
+  const canXet = rows.filter((r) => r.chua_ky_lenh);
+  if (canXet.length > 0) {
+    const thieu = new Set(
+      await chuaCoViDuyet(
+        executor,
+        canXet.flatMap((r) => [r.ma_nguoi_gui, r.ma_ben_nhan, maDonVi]),
+      ),
+    );
+    canXet.forEach((r) => {
+      const ten = (ma, tenHienThi) => `${tenHienThi || ma} (${ma})`;
+      const ds = [];
+      if (thieu.has(r.ma_ben_nhan))
+        ds.push(`bên nhận ${ten(r.ma_ben_nhan, r.ten_ben_nhan)}`);
+      if (thieu.has(r.ma_nguoi_gui))
+        ds.push(`bên gửi ${ten(r.ma_nguoi_gui, r.ten_nguoi_gui)}`);
+      if (thieu.has(maDonVi)) ds.push("đơn vị vận chuyển (bạn)");
+      if (ds.length > 0) {
+        r.ly_do_chua_ky_lenh = `Lệnh chưa ký được vì ${ds.join(", ")} chưa liên kết ví hoặc chưa được quản trị viên duyệt ví blockchain.`;
+      }
+    });
+  }
 };
 
 const TRIP_SELECT = `
@@ -121,9 +247,16 @@ const getMyTrips = async (req, res) => {
       [maDonVi],
     );
 
+    await ganCoKy(db, rows, maDonVi);
+
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy danh sách chuyến vận chuyển:", "Không thể lấy danh sách chuyến");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách chuyến vận chuyển:",
+      "Không thể lấy danh sách chuyến",
+    );
   }
 };
 
@@ -143,12 +276,21 @@ const getTripById = async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy chuyến vận chuyển" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy chuyến vận chuyển" });
     }
+
+    await ganCoKy(db, rows, maDonVi);
 
     return res.json({ success: true, data: rows[0] });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy chi tiết chuyến vận chuyển:", "Không thể lấy chi tiết chuyến");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy chi tiết chuyến vận chuyển:",
+      "Không thể lấy chi tiết chuyến",
+    );
   }
 };
 
@@ -166,16 +308,21 @@ const acceptTrip = async (req, res) => {
         [maVanDon, maDonVi],
       );
 
-      if (rows.length === 0) throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
+      if (rows.length === 0)
+        throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
       if (rows[0].trang_thai !== "CHO_CHAP_NHAN") {
         throw new ApiError(409, "Chuyến không ở trạng thái chờ chấp nhận");
       }
+      await canBenGuiDaKy(connection, maVanDon);
 
       const finalTaiXe = tenTaiXe || rows[0].ten_tai_xe;
       const finalBienSo = bienSoXe || rows[0].bien_so_xe;
 
       if (!finalTaiXe || !finalBienSo) {
-        throw new ApiError(400, "Vui lòng nhập tên tài xế và biển số xe phụ trách");
+        throw new ApiError(
+          400,
+          "Vui lòng nhập tên tài xế và biển số xe phụ trách",
+        );
       }
 
       await connection.execute(
@@ -184,9 +331,17 @@ const acceptTrip = async (req, res) => {
       );
     });
 
-    return res.json({ success: true, message: "Đã chấp nhận chuyến vận chuyển" });
+    return res.json({
+      success: true,
+      message: "Đã chấp nhận chuyến vận chuyển",
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi chấp nhận chuyến vận chuyển:", "Không thể chấp nhận chuyến");
+    return sendError(
+      res,
+      err,
+      "Lỗi chấp nhận chuyến vận chuyển:",
+      "Không thể chấp nhận chuyến",
+    );
   }
 };
 
@@ -198,38 +353,47 @@ const rejectTrip = async (req, res) => {
     const lyDo = cleanText(req.body?.ly_do);
 
     if (!lyDo) throw new ApiError(400, "Vui lòng nhập lý do từ chối");
-    if (lyDo.length > MAX_GHI_CHU) throw new ApiError(400, `Lý do tối đa ${MAX_GHI_CHU} ký tự`);
+    if (lyDo.length > MAX_GHI_CHU)
+      throw new ApiError(400, `Lý do tối đa ${MAX_GHI_CHU} ký tự`);
 
-    await withTransaction(async (connection) => {
+    const choKy = await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `SELECT trang_thai FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_don_vi_van_chuyen = ? LIMIT 1 FOR UPDATE`,
         [maVanDon, maDonVi],
       );
 
-      if (rows.length === 0) throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
+      if (rows.length === 0)
+        throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
       if (rows[0].trang_thai !== "CHO_CHAP_NHAN") {
         throw new ApiError(409, "Chuyến không ở trạng thái chờ chấp nhận");
       }
+      await canBenGuiDaKy(connection, maVanDon);
 
-      await connection.execute(
-        `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ?`,
-        [`Đơn vị vận chuyển từ chối: ${lyDo}`, maVanDon],
+      // Blockchain: đơn vị vận chuyển ký từ chối chuyến (lô ở lại bên gửi). Chuyến chỉ bị từ chối sau khi ký xong.
+      return thucHienBuocCoKy(
+        connection,
+        maVanDon,
+        "HANDOVER_REJECTED",
+        maDonVi,
+        { ben_tu_choi: "VAN_CHUYEN", ly_do: lyDo },
+        { hanh_dong: "TU_CHOI", ghi_chu: `Đơn vị vận chuyển từ chối: ${lyDo}` },
       );
-      // Phiếu xuất kho cho đại lý (nếu có) bị hủy theo; lô xuất ở lại kho nhà phân phối
-      await connection.execute(
-        `UPDATE phieu_xuat_kho SET trang_thai = 'DA_HUY' WHERE ma_van_don = ? AND trang_thai = 'CHO_XUAT'`,
-        [maVanDon],
-      );
-      // Blockchain: đơn vị vận chuyển ký từ chối chuyến (lô ở lại bên gửi)
-      await ghiSuKienVanDon(connection, maVanDon, "HANDOVER_REJECTED", maDonVi, {
-        ben_tu_choi: "VAN_CHUYEN",
-        ly_do: lyDo,
-      });
     });
 
-    return res.json({ success: true, message: "Đã từ chối chuyến vận chuyển" });
+    return res.json({
+      success: true,
+      cho_ky: choKy,
+      message: choKy
+        ? "Đã tạo yêu cầu từ chối chuyến. Hãy ký bằng MetaMask; chuyến chỉ bị từ chối sau khi ký xong."
+        : "Đã từ chối chuyến vận chuyển",
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi từ chối chuyến vận chuyển:", "Không thể từ chối chuyến");
+    return sendError(
+      res,
+      err,
+      "Lỗi từ chối chuyến vận chuyển:",
+      "Không thể từ chối chuyến",
+    );
   }
 };
 
@@ -242,33 +406,44 @@ const confirmPickup = async (req, res) => {
       ? toPositiveNumber(req.body.khoi_luong_thuc_te)
       : null;
 
-    await withTransaction(async (connection) => {
+    const choKy = await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `SELECT trang_thai FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_don_vi_van_chuyen = ? LIMIT 1 FOR UPDATE`,
         [maVanDon, maDonVi],
       );
 
-      if (rows.length === 0) throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
+      if (rows.length === 0)
+        throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
       if (rows[0].trang_thai !== "CHO_LAY_HANG") {
         throw new ApiError(409, "Chuyến không ở trạng thái chờ lấy hàng");
       }
+      await canBenGuiDaKy(connection, maVanDon);
 
-      await connection.execute(
-        `UPDATE lenh_van_chuyen SET trang_thai = 'DANG_VAN_CHUYEN', khoi_luong = COALESCE(?, khoi_luong) WHERE ma_van_don = ?`,
-        [khoiLuongThucTe, maVanDon],
+      // Blockchain: đơn vị vận chuyển ký đã lấy hàng. Chuyến chỉ bắt đầu vận chuyển sau khi ký xong.
+      return thucHienBuocCoKy(
+        connection,
+        maVanDon,
+        "PICKUP_CONFIRMED",
+        maDonVi,
+        khoiLuongThucTe ? { khoi_luong: khoiLuongThucTe.toFixed(3) } : {},
+        { hanh_dong: "LAY_HANG", khoi_luong: khoiLuongThucTe },
       );
-      // Phiếu xuất kho cho đại lý (nếu có) chuyển sang đang giao
-      await connection.execute(
-        `UPDATE phieu_xuat_kho SET trang_thai = 'DANG_GIAO', thoi_gian_xuat = COALESCE(thoi_gian_xuat, NOW()) WHERE ma_van_don = ? AND trang_thai = 'CHO_XUAT'`,
-        [maVanDon],
-      );
-      // Blockchain: đơn vị vận chuyển ký đã lấy hàng
-      await ghiSuKienVanDon(connection, maVanDon, "PICKUP_CONFIRMED", maDonVi);
     });
 
-    return res.json({ success: true, message: "Đã xác nhận lấy hàng, chuyến bắt đầu vận chuyển" });
+    return res.json({
+      success: true,
+      cho_ky: choKy,
+      message: choKy
+        ? "Đã tạo yêu cầu xác nhận lấy hàng. Hãy ký bằng MetaMask; chuyến chỉ bắt đầu vận chuyển sau khi ký xong."
+        : "Đã xác nhận lấy hàng, chuyến bắt đầu vận chuyển",
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi xác nhận lấy hàng:", "Không thể xác nhận lấy hàng");
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận lấy hàng:",
+      "Không thể xác nhận lấy hàng",
+    );
   }
 };
 
@@ -278,31 +453,43 @@ const confirmArrival = async (req, res) => {
   try {
     const maDonVi = getTransporterId(req);
 
-    await withTransaction(async (connection) => {
+    const choKy = await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `SELECT trang_thai FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_don_vi_van_chuyen = ? LIMIT 1 FOR UPDATE`,
         [maVanDon, maDonVi],
       );
 
-      if (rows.length === 0) throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
+      if (rows.length === 0)
+        throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
       if (rows[0].trang_thai !== "DANG_VAN_CHUYEN") {
         throw new ApiError(409, "Chuyến không ở trạng thái đang vận chuyển");
       }
 
-      await connection.execute(
-        `UPDATE lenh_van_chuyen SET trang_thai = 'CHO_TIEP_NHAN' WHERE ma_van_don = ?`,
-        [maVanDon],
+      // Blockchain: đơn vị vận chuyển ký đã giao tới nơi. Bên nhận chỉ xác nhận được sau khi ký xong.
+      return thucHienBuocCoKy(
+        connection,
+        maVanDon,
+        "DELIVERY_CONFIRMED",
+        maDonVi,
+        {},
+        { hanh_dong: "DEN_NOI" },
       );
-      // Blockchain: đơn vị vận chuyển ký đã giao tới nơi
-      await ghiSuKienVanDon(connection, maVanDon, "DELIVERY_CONFIRMED", maDonVi);
     });
 
     return res.json({
       success: true,
-      message: "Đã xác nhận đến nơi, chờ bên nhận xác nhận bàn giao",
+      cho_ky: choKy,
+      message: choKy
+        ? "Đã tạo yêu cầu xác nhận đến nơi. Hãy ký bằng MetaMask; bên nhận chỉ xác nhận được sau khi ký xong."
+        : "Đã xác nhận đến nơi, chờ bên nhận xác nhận bàn giao",
     });
   } catch (err) {
-    return sendError(res, err, "Lỗi xác nhận đến nơi:", "Không thể xác nhận đến nơi");
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận đến nơi:",
+      "Không thể xác nhận đến nơi",
+    );
   }
 };
 

@@ -5,7 +5,10 @@ const {
   ghiSuKienLoCon,
   chuaCoViDuyet,
 } = require("../services/blockchain/hook");
-const { layCauHinh } = require("../services/blockchain/chainClient");
+const {
+  layCauHinh,
+  timMaLoChuaCoTrenChain,
+} = require("../services/blockchain/chainClient");
 
 /*
 ==================================================
@@ -37,7 +40,9 @@ const toPositiveNumber = (value) => {
 
 const sendError = (res, err, logMessage, fallbackMessage) => {
   if (err instanceof ApiError) {
-    return res.status(err.status).json({ success: false, message: err.message });
+    return res
+      .status(err.status)
+      .json({ success: false, message: err.message });
   }
 
   if (err.code === "ER_NO_SUCH_TABLE") {
@@ -83,7 +88,13 @@ const getDistributorId = (req) => {
   return user.ma_nguoi_dung;
 };
 
-const generateCode = async (connection, table, column, prefix, padLength = 3) => {
+const generateCode = async (
+  connection,
+  table,
+  column,
+  prefix,
+  padLength = 3,
+) => {
   const [rows] = await connection.query(
     `
     SELECT COALESCE(MAX(CAST(SUBSTRING(${column}, ?) AS UNSIGNED)), 0) AS max_no
@@ -191,7 +202,10 @@ const confirmReceive = async (req, res) => {
       }
 
       if (!TRANG_THAI_CO_THE_XU_LY.includes(rows[0].trang_thai)) {
-        throw new ApiError(409, "Lệnh vận chuyển không ở trạng thái có thể tiếp nhận");
+        throw new ApiError(
+          409,
+          "Lệnh vận chuyển không ở trạng thái có thể tiếp nhận",
+        );
       }
 
       // Không nhận nhiều hơn khối lượng lô gửi đi (hợp đồng cũng chặn: hao hụt chỉ được giảm)
@@ -225,7 +239,12 @@ const confirmReceive = async (req, res) => {
 
     return res.json({ success: true, message: "Đã nhập kho lô hàng" });
   } catch (err) {
-    return sendError(res, err, "Lỗi xác nhận nhập kho:", "Không thể xác nhận nhập kho");
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận nhập kho:",
+      "Không thể xác nhận nhập kho",
+    );
   }
 };
 
@@ -257,7 +276,10 @@ const rejectReceive = async (req, res) => {
       }
 
       if (!TRANG_THAI_CO_THE_XU_LY.includes(rows[0].trang_thai)) {
-        throw new ApiError(409, "Lệnh vận chuyển không ở trạng thái có thể từ chối");
+        throw new ApiError(
+          409,
+          "Lệnh vận chuyển không ở trạng thái có thể từ chối",
+        );
       }
 
       await connection.execute(
@@ -270,7 +292,12 @@ const rejectReceive = async (req, res) => {
 
     return res.json({ success: true, message: "Đã từ chối tiếp nhận lô hàng" });
   } catch (err) {
-    return sendError(res, err, "Lỗi từ chối tiếp nhận lô:", "Không thể từ chối tiếp nhận");
+    return sendError(
+      res,
+      err,
+      "Lỗi từ chối tiếp nhận lô:",
+      "Không thể từ chối tiếp nhận",
+    );
   }
 };
 
@@ -334,7 +361,12 @@ const getInventory = async (req, res) => {
 
     return res.json({ success: true, data });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy danh sách kho hàng:", "Không thể lấy danh sách kho hàng");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách kho hàng:",
+      "Không thể lấy danh sách kho hàng",
+    );
   }
 };
 
@@ -390,7 +422,12 @@ const getDispatchOrders = async (req, res) => {
 
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy danh sách phiếu xuất kho:", "Không thể lấy danh sách phiếu xuất kho");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách phiếu xuất kho:",
+      "Không thể lấy danh sách phiếu xuất kho",
+    );
   }
 };
 
@@ -410,7 +447,9 @@ const getDispatchDetail = async (req, res) => {
     );
 
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy phiếu xuất kho" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy phiếu xuất kho" });
     }
 
     const [dealerRows] = await db.execute(
@@ -418,9 +457,17 @@ const getDispatchDetail = async (req, res) => {
       [rows[0].ma_dai_ly],
     );
 
-    return res.json({ success: true, data: { ...rows[0], dai_ly: dealerRows[0] || null } });
+    return res.json({
+      success: true,
+      data: { ...rows[0], dai_ly: dealerRows[0] || null },
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy chi tiết phiếu xuất kho:", "Không thể lấy chi tiết phiếu xuất kho");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy chi tiết phiếu xuất kho:",
+      "Không thể lấy chi tiết phiếu xuất kho",
+    );
   }
 };
 
@@ -445,13 +492,17 @@ const createDispatch = async (req, res) => {
     const coChuoi = layCauHinh().daCauHinh;
 
     if (!ma_dai_ly) throw new ApiError(400, "Vui lòng chọn đại lý nhận hàng");
-    if (!ma_lo_nong_san) throw new ApiError(400, "Vui lòng chọn lô hàng cần xuất");
+    if (!ma_lo_nong_san)
+      throw new ApiError(400, "Vui lòng chọn lô hàng cần xuất");
     if (!so_luong_xuat) throw new ApiError(400, "Số lượng xuất phải lớn hơn 0");
     if (!["TU_GIAO", "DV_VAN_CHUYEN"].includes(hinh_thuc)) {
       throw new ApiError(400, "Hình thức giao hàng không hợp lệ");
     }
     if (coChuoi && hinh_thuc === "DV_VAN_CHUYEN" && !ma_don_vi_van_chuyen) {
-      throw new ApiError(400, "Vui lòng chọn đơn vị vận chuyển có tài khoản (họ ký lấy hàng và giao hàng)");
+      throw new ApiError(
+        400,
+        "Vui lòng chọn đơn vị vận chuyển có tài khoản (họ ký lấy hàng và giao hàng)",
+      );
     }
 
     let maPhieu;
@@ -493,17 +544,26 @@ const createDispatch = async (req, res) => {
             throw new ApiError(409, "Lô hàng không còn khả dụng");
           }
           if (so_luong_xuat > Number(lot.so_luong_hien_tai)) {
-            throw new ApiError(409, `Số lượng vượt quá tồn kho khả dụng (${lot.so_luong_hien_tai} ${lot.don_vi_tinh})`);
+            throw new ApiError(
+              409,
+              `Số lượng vượt quá tồn kho khả dụng (${lot.so_luong_hien_tai} ${lot.don_vi_tinh})`,
+            );
           }
           if (lot.han_luu_kho && new Date(lot.han_luu_kho) < new Date()) {
-            throw new ApiError(409, "Lô hàng đã hết hạn lưu kho, không thể xuất bán");
+            throw new ApiError(
+              409,
+              "Lô hàng đã hết hạn lưu kho, không thể xuất bán",
+            );
           }
           const [dangGiao] = await connection.execute(
             `SELECT ma_van_don FROM lenh_van_chuyen WHERE ma_lo_nong_san = ? AND trang_thai NOT IN ('TU_CHOI', 'DA_HUY', 'HOAN_THANH') LIMIT 1`,
             [ma_lo_nong_san],
           );
           if (dangGiao.length > 0) {
-            throw new ApiError(409, `Lô đang trên đường giao (${dangGiao[0].ma_van_don}), không xuất tiếp được`);
+            throw new ApiError(
+              409,
+              `Lô đang trên đường giao (${dangGiao[0].ma_van_don}), không xuất tiếp được`,
+            );
           }
 
           const [kiemDinh] = await connection.execute(
@@ -515,8 +575,14 @@ const createDispatch = async (req, res) => {
             `,
             [ma_lo_nong_san],
           );
-          if (kiemDinh.length > 0 && kiemDinh[0].trang_thai_ho_so === "THU_HOI") {
-            throw new ApiError(409, "Lô hàng đã bị thu hồi chứng thư kiểm định, không thể xuất bán");
+          if (
+            kiemDinh.length > 0 &&
+            kiemDinh[0].trang_thai_ho_so === "THU_HOI"
+          ) {
+            throw new ApiError(
+              409,
+              "Lô hàng đã bị thu hồi chứng thư kiểm định, không thể xuất bán",
+            );
           }
 
           let maVanDon = null;
@@ -529,13 +595,21 @@ const createDispatch = async (req, res) => {
                 `SELECT ma_nguoi_dung, ho_ten FROM nguoi_dung WHERE ma_nguoi_dung = ? AND vai_tro = 'TRANSPORTER' AND trang_thai = 1`,
                 [ma_don_vi_van_chuyen],
               );
-              if (vc.length === 0) throw new ApiError(404, "Không tìm thấy đơn vị vận chuyển");
+              if (vc.length === 0)
+                throw new ApiError(404, "Không tìm thấy đơn vị vận chuyển");
               donViVc = vc[0].ma_nguoi_dung;
               ten_don_vi_van_chuyen = vc[0].ho_ten;
             }
 
             // Tách phần xuất thành lô con (giữ nguyên dòng dõi, khối lượng trên chain)
-            maLoXuat = await generateCode(connection, "lo_nong_san", "ma_lo_nong_san", "LO");
+            maLoXuat = await timMaLoChuaCoTrenChain(
+              await generateCode(
+                connection,
+                "lo_nong_san",
+                "ma_lo_nong_san",
+                "LO",
+              ),
+            );
             await connection.execute(
               `
               INSERT INTO lo_nong_san
@@ -544,24 +618,55 @@ const createDispatch = async (req, res) => {
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               `,
               [
-                maLoXuat, lot.ma_mua_vu, lot.ma_san_pham, maNpp, so_luong_xuat, lot.don_vi_tinh,
-                lot.giai_doan_hien_tai, lot.vi_tri_luu_kho, lot.han_luu_kho, `Xuất cho đại lý ${dealer.ten}`,
+                maLoXuat,
+                lot.ma_mua_vu,
+                lot.ma_san_pham,
+                maNpp,
+                so_luong_xuat,
+                lot.don_vi_tinh,
+                lot.giai_doan_hien_tai,
+                lot.vi_tri_luu_kho,
+                lot.han_luu_kho,
+                `Xuất cho đại lý ${dealer.ten}`,
               ],
             );
-            const maLienKet = await generateCode(connection, "lien_ket_nguon_goc_lo", "ma_lien_ket", "LK");
-            const nhom = await generateCode(connection, "lien_ket_nguon_goc_lo", "relation_group_id", "REL");
+            const maLienKet = await generateCode(
+              connection,
+              "lien_ket_nguon_goc_lo",
+              "ma_lien_ket",
+              "LK",
+            );
+            const nhom = await generateCode(
+              connection,
+              "lien_ket_nguon_goc_lo",
+              "relation_group_id",
+              "REL",
+            );
             await connection.execute(
               `
               INSERT INTO lien_ket_nguon_goc_lo
               (ma_lien_ket, relation_group_id, ma_lo_nguon, ma_lo_duoc_tao_ra, loai_lien_ket, so_luong_tham_gia, don_vi_tinh)
               VALUES (?, ?, ?, ?, 'SPLIT', ?, ?)
               `,
-              [maLienKet, nhom, ma_lo_nong_san, maLoXuat, so_luong_xuat, lot.don_vi_tinh],
+              [
+                maLienKet,
+                nhom,
+                ma_lo_nong_san,
+                maLoXuat,
+                so_luong_xuat,
+                lot.don_vi_tinh,
+              ],
             );
             // Blockchain: nhà phân phối ký tách lô xuất khỏi lô trong kho
             await ghiSuKienLoCon(connection, maLoXuat);
 
-            maVanDon = await generateCode(connection, "lenh_van_chuyen", "ma_van_don", "VD-DL-", 4);
+            maVanDon = await generateCode(
+              connection,
+              "lenh_van_chuyen",
+              "ma_van_don",
+              "VD-DL-",
+              4,
+            );
             await connection.execute(
               `
               INSERT INTO lenh_van_chuyen
@@ -570,17 +675,37 @@ const createDispatch = async (req, res) => {
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)
               `,
               [
-                maVanDon, maLoXuat, maNpp, donViVc, dealer.ma_nguoi_dung, dealer.dia_chi,
-                so_luong_xuat, lot.don_vi_tinh, ten_tai_xe, bien_so_xe, ghi_chu,
+                maVanDon,
+                maLoXuat,
+                maNpp,
+                donViVc,
+                dealer.ma_nguoi_dung,
+                dealer.dia_chi,
+                so_luong_xuat,
+                lot.don_vi_tinh,
+                ten_tai_xe,
+                bien_so_xe,
+                ghi_chu,
                 // tự giao: không cần chờ đơn vị vận chuyển chấp nhận chuyến
                 hinh_thuc === "TU_GIAO" ? "CHO_LAY_HANG" : "CHO_CHAP_NHAN",
               ],
             );
             // Blockchain: nhà phân phối ký tạo lệnh giao cho đại lý
-            await ghiSuKienVanDon(connection, maVanDon, "TRANSPORT_ORDERED", maNpp);
+            await ghiSuKienVanDon(
+              connection,
+              maVanDon,
+              "TRANSPORT_ORDERED",
+              maNpp,
+            );
           }
 
-          const newCode = await generateCode(connection, "phieu_xuat_kho", "ma_phieu", "PXK-", 4);
+          const newCode = await generateCode(
+            connection,
+            "phieu_xuat_kho",
+            "ma_phieu",
+            "PXK-",
+            4,
+          );
 
           await connection.execute(
             `
@@ -606,7 +731,9 @@ const createDispatch = async (req, res) => {
             ],
           );
 
-          const conLai = Math.round((Number(lot.so_luong_hien_tai) - so_luong_xuat) * 1000) / 1000;
+          const conLai =
+            Math.round((Number(lot.so_luong_hien_tai) - so_luong_xuat) * 1000) /
+            1000;
           await connection.execute(
             `
             UPDATE lo_nong_san
@@ -635,7 +762,11 @@ const createDispatch = async (req, res) => {
           `SELECT ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan FROM lenh_van_chuyen WHERE ma_van_don = ?`,
           [maPhieu.maVanDon],
         );
-        const thieu = await chuaCoViDuyet(db, [lenh.ma_nguoi_gui, lenh.ma_don_vi_van_chuyen, lenh.ma_ben_nhan]);
+        const thieu = await chuaCoViDuyet(db, [
+          lenh.ma_nguoi_gui,
+          lenh.ma_don_vi_van_chuyen,
+          lenh.ma_ben_nhan,
+        ]);
         if (thieu.length > 0) {
           canhBaoVi = `. Lưu ý: ${thieu.join(", ")} chưa có ví blockchain được duyệt nên các bước ký sẽ chờ`;
         }
@@ -650,7 +781,12 @@ const createDispatch = async (req, res) => {
       data: { ma_phieu: maPhieu.maPhieu, ma_van_don: maPhieu.maVanDon },
     });
   } catch (err) {
-    return sendError(res, err, "Lỗi lập phiếu xuất kho:", "Không thể lập phiếu xuất kho");
+    return sendError(
+      res,
+      err,
+      "Lỗi lập phiếu xuất kho:",
+      "Không thể lập phiếu xuất kho",
+    );
   }
 };
 
@@ -668,10 +804,14 @@ const layPhieu = async (connection, maPhieu, maNpp) => {
     `,
     [maPhieu, maNpp],
   );
-  if (rows.length === 0) throw new ApiError(404, "Không tìm thấy phiếu xuất kho");
+  if (rows.length === 0)
+    throw new ApiError(404, "Không tìm thấy phiếu xuất kho");
   const p = rows[0];
   if (p.ma_van_don && p.hinh_thuc === "DV_VAN_CHUYEN") {
-    throw new ApiError(409, "Phiếu thuê đơn vị vận chuyển: họ xác nhận lấy hàng / giao hàng trên trang Vận chuyển");
+    throw new ApiError(
+      409,
+      "Phiếu thuê đơn vị vận chuyển: họ xác nhận lấy hàng / giao hàng trên trang Vận chuyển",
+    );
   }
   return p;
 };
@@ -699,13 +839,26 @@ const markDispatchShipped = async (req, res) => {
           [p.ma_van_don],
         );
         // Blockchain: tự giao nên nhà phân phối ký "đã lấy hàng"
-        await ghiSuKienVanDon(connection, p.ma_van_don, "PICKUP_CONFIRMED", maNpp);
+        await ghiSuKienVanDon(
+          connection,
+          p.ma_van_don,
+          "PICKUP_CONFIRMED",
+          maNpp,
+        );
       }
     });
 
-    return res.json({ success: true, message: "Đã xuất kho, đang trên đường giao" });
+    return res.json({
+      success: true,
+      message: "Đã xuất kho, đang trên đường giao",
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi xác nhận xuất kho:", "Không thể xác nhận xuất kho");
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận xuất kho:",
+      "Không thể xác nhận xuất kho",
+    );
   }
 };
 
@@ -725,13 +878,21 @@ const markDispatchDelivered = async (req, res) => {
       if (p.ma_van_don) {
         // Có blockchain: hàng tới nơi, đại lý tự ký nhận hàng ở trang đại lý (phiếu hoàn tất khi đó)
         if (p.trang_thai_van_don !== "DANG_VAN_CHUYEN") {
-          throw new ApiError(409, "Hàng đã tới nơi, đang chờ đại lý xác nhận nhận hàng");
+          throw new ApiError(
+            409,
+            "Hàng đã tới nơi, đang chờ đại lý xác nhận nhận hàng",
+          );
         }
         await connection.execute(
           `UPDATE lenh_van_chuyen SET trang_thai = 'CHO_TIEP_NHAN' WHERE ma_van_don = ?`,
           [p.ma_van_don],
         );
-        await ghiSuKienVanDon(connection, p.ma_van_don, "DELIVERY_CONFIRMED", maNpp);
+        await ghiSuKienVanDon(
+          connection,
+          p.ma_van_don,
+          "DELIVERY_CONFIRMED",
+          maNpp,
+        );
         choDaiLy = true;
         return;
       }
@@ -754,7 +915,12 @@ const markDispatchDelivered = async (req, res) => {
         : "Đã xác nhận giao hàng thành công",
     });
   } catch (err) {
-    return sendError(res, err, "Lỗi xác nhận giao hàng:", "Không thể xác nhận giao hàng");
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận giao hàng:",
+      "Không thể xác nhận giao hàng",
+    );
   }
 };
 
@@ -767,7 +933,12 @@ const getTransporters = async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy đơn vị vận chuyển:", "Không thể lấy danh sách đơn vị vận chuyển");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy đơn vị vận chuyển:",
+      "Không thể lấy danh sách đơn vị vận chuyển",
+    );
   }
 };
 
@@ -786,12 +957,21 @@ const getDealerAccounts = async (req, res) => {
     );
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy tài khoản đại lý:", "Không thể lấy danh sách tài khoản đại lý");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy tài khoản đại lý:",
+      "Không thể lấy danh sách tài khoản đại lý",
+    );
   }
 };
 
 // Kiểm tra tài khoản gắn cho đại lý: phải là RETAILER đang hoạt động và chưa gắn với đại lý khác
-const kiemTraTaiKhoanDaiLy = async (executor, maNguoiDung, maDaiLyHienTai = null) => {
+const kiemTraTaiKhoanDaiLy = async (
+  executor,
+  maNguoiDung,
+  maDaiLyHienTai = null,
+) => {
   if (!maNguoiDung) return null;
   const [rows] = await executor.execute(
     `
@@ -803,7 +983,8 @@ const kiemTraTaiKhoanDaiLy = async (executor, maNguoiDung, maDaiLyHienTai = null
     `,
     [maNguoiDung],
   );
-  if (rows.length === 0) throw new ApiError(404, "Không tìm thấy tài khoản đại lý đang hoạt động");
+  if (rows.length === 0)
+    throw new ApiError(404, "Không tìm thấy tài khoản đại lý đang hoạt động");
   if (rows[0].ma_dai_ly && rows[0].ma_dai_ly !== maDaiLyHienTai) {
     throw new ApiError(409, "Tài khoản này đã gắn với một đại lý khác");
   }
@@ -835,7 +1016,12 @@ const getDealers = async (req, res) => {
 
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy danh sách đại lý:", "Không thể lấy danh sách đại lý");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách đại lý:",
+      "Không thể lấy danh sách đại lý",
+    );
   }
 };
 
@@ -854,17 +1040,37 @@ const createDealer = async (req, res) => {
 
     const maDaiLy = await withTransaction(async (connection) => {
       await kiemTraTaiKhoanDaiLy(connection, ma_nguoi_dung);
-      const newCode = await generateCode(connection, "dai_ly", "ma_dai_ly", "DL", 3);
+      const newCode = await generateCode(
+        connection,
+        "dai_ly",
+        "ma_dai_ly",
+        "DL",
+        3,
+      );
 
       await connection.execute(
         `INSERT INTO dai_ly (ma_dai_ly, ma_nha_phan_phoi, ten, nguoi_lien_he, so_dien_thoai, dia_chi, ma_nguoi_dung) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [newCode, maNpp, ten, nguoi_lien_he, so_dien_thoai, dia_chi, ma_nguoi_dung],
+        [
+          newCode,
+          maNpp,
+          ten,
+          nguoi_lien_he,
+          so_dien_thoai,
+          dia_chi,
+          ma_nguoi_dung,
+        ],
       );
 
       return newCode;
     });
 
-    return res.status(201).json({ success: true, message: "Đã thêm đại lý mới", data: { ma_dai_ly: maDaiLy } });
+    return res
+      .status(201)
+      .json({
+        success: true,
+        message: "Đã thêm đại lý mới",
+        data: { ma_dai_ly: maDaiLy },
+      });
   } catch (err) {
     return sendError(res, err, "Lỗi thêm đại lý:", "Không thể thêm đại lý");
   }
@@ -888,16 +1094,31 @@ const updateDealer = async (req, res) => {
 
     const [result] = await db.execute(
       `UPDATE dai_ly SET ten = ?, nguoi_lien_he = ?, so_dien_thoai = ?, dia_chi = ?, ma_nguoi_dung = ? WHERE ma_dai_ly = ? AND ma_nha_phan_phoi = ?`,
-      [ten, nguoi_lien_he, so_dien_thoai, dia_chi, ma_nguoi_dung, maDaiLy, maNpp],
+      [
+        ten,
+        nguoi_lien_he,
+        so_dien_thoai,
+        dia_chi,
+        ma_nguoi_dung,
+        maDaiLy,
+        maNpp,
+      ],
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy đại lý" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy đại lý" });
     }
 
     return res.json({ success: true, message: "Đã cập nhật đại lý" });
   } catch (err) {
-    return sendError(res, err, "Lỗi cập nhật đại lý:", "Không thể cập nhật đại lý");
+    return sendError(
+      res,
+      err,
+      "Lỗi cập nhật đại lý:",
+      "Không thể cập nhật đại lý",
+    );
   }
 };
 
@@ -912,15 +1133,30 @@ const toggleDealerStatus = async (req, res) => {
       [maDaiLy, maNpp],
     );
     if (rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy đại lý" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy đại lý" });
     }
 
-    const newStatus = rows[0].trang_thai === "HOAT_DONG" ? "NGUNG" : "HOAT_DONG";
-    await db.execute(`UPDATE dai_ly SET trang_thai = ? WHERE ma_dai_ly = ?`, [newStatus, maDaiLy]);
+    const newStatus =
+      rows[0].trang_thai === "HOAT_DONG" ? "NGUNG" : "HOAT_DONG";
+    await db.execute(`UPDATE dai_ly SET trang_thai = ? WHERE ma_dai_ly = ?`, [
+      newStatus,
+      maDaiLy,
+    ]);
 
-    return res.json({ success: true, message: "Đã cập nhật trạng thái đại lý", data: { trang_thai: newStatus } });
+    return res.json({
+      success: true,
+      message: "Đã cập nhật trạng thái đại lý",
+      data: { trang_thai: newStatus },
+    });
   } catch (err) {
-    return sendError(res, err, "Lỗi đổi trạng thái đại lý:", "Không thể đổi trạng thái đại lý");
+    return sendError(
+      res,
+      err,
+      "Lỗi đổi trạng thái đại lý:",
+      "Không thể đổi trạng thái đại lý",
+    );
   }
 };
 
@@ -935,7 +1171,9 @@ const getDealerHistory = async (req, res) => {
       [maDaiLy, maNpp],
     );
     if (dealerRows.length === 0) {
-      return res.status(404).json({ success: false, message: "Không tìm thấy đại lý" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Không tìm thấy đại lý" });
     }
 
     const [rows] = await db.execute(
@@ -949,7 +1187,12 @@ const getDealerHistory = async (req, res) => {
 
     return res.json({ success: true, data: rows });
   } catch (err) {
-    return sendError(res, err, "Lỗi lấy lịch sử giao dịch đại lý:", "Không thể lấy lịch sử giao dịch");
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy lịch sử giao dịch đại lý:",
+      "Không thể lấy lịch sử giao dịch",
+    );
   }
 };
 

@@ -25,6 +25,24 @@ const loiNgan = (e) => {
   return e?.reason || e?.shortMessage || e?.message || "Có lỗi xảy ra";
 };
 
+// Lý do chưa ký được, kèm sự kiện đang chặn: ai phải ký bước nào trước
+const lyDoChuaKy = (it) => {
+  const cb = it.chan_boi;
+  if (!cb) return it.ly_do || "Sự kiện này chưa ký được";
+  const ten = TEN_SU_KIEN[cb.loai] || cb.loai;
+  const nguoi = cb.ten_nguoi_ky
+    ? `${cb.ten_nguoi_ky} (${cb.ma_nguoi_ky})`
+    : cb.ma_nguoi_ky;
+  return [
+    `${it.ly_do}.`,
+    "",
+    `Bước đang chặn: #${cb.stt} "${ten}" của lô ${it.ma_lo}`,
+    cb.trang_thai === "SUBMITTED"
+      ? `Người ký: ${nguoi}. Giao dịch đã gửi, đang chờ blockchain xác nhận.`
+      : `Người ký: ${nguoi}. Bước này chưa được ký, người đó cần ký trước.`,
+  ].join("\n");
+};
+
 // Mở MetaMask, chuyển đúng mạng, trả về signer (ví đang chọn)
 const ketNoiMetaMask = async (cauHinh) => {
   if (!window.ethereum) throw new Error("Chưa cài MetaMask");
@@ -67,9 +85,9 @@ const ketNoiMetaMask = async (cauHinh) => {
   return { signer, diaChi: await signer.getAddress() };
 };
 
-// thongBaoBangAlert: hiện thông báo kết quả bằng alert (thay vì dòng chữ trong khung ví), khung ví chỉ ghi
-// "Ví đã kết nối / Chưa kết nối ví", và nút ký của sự kiện chưa đủ điều kiện vẫn bấm được: bấm thì alert lý do.
-// Mặc định tắt nên các trang khác dùng khung này không đổi.
+// Mọi sự kiện đều có nút ký; sự kiện chưa đủ điều kiện thì nút mờ, bấm ra alert nói rõ ai / bước nào đang chặn.
+// thongBaoBangAlert: hiện thông báo kết quả bằng alert (thay vì dòng chữ trong khung ví) và khung ví chỉ ghi
+// "Ví đã kết nối / Chưa kết nối ví". Mặc định tắt.
 const BlockchainPanel = ({ thongBaoBangAlert = false }) => {
   const [cauHinh, setCauHinh] = useState(null);
   const [thongTin, setThongTin] = useState(null);
@@ -331,31 +349,20 @@ const BlockchainPanel = ({ thongBaoBangAlert = false }) => {
                           Lần ký trước: {it.loi_truoc}
                         </div>
                       )}
-                      {it.san_sang || thongBaoBangAlert ? (
-                        <>
-                          <button
-                            type="button"
-                            className="bc-btn"
-                            style={it.san_sang ? undefined : { opacity: 0.5 }}
-                            onClick={() =>
-                              it.san_sang
-                                ? ky(it)
-                                : alert(it.ly_do || "Sự kiện này chưa ký được")
-                            }
-                            disabled={Boolean(dangXuLy)}
-                          >
-                            {dangXuLy === it.ma_lich_su
-                              ? "Đang ký..."
-                              : "Ký lên blockchain"}
-                          </button>
-                          {!it.san_sang && linkGiaoDich(it)}
-                        </>
-                      ) : (
-                        <span className="bc-muted">
-                          {it.ly_do}
-                          {linkGiaoDich(it)}
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        className="bc-btn"
+                        style={it.san_sang ? undefined : { opacity: 0.5 }}
+                        onClick={() =>
+                          it.san_sang ? ky(it) : alert(lyDoChuaKy(it))
+                        }
+                        disabled={Boolean(dangXuLy)}
+                      >
+                        {dangXuLy === it.ma_lich_su
+                          ? "Đang ký..."
+                          : "Ký lên blockchain"}
+                      </button>
+                      {!it.san_sang && linkGiaoDich(it)}
                     </td>
                   </tr>
                 ))}

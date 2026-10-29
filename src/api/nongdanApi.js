@@ -161,12 +161,6 @@ const xoaLoThuHoach = (maLo) =>
 const fetchYeuCauKiemDinh = () =>
   request("/api/kiem-dinh/yeu-cau/cua-toi", { headers: authHeaders() });
 
-const xacNhanLayMau = (maKiemDinh) =>
-  request(`/api/kiem-dinh/yeu-cau/${maKiemDinh}/xac-nhan-lay-mau`, {
-    method: "POST",
-    headers: authHeaders(),
-  });
-
 const fetchCoQuanKiemDinh = () =>
   request("/api/kiem-dinh/co-quan", { headers: authHeaders() });
 
@@ -236,7 +230,6 @@ export {
   luuLoThuHoach,
   xoaLoThuHoach,
   fetchYeuCauKiemDinh,
-  xacNhanLayMau,
   fetchCoQuanKiemDinh,
   guiYeuCauKiemDinh,
   fetchSuKienChoKy,

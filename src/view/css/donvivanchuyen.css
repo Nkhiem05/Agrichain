@@ -813,3 +813,33 @@
     opacity: 0;
   }
 }
+
+/* ========== TAB KÝ BLOCKCHAIN (FULL WIDTH, CUỘN ĐƯỢC) ========== */
+.vanchuyen .blockchain-tab-wrapper {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 24px 36px 32px;
+  box-sizing: border-box;
+}
+.vanchuyen .blockchain-tab-desc {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.vanchuyen .blockchain-panel-full {
+  width: 100%;
+}
+.vanchuyen .blockchain-panel-full > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+/* Cột cuối (nút "Ký lên blockchain") căn sang bên phải, thẳng hàng với nút "Ký tất cả" */
+.vanchuyen .blockchain-panel-full .bc-table th:last-child,
+.vanchuyen .blockchain-panel-full .bc-table td:last-child {
+  text-align: right;
+  padding-right: 0;
+}

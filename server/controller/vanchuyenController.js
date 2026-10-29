@@ -1,6 +1,10 @@
 const db = require("../config/db");
-const { ghiSuKienVanDon, chuaCoViDuyet } = require("../services/blockchain/hook");
+const {
+  ghiSuKienVanDon,
+  chuaCoViDuyet,
+} = require("../services/blockchain/hook");
 const { layCauHinh } = require("../services/blockchain/chainClient");
+const { capNhatTrangThaiLo } = require("../services/blockchain/ghiNhan");
 
 /*
 ==================================================
@@ -52,7 +56,9 @@ const parseDateTime = (value) => {
   const text = cleanText(value);
   if (text === null) return null;
 
-  const match = text.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::\d{2})?$/);
+  const match = text.match(
+    /^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::\d{2})?$/,
+  );
 
   if (
     !match ||
@@ -69,7 +75,9 @@ const parseDateTime = (value) => {
 // Quy đổi khối lượng ra tấn để cộng dồn (đơn vị lạ coi như kg)
 const toTonnes = (amount, unit) => {
   const value = Number(amount) || 0;
-  const normalized = String(unit || "").trim().toLowerCase();
+  const normalized = String(unit || "")
+    .trim()
+    .toLowerCase();
 
   return normalized === "tấn" || normalized === "tan" ? value : value / 1000;
 };
@@ -551,7 +559,12 @@ const createOrder = async (req, res) => {
           );
 
           // Blockchain: nông dân ký tạo lệnh bàn giao (gắn ví vận chuyển + ví bên nhận)
-          await ghiSuKienVanDon(connection, newCode, "TRANSPORT_ORDERED", maNguoiDung);
+          await ghiSuKienVanDon(
+            connection,
+            newCode,
+            "TRANSPORT_ORDERED",
+            maNguoiDung,
+          );
 
           return newCode;
         });
@@ -566,7 +579,11 @@ const createOrder = async (req, res) => {
     // Các bước ký blockchain của lệnh sẽ chờ tới khi các bên có ví được admin duyệt
     let canhBaoVi = "";
     try {
-      const thieu = await chuaCoViDuyet(db, [maNguoiDung, ma_don_vi_van_chuyen, ma_ben_nhan]);
+      const thieu = await chuaCoViDuyet(db, [
+        maNguoiDung,
+        ma_don_vi_van_chuyen,
+        ma_ben_nhan,
+      ]);
       if (thieu.length > 0) {
         canhBaoVi = `. Lưu ý: ${thieu.join(", ")} chưa có ví blockchain được duyệt nên các bước ký của lệnh này sẽ chờ`;
       }
@@ -687,13 +704,55 @@ HỦY LỆNH (khi xe chưa lấy hàng)
 ==================================================
 */
 
+// Lệnh vừa tạo mà sự kiện tạo lệnh CHƯA ký (chưa lên blockchain) và đang là sự kiện cuối của lô: gỡ luôn sự kiện chờ ký
+// để hủy lệnh không cần ký gì (chưa có gì trên chain để hủy). Trả true nếu đã gỡ.
+const goSuKienLenhChuaKy = async (connection, maVanDon) => {
+  const [ev] = await connection.query(
+    `
+    SELECT ma_lich_su, ma_lo_nong_san, so_thu_tu_su_kien, ma_bam_su_kien_truoc, blockchain_sync_status
+    FROM lich_su_truy_xuat_lo
+    WHERE loai_hoat_dong = 'TRANSPORT_ORDERED'
+      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) = ?
+    LIMIT 1
+    `,
+    [maVanDon],
+  );
+  if (ev.length === 0 || ev[0].blockchain_sync_status !== "QUEUED")
+    return false;
+  const e = ev[0];
+
+  const [lo] = await connection.query(
+    `SELECT latest_event_sequence FROM lo_nong_san WHERE ma_lo_nong_san = ? FOR UPDATE`,
+    [e.ma_lo_nong_san],
+  );
+  if (
+    lo.length === 0 ||
+    Number(lo[0].latest_event_sequence) !== Number(e.so_thu_tu_su_kien)
+  )
+    return false;
+
+  await connection.query(`DELETE FROM blockchain_outbox WHERE event_id = ?`, [
+    e.ma_lich_su,
+  ]);
+  await connection.query(
+    `DELETE FROM lich_su_truy_xuat_lo WHERE ma_lich_su = ?`,
+    [e.ma_lich_su],
+  );
+  await connection.query(
+    `UPDATE lo_nong_san SET latest_event_sequence = ?, latest_event_hash = ? WHERE ma_lo_nong_san = ?`,
+    [Number(e.so_thu_tu_su_kien) - 1, e.ma_bam_su_kien_truoc, e.ma_lo_nong_san],
+  );
+  await capNhatTrangThaiLo(connection, e.ma_lo_nong_san);
+  return true;
+};
+
 const cancelOrder = async (req, res) => {
   const { maVanDon } = req.params;
 
   try {
     const maNguoiDung = getFarmerId(req);
 
-    await withTransaction(async (connection) => {
+    const daGoSuKien = await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `
         SELECT trang_thai
@@ -723,15 +782,27 @@ const cancelOrder = async (req, res) => {
         `UPDATE lenh_van_chuyen SET trang_thai = 'DA_HUY' WHERE ma_van_don = ?`,
         [maVanDon],
       );
+      // Lệnh chưa ký lên blockchain: gỡ sự kiện chờ ký, không cần ký hủy
+      if (await goSuKienLenhChuaKy(connection, maVanDon)) return true;
+
       // Blockchain: nông dân ký hủy lệnh (lô ở lại nông trại)
-      await ghiSuKienVanDon(connection, maVanDon, "HANDOVER_REJECTED", maNguoiDung, {
-        ben_tu_choi: "BEN_GUI",
-      });
+      await ghiSuKienVanDon(
+        connection,
+        maVanDon,
+        "HANDOVER_REJECTED",
+        maNguoiDung,
+        {
+          ben_tu_choi: "BEN_GUI",
+        },
+      );
+      return false;
     });
 
     return res.json({
       success: true,
-      message: "Hủy lệnh vận chuyển thành công",
+      message: daGoSuKien
+        ? "Hủy lệnh vận chuyển thành công (lệnh chưa ký lên blockchain nên không cần ký hủy)"
+        : "Hủy lệnh vận chuyển thành công",
     });
   } catch (err) {
     return sendError(

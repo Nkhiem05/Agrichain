@@ -38,7 +38,6 @@ import {
   luuLoThuHoach,
   xoaLoThuHoach,
   fetchYeuCauKiemDinh,
-  xacNhanLayMau,
   fetchCoQuanKiemDinh,
   guiYeuCauKiemDinh,
   fetchSuKienChoKy,
@@ -1202,38 +1201,6 @@ const DashboardPage = () => {
     }
   }, [activeTab]);
 
-  // Chủ lô xác nhận biên bản lấy mẫu của cơ quan kiểm định (sau đó ký bằng ví ở Trang cá nhân)
-  const [confirmingSample, setConfirmingSample] = useState("");
-  const handleConfirmSampling = async (item) => {
-    const bienBan = [
-      `Hồ sơ: ${item.ma_ho_so} - Lô ${item.ma_lo_nong_san}`,
-      `Kiểm định viên: ${item.kiem_dinh_vien || "—"}`,
-      `Mã niêm phong: ${item.ma_niem_phong || "—"}`,
-      `Khối lượng mẫu: ${item.khoi_luong_mau || "—"}`,
-      `Phương pháp lấy mẫu: ${item.phuong_phap_lay_mau || "—"}`,
-      `Tình trạng cảm quan: ${item.tinh_trang_cam_quan || "—"}`,
-      `Thời gian lấy mẫu: ${item.thoi_gian_lay_mau || "—"}`,
-    ].join("\n");
-    if (
-      !window.confirm(
-        `Xác nhận biên bản lấy mẫu dưới đây đúng với thực tế?\n\n${bienBan}\n\nSau khi xác nhận, bạn ký bằng ví MetaMask ở Trang cá nhân → Ví blockchain.`,
-      )
-    )
-      return;
-
-    setConfirmingSample(item.ma_kiem_dinh);
-    try {
-      const { ok, data } = await xacNhanLayMau(item.ma_kiem_dinh);
-      alert(data.message || (ok ? "Đã xác nhận" : "Không thể xác nhận"));
-      if (ok) fetchInspections();
-    } catch (error) {
-      console.error("Lỗi xác nhận biên bản lấy mẫu:", error);
-      alert("Không thể kết nối tới backend");
-    } finally {
-      setConfirmingSample("");
-    }
-  };
-
   const fetchAuthorities = async () => {
     setAuthorityError("");
 
@@ -2393,28 +2360,19 @@ const DashboardPage = () => {
                             item.ma_niem_phong &&
                             item.ma_nguoi_quan_ly === user?.ma_nguoi_dung ? (
                               item.chu_lo_da_xac_nhan ? (
-                                <span
-                                  className="confirmed-sample-badge"
-                                  title="Ký xác nhận bằng ví ở Trang cá nhân → Ví blockchain nếu chưa ký"
-                                >
+                                <span className="confirmed-sample-badge">
                                   <CheckCircle2 size={15} />
-                                  Đã xác nhận lấy mẫu
+                                  Đã ký xác nhận lấy mẫu
                                 </span>
                               ) : (
-                                <button
-                                  type="button"
-                                  className="btn-action-retry"
-                                  title="Xác nhận biên bản lấy mẫu của cơ quan kiểm định"
-                                  disabled={
-                                    confirmingSample === item.ma_kiem_dinh
-                                  }
-                                  onClick={() => handleConfirmSampling(item)}
+                                <span
+                                  className="confirmed-sample-badge"
+                                  style={{ opacity: 0.75 }}
+                                  title='Vào tab "Ký blockchain" để ký xác nhận biên bản lấy mẫu'
                                 >
-                                  <CheckCircle2 size={15} />
-                                  {confirmingSample === item.ma_kiem_dinh
-                                    ? "Đang xác nhận..."
-                                    : "Xác nhận lấy mẫu"}
-                                </button>
+                                  <Clock size={15} />
+                                  Chờ bạn ký xác nhận (tab Ký blockchain)
+                                </span>
                               )
                             ) : canResend ? (
                               <button
