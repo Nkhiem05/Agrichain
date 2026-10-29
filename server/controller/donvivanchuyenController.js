@@ -11,8 +11,10 @@ const { layCauHinh } = require("../services/blockchain/chainClient");
 ĐƠN VỊ VẬN CHUYỂN (vai trò TRANSPORTER)
 Thao tác trên các lệnh vận chuyển (lenh_van_chuyen) mà nông dân hoặc cơ sở
 sơ chế đã chỉ định cho đơn vị này (ma_don_vi_van_chuyen).
+Đơn vị vận chuyển quản lý danh sách tài xế (tai_xe) và phương tiện (phuong_tien) của mình; khi chấp nhận chuyến chỉ cần
+chọn tài xế + phương tiện từ danh sách, không nhập tay (bên gửi cũng không còn nhập tài xế / biển số).
 Luồng trạng thái do đơn vị vận chuyển điều khiển:
-  CHO_CHAP_NHAN -> (chấp nhận) -> CHO_LAY_HANG
+  CHO_CHAP_NHAN -> (chấp nhận, chọn tài xế + phương tiện) -> CHO_LAY_HANG
   CHO_LAY_HANG  -> (xác nhận lấy hàng) -> DANG_VAN_CHUYEN
   DANG_VAN_CHUYEN -> (xác nhận đã đến nơi) -> CHO_TIEP_NHAN
   CHO_TIEP_NHAN -> (bên nhận tự xác nhận, không phải đơn vị vận chuyển) -> HOAN_THANH
@@ -294,17 +296,387 @@ const getTripById = async (req, res) => {
   }
 };
 
+/*
+==================================================
+TÀI XẾ & PHƯƠNG TIỆN CỦA ĐƠN VỊ VẬN CHUYỂN
+Bảng tự tạo ở lần dùng đầu tiên (CREATE TABLE IF NOT EXISTS), không cần chạy migration thủ công.
+Chuyến vận chuyển vẫn lưu bản sao tên tài xế / biển số (lenh_van_chuyen.ten_tai_xe, bien_so_xe) nên sửa hay xóa danh sách
+không làm đổi dữ liệu các chuyến đã có.
+==================================================
+*/
+
+let daBaoDamBang = null;
+const baoDamBangTaiXePhuongTien = () => {
+  if (!daBaoDamBang) {
+    daBaoDamBang = (async () => {
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS tai_xe (
+          ma_tai_xe varchar(32) NOT NULL,
+          ma_don_vi varchar(50) NOT NULL COMMENT 'Đơn vị vận chuyển sở hữu danh sách này',
+          ho_ten varchar(150) NOT NULL,
+          so_dien_thoai varchar(20) DEFAULT NULL,
+          so_giay_phep varchar(50) DEFAULT NULL COMMENT 'Số giấy phép lái xe',
+          hang_bang varchar(10) DEFAULT NULL,
+          created_at datetime NOT NULL DEFAULT current_timestamp(),
+          updated_at datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+          PRIMARY KEY (ma_tai_xe),
+          KEY idx_tai_xe_don_vi (ma_don_vi)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `,
+      );
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS phuong_tien (
+          ma_phuong_tien varchar(32) NOT NULL,
+          ma_don_vi varchar(50) NOT NULL COMMENT 'Đơn vị vận chuyển sở hữu danh sách này',
+          bien_so varchar(30) NOT NULL,
+          loai_xe varchar(100) DEFAULT NULL,
+          tai_trong_kg decimal(12,2) DEFAULT NULL,
+          created_at datetime NOT NULL DEFAULT current_timestamp(),
+          updated_at datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+          PRIMARY KEY (ma_phuong_tien),
+          UNIQUE KEY uq_phuong_tien_bien_so (ma_don_vi, bien_so)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `,
+      );
+    })().catch((err) => {
+      daBaoDamBang = null; // lần sau thử lại
+      throw err;
+    });
+  }
+  return daBaoDamBang;
+};
+
+const taoMaMoi = async (executor, bang, cot, tienTo) => {
+  const [rows] = await executor.query(
+    `
+    SELECT COALESCE(MAX(CAST(SUBSTRING(${cot}, ?) AS UNSIGNED)), 0) AS max_no
+    FROM ${bang}
+    WHERE ${cot} REGEXP ?
+    `,
+    [tienTo.length + 1, `^${tienTo}[0-9]+$`],
+  );
+  return tienTo + String(Number(rows[0].max_no) + 1).padStart(3, "0");
+};
+
+// Chuyến đang chạy (đã chấp nhận, chưa tới nơi) của từng tài xế / biển số để báo "đang bận"
+const CHUYEN_DANG_CHAY = ["CHO_LAY_HANG", "DANG_VAN_CHUYEN"];
+const chuyenDangChay = async (executor, maDonVi) => {
+  const [rows] = await executor.query(
+    `
+    SELECT ma_van_don, ten_tai_xe, bien_so_xe FROM lenh_van_chuyen
+    WHERE ma_don_vi_van_chuyen = ? AND trang_thai IN (?)
+    `,
+    [maDonVi, CHUYEN_DANG_CHAY],
+  );
+  return rows;
+};
+
+const SDT_HOP_LE = /^[0-9+][0-9 .-]{6,18}$/;
+
+const docThongTinTaiXe = (body) => {
+  const hoTen = cleanText(body?.ho_ten);
+  const soDienThoai = cleanText(body?.so_dien_thoai);
+  const soGiayPhep = cleanText(body?.so_giay_phep);
+  const hangBang = cleanText(body?.hang_bang);
+  if (!hoTen) throw new ApiError(400, "Vui lòng nhập họ tên tài xế");
+  if (hoTen.length > 150) throw new ApiError(400, "Họ tên tối đa 150 ký tự");
+  if (soDienThoai && !SDT_HOP_LE.test(soDienThoai))
+    throw new ApiError(400, "Số điện thoại không hợp lệ");
+  if (soGiayPhep && soGiayPhep.length > 50)
+    throw new ApiError(400, "Số giấy phép tối đa 50 ký tự");
+  if (hangBang && hangBang.length > 10)
+    throw new ApiError(400, "Hạng bằng tối đa 10 ký tự");
+  return {
+    hoTen,
+    soDienThoai,
+    soGiayPhep,
+    hangBang: hangBang ? hangBang.toUpperCase() : null,
+  };
+};
+
+const docThongTinPhuongTien = (body) => {
+  const bienSo = cleanText(body?.bien_so);
+  const loaiXe = cleanText(body?.loai_xe);
+  const taiTrong =
+    body?.tai_trong_kg === "" ||
+    body?.tai_trong_kg === undefined ||
+    body?.tai_trong_kg === null
+      ? null
+      : toPositiveNumber(body.tai_trong_kg);
+  if (!bienSo) throw new ApiError(400, "Vui lòng nhập biển số xe");
+  if (bienSo.length > 30) throw new ApiError(400, "Biển số tối đa 30 ký tự");
+  if (loaiXe && loaiXe.length > 100)
+    throw new ApiError(400, "Loại xe tối đa 100 ký tự");
+  if (
+    body?.tai_trong_kg !== "" &&
+    body?.tai_trong_kg !== undefined &&
+    body?.tai_trong_kg !== null &&
+    !taiTrong
+  ) {
+    throw new ApiError(400, "Tải trọng phải là số lớn hơn 0 (kg)");
+  }
+  return { bienSo: bienSo.toUpperCase(), loaiXe, taiTrong };
+};
+
+const getDrivers = async (req, res) => {
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const [rows] = await db.query(
+      `SELECT ma_tai_xe, ho_ten, so_dien_thoai, so_giay_phep, hang_bang FROM tai_xe WHERE ma_don_vi = ? ORDER BY ho_ten ASC, ma_tai_xe ASC`,
+      [maDonVi],
+    );
+    const dangChay = await chuyenDangChay(db, maDonVi);
+    rows.forEach((r) => {
+      r.dang_chay_chuyen =
+        dangChay.find((c) => c.ten_tai_xe === r.ho_ten)?.ma_van_don || null;
+    });
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách tài xế:",
+      "Không thể lấy danh sách tài xế",
+    );
+  }
+};
+
+const createDriver = async (req, res) => {
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const t = docThongTinTaiXe(req.body);
+
+    let ma;
+    for (let lan = 1; ; lan++) {
+      try {
+        ma = await taoMaMoi(db, "tai_xe", "ma_tai_xe", "TX");
+        await db.query(
+          `INSERT INTO tai_xe (ma_tai_xe, ma_don_vi, ho_ten, so_dien_thoai, so_giay_phep, hang_bang) VALUES (?, ?, ?, ?, ?, ?)`,
+          [ma, maDonVi, t.hoTen, t.soDienThoai, t.soGiayPhep, t.hangBang],
+        );
+        break;
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY" && lan < 3) continue;
+        throw err;
+      }
+    }
+    return res
+      .status(201)
+      .json({
+        success: true,
+        message: "Đã thêm tài xế",
+        data: { ma_tai_xe: ma },
+      });
+  } catch (err) {
+    return sendError(res, err, "Lỗi thêm tài xế:", "Không thể thêm tài xế");
+  }
+};
+
+const updateDriver = async (req, res) => {
+  const { maTaiXe } = req.params;
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const t = docThongTinTaiXe(req.body);
+    const [kq] = await db.query(
+      `UPDATE tai_xe SET ho_ten = ?, so_dien_thoai = ?, so_giay_phep = ?, hang_bang = ? WHERE ma_tai_xe = ? AND ma_don_vi = ?`,
+      [t.hoTen, t.soDienThoai, t.soGiayPhep, t.hangBang, maTaiXe, maDonVi],
+    );
+    if (kq.affectedRows === 0) throw new ApiError(404, "Không tìm thấy tài xế");
+    return res.json({ success: true, message: "Đã cập nhật tài xế" });
+  } catch (err) {
+    return sendError(res, err, "Lỗi sửa tài xế:", "Không thể cập nhật tài xế");
+  }
+};
+
+const deleteDriver = async (req, res) => {
+  const { maTaiXe } = req.params;
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const [rows] = await db.query(
+      `SELECT ho_ten FROM tai_xe WHERE ma_tai_xe = ? AND ma_don_vi = ? LIMIT 1`,
+      [maTaiXe, maDonVi],
+    );
+    if (rows.length === 0) throw new ApiError(404, "Không tìm thấy tài xế");
+    const dangChay = (await chuyenDangChay(db, maDonVi)).find(
+      (c) => c.ten_tai_xe === rows[0].ho_ten,
+    );
+    if (dangChay) {
+      throw new ApiError(
+        409,
+        `Tài xế đang phụ trách chuyến ${dangChay.ma_van_don}, chưa xóa được`,
+      );
+    }
+    await db.query(`DELETE FROM tai_xe WHERE ma_tai_xe = ? AND ma_don_vi = ?`, [
+      maTaiXe,
+      maDonVi,
+    ]);
+    return res.json({ success: true, message: "Đã xóa tài xế" });
+  } catch (err) {
+    return sendError(res, err, "Lỗi xóa tài xế:", "Không thể xóa tài xế");
+  }
+};
+
+const getVehicles = async (req, res) => {
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const [rows] = await db.query(
+      `SELECT ma_phuong_tien, bien_so, loai_xe, tai_trong_kg FROM phuong_tien WHERE ma_don_vi = ? ORDER BY bien_so ASC`,
+      [maDonVi],
+    );
+    const dangChay = await chuyenDangChay(db, maDonVi);
+    rows.forEach((r) => {
+      r.dang_chay_chuyen =
+        dangChay.find((c) => c.bien_so_xe === r.bien_so)?.ma_van_don || null;
+    });
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách phương tiện:",
+      "Không thể lấy danh sách phương tiện",
+    );
+  }
+};
+
+const createVehicle = async (req, res) => {
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const t = docThongTinPhuongTien(req.body);
+
+    let ma;
+    for (let lan = 1; ; lan++) {
+      try {
+        ma = await taoMaMoi(db, "phuong_tien", "ma_phuong_tien", "PT");
+        await db.query(
+          `INSERT INTO phuong_tien (ma_phuong_tien, ma_don_vi, bien_so, loai_xe, tai_trong_kg) VALUES (?, ?, ?, ?, ?)`,
+          [ma, maDonVi, t.bienSo, t.loaiXe, t.taiTrong],
+        );
+        break;
+      } catch (err) {
+        if (
+          err.code === "ER_DUP_ENTRY" &&
+          /uq_phuong_tien_bien_so/.test(err.message)
+        ) {
+          throw new ApiError(
+            409,
+            `Biển số ${t.bienSo} đã có trong danh sách phương tiện`,
+          );
+        }
+        if (err.code === "ER_DUP_ENTRY" && lan < 3) continue;
+        throw err;
+      }
+    }
+    return res
+      .status(201)
+      .json({
+        success: true,
+        message: "Đã thêm phương tiện",
+        data: { ma_phuong_tien: ma },
+      });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi thêm phương tiện:",
+      "Không thể thêm phương tiện",
+    );
+  }
+};
+
+const updateVehicle = async (req, res) => {
+  const { maPhuongTien } = req.params;
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const t = docThongTinPhuongTien(req.body);
+    try {
+      const [kq] = await db.query(
+        `UPDATE phuong_tien SET bien_so = ?, loai_xe = ?, tai_trong_kg = ? WHERE ma_phuong_tien = ? AND ma_don_vi = ?`,
+        [t.bienSo, t.loaiXe, t.taiTrong, maPhuongTien, maDonVi],
+      );
+      if (kq.affectedRows === 0)
+        throw new ApiError(404, "Không tìm thấy phương tiện");
+    } catch (err) {
+      if (err.code === "ER_DUP_ENTRY")
+        throw new ApiError(
+          409,
+          `Biển số ${t.bienSo} đã có trong danh sách phương tiện`,
+        );
+      throw err;
+    }
+    return res.json({ success: true, message: "Đã cập nhật phương tiện" });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi sửa phương tiện:",
+      "Không thể cập nhật phương tiện",
+    );
+  }
+};
+
+const deleteVehicle = async (req, res) => {
+  const { maPhuongTien } = req.params;
+  try {
+    const maDonVi = getTransporterId(req);
+    await baoDamBangTaiXePhuongTien();
+    const [rows] = await db.query(
+      `SELECT bien_so FROM phuong_tien WHERE ma_phuong_tien = ? AND ma_don_vi = ? LIMIT 1`,
+      [maPhuongTien, maDonVi],
+    );
+    if (rows.length === 0)
+      throw new ApiError(404, "Không tìm thấy phương tiện");
+    const dangChay = (await chuyenDangChay(db, maDonVi)).find(
+      (c) => c.bien_so_xe === rows[0].bien_so,
+    );
+    if (dangChay) {
+      throw new ApiError(
+        409,
+        `Phương tiện đang chạy chuyến ${dangChay.ma_van_don}, chưa xóa được`,
+      );
+    }
+    await db.query(
+      `DELETE FROM phuong_tien WHERE ma_phuong_tien = ? AND ma_don_vi = ?`,
+      [maPhuongTien, maDonVi],
+    );
+    return res.json({ success: true, message: "Đã xóa phương tiện" });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi xóa phương tiện:",
+      "Không thể xóa phương tiện",
+    );
+  }
+};
+
 const acceptTrip = async (req, res) => {
   const { maVanDon } = req.params;
 
   try {
     const maDonVi = getTransporterId(req);
-    const tenTaiXe = cleanText(req.body?.ten_tai_xe);
-    const bienSoXe = cleanText(req.body?.bien_so_xe);
+    await baoDamBangTaiXePhuongTien();
+    const maTaiXe = cleanText(req.body?.ma_tai_xe);
+    const maPhuongTien = cleanText(req.body?.ma_phuong_tien);
+    if (!maTaiXe || !maPhuongTien) {
+      throw new ApiError(
+        400,
+        'Hãy chọn tài xế và phương tiện từ danh sách. Nếu chưa có, thêm ở mục "Tài xế & phương tiện"',
+      );
+    }
 
     await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
-        `SELECT trang_thai, ten_tai_xe, bien_so_xe FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_don_vi_van_chuyen = ? LIMIT 1 FOR UPDATE`,
+        `SELECT trang_thai FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_don_vi_van_chuyen = ? LIMIT 1 FOR UPDATE`,
         [maVanDon, maDonVi],
       );
 
@@ -315,19 +687,29 @@ const acceptTrip = async (req, res) => {
       }
       await canBenGuiDaKy(connection, maVanDon);
 
-      const finalTaiXe = tenTaiXe || rows[0].ten_tai_xe;
-      const finalBienSo = bienSoXe || rows[0].bien_so_xe;
-
-      if (!finalTaiXe || !finalBienSo) {
+      // Tài xế / phương tiện phải thuộc danh sách của chính đơn vị này
+      const [taiXe] = await connection.execute(
+        `SELECT ho_ten FROM tai_xe WHERE ma_tai_xe = ? AND ma_don_vi = ? LIMIT 1`,
+        [maTaiXe, maDonVi],
+      );
+      if (taiXe.length === 0)
         throw new ApiError(
-          400,
-          "Vui lòng nhập tên tài xế và biển số xe phụ trách",
+          404,
+          "Không tìm thấy tài xế trong danh sách của bạn",
         );
-      }
+      const [xe] = await connection.execute(
+        `SELECT bien_so FROM phuong_tien WHERE ma_phuong_tien = ? AND ma_don_vi = ? LIMIT 1`,
+        [maPhuongTien, maDonVi],
+      );
+      if (xe.length === 0)
+        throw new ApiError(
+          404,
+          "Không tìm thấy phương tiện trong danh sách của bạn",
+        );
 
       await connection.execute(
         `UPDATE lenh_van_chuyen SET trang_thai = 'CHO_LAY_HANG', ten_tai_xe = ?, bien_so_xe = ? WHERE ma_van_don = ?`,
-        [finalTaiXe, finalBienSo, maVanDon],
+        [taiXe[0].ho_ten, xe[0].bien_so, maVanDon],
       );
     });
 
@@ -496,6 +878,14 @@ const confirmArrival = async (req, res) => {
 module.exports = {
   getMyTrips,
   getTripById,
+  getDrivers,
+  createDriver,
+  updateDriver,
+  deleteDriver,
+  getVehicles,
+  createVehicle,
+  updateVehicle,
+  deleteVehicle,
   acceptTrip,
   rejectTrip,
   confirmPickup,

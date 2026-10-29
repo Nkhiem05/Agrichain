@@ -267,9 +267,11 @@ export const ketNoiMetaMask = async (cauHinh) => {
 
 // Ký (qua MetaMask) mọi sự kiện đang sẵn sàng của người dùng đang đăng nhập.
 // Gọi ngay sau một thao tác nghiệp vụ (ví dụ tạo lô thu hoạch) để MetaMask hiện popup xác nhận.
-// Trả về { soDaKy, lyDo }: soDaKy = 0 kèm lyDo khi chưa ký được vì thiếu điều kiện.
+// Truyền { maLo } để chỉ ký các sự kiện của lô đó (vd bấm Công bố một hồ sơ thì chỉ ký sự kiện công bố của lô ấy).
+// Trả về { soDaKy, soChoXacNhan, lyDo }: soDaKy = 0 kèm lyDo khi chưa ký được vì thiếu điều kiện;
+// soChoXacNhan = số sự kiện đã gửi nhưng blockchain chưa xác nhận xong (hệ thống tự cập nhật sau).
 // Ném lỗi khi người dùng từ chối trong MetaMask hoặc giao dịch thất bại.
-export const kyCacSuKienDangCho = async () => {
+export const kyCacSuKienDangCho = async ({ maLo = null } = {}) => {
   const [cauHinh, thongTin] = await Promise.all([
     fetchCauHinh(),
     fetchViCuaToi(),
@@ -286,7 +288,8 @@ export const kyCacSuKienDangCho = async () => {
     };
   }
 
-  const choKy = (await fetchChoKy()).su_kien;
+  const locLo = (ds) => (maLo ? ds.filter((x) => x.ma_lo === maLo) : ds);
+  const choKy = locLo((await fetchChoKy()).su_kien);
   let dsSanSang = choKy.filter((x) => x.san_sang);
   if (dsSanSang.length === 0) {
     // Nói rõ vì sao chưa ký được: không có sự kiện nào (lô không được theo dõi trên chain), hoặc có nhưng đang chờ bước trước
@@ -308,12 +311,14 @@ export const kyCacSuKienDangCho = async () => {
   const contract = new Contract(cauHinh.contractAddress, cauHinh.abi, signer);
 
   let soDaKy = 0;
+  let soChoXacNhan = 0;
   for (let vong = 0; vong < 30 && dsSanSang.length > 0; vong++) {
     for (const item of dsSanSang) {
-      await guiVaXacNhanSuKien(contract, item);
+      const kq = await guiVaXacNhanSuKien(contract, item);
       soDaKy++;
+      if (kq === "cho-xac-nhan") soChoXacNhan++;
     }
-    dsSanSang = (await fetchChoKy()).su_kien.filter((x) => x.san_sang);
+    dsSanSang = locLo((await fetchChoKy()).su_kien).filter((x) => x.san_sang);
   }
-  return { soDaKy };
+  return { soDaKy, soChoXacNhan };
 };

@@ -706,15 +706,39 @@ const choKy = async (req, res) => {
 
     // Tên người dùng để báo rõ ai đang thiếu ví (vd "Cơ Sở Sơ Chế Demo (DEMOSC01)")
     const tenNguoi = new Map();
+    const vaiTroNguoi = new Map();
     if (cacNguoi.size > 0) {
       const [ns] = await db.query(
-        `SELECT ma_nguoi_dung, ho_ten FROM nguoi_dung WHERE ma_nguoi_dung IN (?)`,
+        `SELECT ma_nguoi_dung, ho_ten, vai_tro FROM nguoi_dung WHERE ma_nguoi_dung IN (?)`,
         [[...cacNguoi]],
       );
-      ns.forEach((n) => tenNguoi.set(n.ma_nguoi_dung, n.ho_ten));
+      ns.forEach((n) => {
+        tenNguoi.set(n.ma_nguoi_dung, n.ho_ten);
+        vaiTroNguoi.set(n.ma_nguoi_dung, n.vai_tro);
+      });
     }
     const nhanDien = (ma) =>
       tenNguoi.get(ma) ? `${tenNguoi.get(ma)} (${ma})` : ma;
+
+    // Ví "Đã duyệt" trong database nhưng hợp đồng đang dùng chưa gán đúng vai trò (vd hợp đồng đã được triển khai lại)
+    // thì giao dịch chắc chắn bị từ chối. Kiểm tra trước để báo đúng nguyên nhân thay vì mở MetaMask rồi lỗi.
+    const lechVaiTro = new Set();
+    await Promise.all(
+      [...viCua.entries()].map(async ([ma, diaChi]) => {
+        const mongDoi = VAI_TRO_ON_CHAIN[vaiTroNguoi.get(ma)];
+        if (!mongDoi) return;
+        try {
+          const thucTe = await chain.vaiTroTrenChain(diaChi);
+          if (thucTe !== null && thucTe !== mongDoi) lechVaiTro.add(ma);
+        } catch (err) {
+          console.error(
+            "Không đọc được vai trò on-chain của",
+            ma,
+            err.shortMessage || err.message,
+          );
+        }
+      }),
+    );
 
     const data = items.map((it) => {
       const stt = Number(it.so_thu_tu_su_kien);
@@ -724,6 +748,9 @@ const choKy = async (req, res) => {
         lyDo =
           "Đã gửi giao dịch, đang chờ blockchain xác nhận (hệ thống tự kiểm tra)";
       else if (!viCuaToiAddr) lyDo = "Bạn chưa có ví được duyệt";
+      else if (lechVaiTro.has(maNguoiDung))
+        lyDo =
+          "Ví của bạn đã được duyệt trong hệ thống nhưng hợp đồng blockchain hiện tại chưa gán vai trò cho ví này (hợp đồng có thể đã được triển khai lại). Hãy nhờ quản trị viên duyệt lại ví (Quản trị → Ví blockchain)";
       else if (minChuaXacNhan.get(it.ma_lo_nong_san) !== stt)
         lyDo = "Đang chờ sự kiện trước của lô được ký";
 
@@ -741,6 +768,13 @@ const choKy = async (req, res) => {
       if (!lyDo && dung.loi) lyDo = dung.loi;
       if (!lyDo && dung.thieuVi) {
         lyDo = `Chờ ${dung.thieuVi.map(nhanDien).join(", ")} liên kết ví và được quản trị viên duyệt ví`;
+      }
+      if (!lyDo && it.outbox.ham === "orderTransport") {
+        const lech = [ts.ma_don_vi_van_chuyen, ts.ma_ben_nhan].filter((ma) =>
+          lechVaiTro.has(ma),
+        );
+        if (lech.length > 0)
+          lyDo = `Ví của ${lech.map(nhanDien).join(", ")} đã duyệt trong hệ thống nhưng chưa có vai trò trên hợp đồng blockchain hiện tại. Quản trị viên cần duyệt lại ví (Quản trị → Ví blockchain)`;
       }
 
       return {

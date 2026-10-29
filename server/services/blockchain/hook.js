@@ -90,17 +90,15 @@ const ghiSuKienVanDon = async (
     }
   }
 
-  // hợp đồng v2: bên nhận ký kèm khối lượng thực nhận (gram)
+  // hợp đồng v2: bên nhận ký kèm khối lượng thực nhận (gram). Bên nhận chưa ký thì lệnh chưa lưu khoi_luong_nhan,
+  // nên cho phép truyền khối lượng cân thực tế qua duLieuThem.khoi_luong_nhan.
+  const khoiLuongNhan =
+    duLieuThem.khoi_luong_nhan ?? (v.khoi_luong_nhan || v.khoi_luong);
   const thamSo =
     loai === "TRANSPORT_ORDERED"
       ? thamSoLenh
       : loai === "STOCK_IN_CONFIRMED"
-        ? {
-            khoi_luong_nhan_gram: sangGram(
-              v.khoi_luong_nhan || v.khoi_luong,
-              v.don_vi_tinh,
-            ),
-          }
+        ? { khoi_luong_nhan_gram: sangGram(khoiLuongNhan, v.don_vi_tinh) }
         : {};
 
   return ghiSuKien(executor, {
@@ -109,7 +107,7 @@ const ghiSuKienVanDon = async (
     maNguoiKy,
     duLieu:
       loai === "STOCK_IN_CONFIRMED"
-        ? { ...duLieu, khoi_luong_nhan: v.khoi_luong_nhan || v.khoi_luong }
+        ? { ...duLieu, khoi_luong_nhan: String(khoiLuongNhan) }
         : duLieu,
     thamSo: ketQuaTam
       ? { ...thamSo, ma_van_don: v.ma_van_don, ap_dung: ketQuaTam }
@@ -122,7 +120,12 @@ const ghiSuKienVanDon = async (
 //   HANDOVER_REJECTED (bên nhận ký) -> RETURN_SHIPPED (vận chuyển ký khi đã chở về)
 //   -> RETURN_RECEIVED (bên gửi ký khi đã nhận lại hàng).
 // Mỗi bên ký đúng lúc việc đó xảy ra; chữ ký chính là xác nhận của họ.
-const ghiSuKienTuChoiNhanHang = async (executor, maVanDon) => {
+// ketQuaTam (tùy chọn): lệnh chỉ chuyển sang "từ chối" sau khi bên nhận ký sự kiện HANDOVER_REJECTED (xem ghiNhan.js).
+const ghiSuKienTuChoiNhanHang = async (
+  executor,
+  maVanDon,
+  ketQuaTam = null,
+) => {
   const [rows] = await executor.query(
     `SELECT ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan FROM lenh_van_chuyen WHERE ma_van_don = ? LIMIT 1`,
     [maVanDon],
@@ -136,6 +139,7 @@ const ghiSuKienTuChoiNhanHang = async (executor, maVanDon) => {
     "HANDOVER_REJECTED",
     v.ma_ben_nhan,
     { ben_tu_choi: "BEN_NHAN" },
+    ketQuaTam,
   );
   if (!tuChoi) return null; // lô không được theo dõi trên chain
   await ghiSuKienVanDon(
@@ -157,7 +161,14 @@ const ghiSuKienLoCon = async (executor, maLoMoi) => {
 
 // Sơ chế đổi giai đoạn: sang "đang đóng gói" -> PROCESSING_DONE; "hoàn tất" -> PROCESSING_DONE + PACKAGING_DONE.
 // Mỗi loại chỉ ghi một lần cho mỗi lô; cơ sở sơ chế ký (hàm step trên hợp đồng).
-const ghiSuKienGiaiDoanSoChe = async (executor, maSoChe, giaiDoan) => {
+// ketQuaTam (tùy chọn): thay đổi giai đoạn CHƯA áp dụng; gắn vào sự kiện cuối cùng của lần đổi này (tham_so.ap_dung)
+// để lô sơ chế chỉ chuyển giai đoạn sau khi cơ sở đã ký xong. Trả [] nếu không có sự kiện mới nào cần ký.
+const ghiSuKienGiaiDoanSoChe = async (
+  executor,
+  maSoChe,
+  giaiDoan,
+  ketQuaTam = null,
+) => {
   const can =
     giaiDoan === "DA_HOAN_TAT"
       ? ["PROCESSING_DONE", "PACKAGING_DONE"]
@@ -202,7 +213,8 @@ const ghiSuKienGiaiDoanSoChe = async (executor, maSoChe, giaiDoan) => {
         so_luong: sc.so_luong,
         don_vi_tinh: sc.don_vi_tinh,
       },
-      thamSo: {},
+      thamSo:
+        ketQuaTam && loai === can[can.length - 1] ? { ap_dung: ketQuaTam } : {},
     });
     if (!kq) break; // lô không được theo dõi trên chain
     daGhi.push(loai);
@@ -230,6 +242,84 @@ const xoaSuKienChuaKy = async (executor, maLo) => {
     );
   }
   return true;
+};
+
+// Gỡ các sự kiện sơ chế / đóng gói CHƯA KÝ của một lô (dùng khi xóa hồ sơ sơ chế làm trên chính lô đã nhận, lô vẫn giữ mã cũ).
+// Trả false nếu có sự kiện sơ chế đã gửi / đã ký lên chain, hoặc phía sau còn sự kiện khác của lô: khi đó không được xóa.
+const goSuKienSoCheChuaKy = async (executor, maLo) => {
+  const [ev] = await executor.query(
+    `
+    SELECT ma_lich_su, so_thu_tu_su_kien AS stt, blockchain_sync_status AS trang_thai
+    FROM lich_su_truy_xuat_lo
+    WHERE ma_lo_nong_san = ? AND loai_hoat_dong IN ('PROCESSING_DONE', 'PACKAGING_DONE')
+    `,
+    [maLo],
+  );
+  if (ev.length === 0) return true;
+  if (ev.some((e) => e.trang_thai !== "QUEUED")) return false;
+
+  const dauTien = Math.min(...ev.map((e) => Number(e.stt)));
+  const [sau] = await executor.query(
+    `
+    SELECT COUNT(*) AS c FROM lich_su_truy_xuat_lo
+    WHERE ma_lo_nong_san = ? AND so_thu_tu_su_kien >= ?
+      AND loai_hoat_dong NOT IN ('PROCESSING_DONE', 'PACKAGING_DONE')
+    `,
+    [maLo, dauTien],
+  );
+  if (Number(sau[0].c) > 0) return false;
+
+  const ids = ev.map((e) => e.ma_lich_su);
+  await executor.query(`DELETE FROM blockchain_outbox WHERE event_id IN (?)`, [
+    ids,
+  ]);
+  await executor.query(
+    `DELETE FROM lich_su_truy_xuat_lo WHERE ma_lich_su IN (?)`,
+    [ids],
+  );
+
+  // Trả bộ đếm chuỗi của lô về sự kiện cuối còn lại
+  const [cuoi] = await executor.query(
+    `
+    SELECT so_thu_tu_su_kien AS stt, ma_bam_su_kien_hien_tai AS hash
+    FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? ORDER BY so_thu_tu_su_kien DESC LIMIT 1
+    `,
+    [maLo],
+  );
+  const [con] = await executor.query(
+    `SELECT COUNT(*) AS c FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? AND blockchain_sync_status <> 'CONFIRMED'`,
+    [maLo],
+  );
+  await executor.query(
+    `
+    UPDATE lo_nong_san
+    SET latest_event_sequence = ?, latest_event_hash = ?, blockchain_sync_status = ?
+    WHERE ma_lo_nong_san = ?
+    `,
+    [
+      cuoi[0]?.stt ?? 0,
+      cuoi[0]?.hash ?? null,
+      Number(con[0].c) === 0 ? "CONFIRMED" : "QUEUED",
+      maLo,
+    ],
+  );
+  return true;
+};
+
+// Sự kiện chưa lên chain sớm nhất của lô (null nếu lô đã ký xong hoặc không được theo dõi).
+// Các sự kiện của một lô phải ký đúng thứ tự nên bước tiếp theo của lô chỉ làm được khi hàm này trả null.
+const suKienChuaKyCuaLo = async (executor, maLo) => {
+  const [rows] = await executor.query(
+    `
+    SELECT so_thu_tu_su_kien AS stt, loai_hoat_dong AS loai, ma_nguoi_dung AS ma_nguoi_ky, blockchain_sync_status AS trang_thai
+    FROM lich_su_truy_xuat_lo
+    WHERE ma_lo_nong_san = ? AND blockchain_sync_status <> 'CONFIRMED'
+    ORDER BY so_thu_tu_su_kien
+    LIMIT 1
+    `,
+    [maLo],
+  );
+  return rows[0] || null;
 };
 
 // Mã người dùng (trong danh sách) chưa có ví được duyệt: các bước họ phải ký sẽ chờ tới khi có ví
@@ -393,6 +483,8 @@ module.exports = {
   ghiSuKienLoCon,
   ghiSuKienGiaiDoanSoChe,
   xoaSuKienChuaKy,
+  goSuKienSoCheChuaKy,
+  suKienChuaKyCuaLo,
   chuaCoViDuyet,
   ghiSuKienKiemDinh,
   ghiSuKienKiemDinhTrong,

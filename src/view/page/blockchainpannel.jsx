@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { BrowserProvider, Contract } from "ethers";
 import { Wallet, RefreshCw, PenLine } from "lucide-react";
 import {
@@ -88,13 +88,18 @@ const ketNoiMetaMask = async (cauHinh) => {
 // Mọi sự kiện đều có nút ký; sự kiện chưa đủ điều kiện thì nút mờ, bấm ra alert nói rõ ai / bước nào đang chặn.
 // thongBaoBangAlert: hiện thông báo kết quả bằng alert (thay vì dòng chữ trong khung ví) và khung ví chỉ ghi
 // "Ví đã kết nối / Chưa kết nối ví". Mặc định tắt.
-const BlockchainPanel = ({ thongBaoBangAlert = false }) => {
+// onDaKy: gọi mỗi khi có sự kiện vừa được ký xong (biến mất khỏi danh sách chờ) để trang chứa khối này tải lại dữ liệu,
+// tránh phải F5 mới thấy lô / lệnh đã ký.
+const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
   const [cauHinh, setCauHinh] = useState(null);
   const [thongTin, setThongTin] = useState(null);
   const [choKy, setChoKy] = useState([]);
   const [dangTai, setDangTai] = useState(true);
   const [dangXuLy, setDangXuLy] = useState("");
   const [thongBao, setThongBao] = useState({ loai: "", text: "" });
+  const choKyTruoc = useRef(null);
+  const onDaKyRef = useRef(onDaKy);
+  onDaKyRef.current = onDaKy;
 
   const baoLoi = (e) => {
     if (thongBaoBangAlert) alert(loiNgan(e));
@@ -113,7 +118,14 @@ const BlockchainPanel = ({ thongBaoBangAlert = false }) => {
 
       const daDuyet = tt.vi?.trang_thai_duyet === "DA_DUYET";
       if (daDuyet && tt.vai_tro !== "ADMIN") {
-        setChoKy((await fetchChoKy()).su_kien);
+        const ds = (await fetchChoKy()).su_kien;
+        // Có sự kiện vừa rời danh sách chờ = đã lên blockchain: báo trang chứa khối này tải lại
+        const truoc = choKyTruoc.current;
+        if (truoc && truoc.some((id) => !ds.some((x) => x.ma_lich_su === id))) {
+          if (onDaKyRef.current) onDaKyRef.current();
+        }
+        choKyTruoc.current = ds.map((x) => x.ma_lich_su);
+        setChoKy(ds);
       } else {
         setChoKy([]);
       }

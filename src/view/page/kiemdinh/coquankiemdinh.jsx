@@ -44,6 +44,7 @@ import {
 import "../../css/coquankiemdinh.css";
 import { useNavigate } from "react-router-dom";
 import BlockchainPanel from "../blockchainpannel";
+import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
 
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
@@ -418,6 +419,43 @@ function Coquankiemdinh() {
     setModalSamplingOpen(true);
   };
 
+  // Server đã tạo yêu cầu chờ ký (công bố / không đạt / thu hồi): mở MetaMask ký ngay cho lô đó.
+  // Hủy hoặc lỗi thì sự kiện vẫn nằm ở mục "Ký blockchain" để ký lại. Trả { daKy, choXacNhan, lyDo }.
+  const kyNgaySauThaoTac = async (maLo) => {
+    try {
+      const kq = await kyCacSuKienDangCho({ maLo });
+      if (kq.soDaKy > 0) return { daKy: true, choXacNhan: kq.soChoXacNhan > 0 };
+      return { daKy: false, lyDo: kq.lyDo };
+    } catch (loi) {
+      const tuChoi = loi?.code === "ACTION_REJECTED" || loi?.code === 4001;
+      return {
+        daKy: false,
+        lyDo: tuChoi
+          ? "bạn đã từ chối trong MetaMask"
+          : loi?.reason || loi?.shortMessage || loi?.message,
+      };
+    }
+  };
+
+  // Đã gửi yêu cầu mà chưa ký (vd lần trước bấm hủy trong MetaMask): bấm lại nút thì mở MetaMask ký tiếp
+  const kyLaiYeuCauDangCho = async (item, tenBuoc) => {
+    const ky = await kyNgaySauThaoTac(item.ma_lo_nong_san);
+    alert(
+      ky.daKy
+        ? ky.choXacNhan
+          ? `Lô #${item.ma_lo_nong_san}: đã ký ${tenBuoc}, đang chờ blockchain xác nhận (hệ thống tự cập nhật).`
+          : `Đã ký ${tenBuoc} lô #${item.ma_lo_nong_san} lên blockchain.`
+        : `Chưa ký được ${tenBuoc} lô #${item.ma_lo_nong_san} (${ky.lyDo}).\nBạn cũng có thể ký ở mục "Ký blockchain".`,
+    );
+    taiLaiDanhSach();
+  };
+
+  const taiLaiDanhSach = () => {
+    fetchSamplingRequests();
+    fetchPublishedCertificates();
+    fetchRevokedCertificates();
+  };
+
   // Mở popup và gửi yêu cầu đến server tải các tiêu chuẩn của bảng ngưỡng kiểm định chuẩn
   const handleOpenPublishModal = async (item) => {
     if (item.da_ky_lay_mau === false) {
@@ -477,7 +515,7 @@ function Coquankiemdinh() {
 
   const handleOpenRevokeModal = (item) => {
     if (item.cho_ky_thu_hoi) {
-      alert(CANH_BAO_DA_GUI_THU_HOI);
+      kyLaiYeuCauDangCho(item, "thu hồi");
       return;
     }
     if (item.cho_ky_cong_bo) {
@@ -509,15 +547,25 @@ function Coquankiemdinh() {
         alert(ketQua?.message || "Gửi yêu cầu thu hồi thất bại!");
         return;
       }
-      alert(
-        ketQua.cho_ky
-          ? `Lô #${revokeItem.ma_lo_nong_san}: ${ketQua.message}`
-          : `Đã kích hoạt thu hồi lô #${revokeItem.ma_lo_nong_san} thành công!`,
-      );
       setModalRevokeOpen(false);
-      fetchSamplingRequests();
-      fetchPublishedCertificates();
-      fetchRevokedCertificates();
+      if (!ketQua.cho_ky) {
+        alert(
+          `Đã kích hoạt thu hồi lô #${revokeItem.ma_lo_nong_san} thành công!`,
+        );
+        taiLaiDanhSach();
+        return;
+      }
+      // Thu hồi chỉ có hiệu lực sau khi cơ quan ký: mở MetaMask ngay
+      taiLaiDanhSach();
+      const ky = await kyNgaySauThaoTac(revokeItem.ma_lo_nong_san);
+      alert(
+        ky.daKy
+          ? ky.choXacNhan
+            ? `Lô #${revokeItem.ma_lo_nong_san}: đã ký thu hồi, đang chờ blockchain xác nhận (hệ thống tự cập nhật trạng thái).`
+            : `Đã ký và thu hồi chứng nhận lô #${revokeItem.ma_lo_nong_san} thành công!`
+          : `Đã gửi yêu cầu thu hồi lô #${revokeItem.ma_lo_nong_san} nhưng chưa ký (${ky.lyDo}).\nChứng nhận chỉ bị thu hồi sau khi ký: vào mục "Ký blockchain" để ký lại.`,
+      );
+      taiLaiDanhSach();
     } catch (err) {
       console.error("Lỗi yêu cầu thu hồi:", err);
       alert("Gửi yêu cầu thu hồi thất bại!");
@@ -536,18 +584,29 @@ function Coquankiemdinh() {
         alert(result?.message || "Công bố kết quả thất bại!");
         return;
       }
-      alert(
-        result.cho_ky
-          ? `Lô #${selectedPublishItem.ma_lo_nong_san}: ${result.message}`
-          : `Đã công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!${
-              result.so_chung_nhan
-                ? ` Số chứng nhận: ${result.so_chung_nhan}`
-                : ""
-            }`,
-      );
       setModalConfirmPublishOpen(false);
-      fetchSamplingRequests();
-      fetchPublishedCertificates();
+      if (!result.cho_ky) {
+        alert(
+          `Đã công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!${
+            result.so_chung_nhan
+              ? ` Số chứng nhận: ${result.so_chung_nhan}`
+              : ""
+          }`,
+        );
+        taiLaiDanhSach();
+        return;
+      }
+      // Công bố chỉ có hiệu lực sau khi cơ quan ký: mở MetaMask ngay
+      taiLaiDanhSach();
+      const ky = await kyNgaySauThaoTac(selectedPublishItem.ma_lo_nong_san);
+      alert(
+        ky.daKy
+          ? ky.choXacNhan
+            ? `Lô #${selectedPublishItem.ma_lo_nong_san}: đã ký công bố, đang chờ blockchain xác nhận (hệ thống tự chuyển hồ sơ sang "Công bố chứng nhận").`
+            : `Đã ký và công bố chứng nhận cho lô #${selectedPublishItem.ma_lo_nong_san} thành công!`
+          : `Đã gửi yêu cầu công bố lô #${selectedPublishItem.ma_lo_nong_san} nhưng chưa ký (${ky.lyDo}).\nHồ sơ chỉ chuyển sang "Công bố chứng nhận" sau khi ký: vào mục "Ký blockchain" để ký lại.`,
+      );
+      taiLaiDanhSach();
     } catch (err) {
       console.error("Lỗi khi công bố chứng nhận:", err);
       alert("Công bố kết quả thất bại!");
@@ -572,14 +631,25 @@ function Coquankiemdinh() {
         alert(result?.message || "Công bố kết luận không đạt thất bại!");
         return;
       }
-      alert(
-        result.cho_ky
-          ? `Lô #${failItem.ma_lo_nong_san}: ${result.message}`
-          : `Đã công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.`,
-      );
       setModalFailOpen(false);
-      fetchSamplingRequests();
-      fetchPublishedCertificates();
+      if (!result.cho_ky) {
+        alert(
+          `Đã công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.`,
+        );
+        taiLaiDanhSach();
+        return;
+      }
+      // Công bố không đạt cũng chỉ có hiệu lực sau khi cơ quan ký: mở MetaMask ngay
+      taiLaiDanhSach();
+      const ky = await kyNgaySauThaoTac(failItem.ma_lo_nong_san);
+      alert(
+        ky.daKy
+          ? ky.choXacNhan
+            ? `Lô #${failItem.ma_lo_nong_san}: đã ký công bố không đạt, đang chờ blockchain xác nhận (hệ thống tự cập nhật hồ sơ).`
+            : `Đã ký và công bố kết luận KHÔNG ĐẠT cho lô #${failItem.ma_lo_nong_san}.`
+          : `Đã gửi yêu cầu công bố không đạt lô #${failItem.ma_lo_nong_san} nhưng chưa ký (${ky.lyDo}).\nHồ sơ chỉ chuyển sang "Công bố chứng nhận" sau khi ký: vào mục "Ký blockchain" để ký lại.`,
+      );
+      taiLaiDanhSach();
     } catch (err) {
       console.error("Lỗi khi công bố không đạt:", err);
       alert("Công bố kết luận không đạt thất bại!");
@@ -1396,6 +1466,10 @@ function Coquankiemdinh() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     const canhBao = canhBaoTruocCongBo(item);
+                                    if (item.cho_ky_cong_bo) {
+                                      kyLaiYeuCauDangCho(item, "công bố");
+                                      return;
+                                    }
                                     if (canhBao) {
                                       alert(canhBao);
                                       return;
@@ -1427,6 +1501,10 @@ function Coquankiemdinh() {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const canhBao = canhBaoTruocCongBo(item);
+                                      if (item.cho_ky_cong_bo) {
+                                        kyLaiYeuCauDangCho(item, "công bố");
+                                        return;
+                                      }
                                       if (canhBao) {
                                         alert(canhBao);
                                         return;
@@ -1787,7 +1865,10 @@ function Coquankiemdinh() {
                     nhận biên bản lấy mẫu).
                   </p>
                   <div className="blockchain-panel-full">
-                    <BlockchainPanel thongBaoBangAlert />
+                    <BlockchainPanel
+                      thongBaoBangAlert
+                      onDaKy={taiLaiDanhSach}
+                    />
                   </div>
                 </div>
               </main>

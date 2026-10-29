@@ -1416,6 +1416,7 @@ const DashboardPage = () => {
     setSavingShipping(true);
 
     try {
+      const maLo = shippingForm.ma_lo_nong_san;
       const { ok, data } = await taoLenhVanChuyen(shippingForm);
 
       if (!ok) {
@@ -1423,8 +1424,34 @@ const DashboardPage = () => {
         return;
       }
 
-      alert(`${data.message}. Mã vận đơn: ${data.data.ma_van_don}`);
+      const maVanDon = data.data.ma_van_don;
       handleCloseShippingModal();
+      await fetchShippingOrders();
+
+      // Tạo lệnh xong: mở MetaMask ký lệnh ngay (đơn vị vận chuyển chỉ thực hiện được sau khi bên gửi ký).
+      // Hủy hoặc lỗi thì lệnh vẫn nằm ở tab "Ký blockchain" để ký sau.
+      try {
+        const kq = await kyCacSuKienDangCho({ maLo });
+        if (kq.soDaKy > 0) {
+          alert(
+            kq.soChoXacNhan > 0
+              ? `Đã tạo lệnh ${maVanDon} và gửi ký, đang chờ blockchain xác nhận (hệ thống tự cập nhật).`
+              : `Đã tạo lệnh ${maVanDon} và ký lên blockchain. Đơn vị vận chuyển có thể thực hiện lệnh.`,
+          );
+        } else {
+          alert(
+            `Đã tạo lệnh ${maVanDon} nhưng chưa ký blockchain: ${kq.lyDo}.\nĐơn vị vận chuyển chỉ thực hiện được sau khi bạn ký: vào tab "Ký blockchain" để ký.`,
+          );
+        }
+      } catch (loi) {
+        const lyDo =
+          loi?.code === "ACTION_REJECTED" || loi?.code === 4001
+            ? "bạn đã từ chối trong MetaMask"
+            : loi?.reason || loi?.shortMessage || loi?.message;
+        alert(
+          `Đã tạo lệnh ${maVanDon} nhưng chưa ký blockchain (${lyDo}).\nĐơn vị vận chuyển chỉ thực hiện được sau khi bạn ký: vào tab "Ký blockchain" để ký lại.`,
+        );
+      }
       await fetchShippingOrders();
     } catch (error) {
       console.error("Lỗi tạo lệnh vận chuyển:", error);
@@ -1662,7 +1689,14 @@ const DashboardPage = () => {
                 MetaMask để ghi lên blockchain.
               </p>
               <div className="blockchain-panel-full">
-                <BlockchainPanel />
+                <BlockchainPanel
+                  onDaKy={() => {
+                    // Ký xong thì tải lại các danh sách đang phụ thuộc trạng thái ký (lô, hồ sơ kiểm định, lệnh vận chuyển)
+                    fetchBatches();
+                    fetchInspections();
+                    fetchShippingOrders();
+                  }}
+                />
               </div>
             </div>
           )}
@@ -2090,6 +2124,20 @@ const DashboardPage = () => {
                     {batches.map((batch) => {
                       const isDropdownActive =
                         openDropdown === `batch-${batch.ma_lo_nong_san}`;
+                      // Lô đã có hồ sơ đang xử lý hoặc đã kiểm định đạt thì không gửi yêu cầu kiểm định nữa
+                      // (khớp điều kiện chặn gửi trùng của server; hồ sơ bị từ chối / không đạt vẫn gửi lại được)
+                      const daKiemDinh = inspections.some(
+                        (i) =>
+                          i.ma_lo_nong_san === batch.ma_lo_nong_san &&
+                          ([
+                            "CHO_TIEP_NHAN",
+                            "DA_HEN_LICH",
+                            "CHO_LAY_MAU",
+                            "DA_LAY_MAU",
+                          ].includes(i.trang_thai_ho_so) ||
+                            (i.trang_thai_ho_so === "DA_CONG_BO" &&
+                              i.ket_luan === "PASSED")),
+                      );
 
                       return (
                         <tr
@@ -2225,22 +2273,28 @@ const DashboardPage = () => {
                                       <Pencil size={15} />
                                       Cập nhật
                                     </div>
-                                    <div className="dropdown-divider"></div>
-                                    <div
-                                      className="dropdown-item"
-                                      onClick={() =>
-                                        handleOpenInspection({
-                                          ma_lo_nong_san: batch.ma_lo_nong_san,
-                                          loai_cay_trong: batch.loai_cay_trong,
-                                          so_luong_hien_tai:
-                                            batch.so_luong_hien_tai,
-                                          don_vi_tinh: batch.don_vi_tinh,
-                                        })
-                                      }
-                                    >
-                                      <CalendarCheck size={15} />
-                                      Yêu cầu kiểm định
-                                    </div>
+                                    {!daKiemDinh && (
+                                      <>
+                                        <div className="dropdown-divider"></div>
+                                        <div
+                                          className="dropdown-item"
+                                          onClick={() =>
+                                            handleOpenInspection({
+                                              ma_lo_nong_san:
+                                                batch.ma_lo_nong_san,
+                                              loai_cay_trong:
+                                                batch.loai_cay_trong,
+                                              so_luong_hien_tai:
+                                                batch.so_luong_hien_tai,
+                                              don_vi_tinh: batch.don_vi_tinh,
+                                            })
+                                          }
+                                        >
+                                          <CalendarCheck size={15} />
+                                          Yêu cầu kiểm định
+                                        </div>
+                                      </>
+                                    )}
                                     <div className="dropdown-divider"></div>
                                     <div
                                       className="dropdown-item danger"

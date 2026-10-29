@@ -80,6 +80,29 @@ const apDungKetQuaVanDon = async (executor, maVanDon, ap) => {
       `UPDATE lenh_van_chuyen SET trang_thai = 'CHO_TIEP_NHAN' WHERE ma_van_don = ? AND trang_thai = 'DANG_VAN_CHUYEN'`,
       [maVanDon],
     );
+  } else if (ap.hanh_dong === "NHAN_HANG") {
+    // Bên nhận (cơ sở sơ chế) đã ký nhận hàng: lệnh hoàn thành, lô chuyển sang kho bên nhận với khối lượng thực nhận
+    const [kq] = await executor.query(
+      `UPDATE lenh_van_chuyen SET trang_thai = 'HOAN_THANH', khoi_luong_nhan = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_TIEP_NHAN'`,
+      [ap.khoi_luong_nhan, maVanDon],
+    );
+    if (kq.affectedRows > 0) {
+      await executor.query(
+        `
+        UPDATE lo_nong_san lo
+        JOIN lenh_van_chuyen v ON v.ma_lo_nong_san = lo.ma_lo_nong_san
+        SET lo.ma_nguoi_quan_ly = v.ma_ben_nhan, lo.so_luong_hien_tai = ?, lo.giai_doan_hien_tai = 'RECEIVED'
+        WHERE v.ma_van_don = ?
+        `,
+        [ap.khoi_luong_nhan, maVanDon],
+      );
+    }
+  } else if (ap.hanh_dong === "BEN_NHAN_TU_CHOI") {
+    // Bên nhận đã ký từ chối khi hàng đến nơi
+    await executor.query(
+      `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_TIEP_NHAN'`,
+      [ap.ghi_chu ?? null, maVanDon],
+    );
   } else if (ap.hanh_dong === "TU_CHOI") {
     await executor.query(
       `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_CHAP_NHAN'`,
@@ -89,6 +112,40 @@ const apDungKetQuaVanDon = async (executor, maVanDon, ap) => {
     await executor.query(
       `UPDATE phieu_xuat_kho SET trang_thai = 'DA_HUY' WHERE ma_van_don = ? AND trang_thai = 'CHO_XUAT'`,
       [maVanDon],
+    );
+  }
+};
+
+// Giai đoạn sơ chế: đổi sang "đang đóng gói" / "hoàn tất" chỉ có hiệu lực sau khi cơ sở đã ký sự kiện sơ chế / đóng gói xong.
+// Chỉ tiến lên (không lùi) nên gọi lại vẫn an toàn.
+const THU_TU_GIAI_DOAN_SO_CHE = [
+  "DANG_RUA_KHU_KHUAN",
+  "DANG_PHAN_LOAI",
+  "DANG_DONG_GOI",
+  "DA_HOAN_TAT",
+];
+const apDungGiaiDoanSoChe = async (executor, ap) => {
+  if (!ap?.ma_so_che || !THU_TU_GIAI_DOAN_SO_CHE.includes(ap.giai_doan)) return;
+  const [kq] = await executor.query(
+    `
+    UPDATE so_che_lo_hang
+    SET giai_doan_so_che = ?, ngay_hoan_tat = IF(? = 'DA_HOAN_TAT', COALESCE(ngay_hoan_tat, CURDATE()), ngay_hoan_tat)
+    WHERE ma_so_che = ? AND FIELD(giai_doan_so_che, ?) < FIELD(?, ?)
+    `,
+    [
+      ap.giai_doan,
+      ap.giai_doan,
+      ap.ma_so_che,
+      THU_TU_GIAI_DOAN_SO_CHE,
+      ap.giai_doan,
+      THU_TU_GIAI_DOAN_SO_CHE,
+    ],
+  );
+  if (kq.affectedRows > 0 && ap.giai_doan === "DA_HOAN_TAT") {
+    await executor.query(
+      `UPDATE lo_nong_san lo JOIN so_che_lo_hang sc ON sc.ma_lo_moi = lo.ma_lo_nong_san
+       SET lo.giai_doan_hien_tai = 'PACKAGED' WHERE sc.ma_so_che = ?`,
+      [ap.ma_so_che],
     );
   }
 };
@@ -105,7 +162,9 @@ const apDungKetQuaKhiXacNhan = async (executor, maLichSu) => {
       ? JSON.parse(rows[0].payload)
       : rows[0].payload;
   const ts = payload?.tham_so || {};
-  if (ts.ap_dung?.hanh_dong) {
+  if (ts.ap_dung?.hanh_dong === "SO_CHE_GIAI_DOAN") {
+    await apDungGiaiDoanSoChe(executor, ts.ap_dung);
+  } else if (ts.ap_dung?.hanh_dong) {
     await apDungKetQuaVanDon(executor, ts.ma_van_don, ts.ap_dung);
   } else {
     await apDungKetQuaKiemDinh(executor, ts.ma_kiem_dinh, ts.ap_dung);
@@ -192,6 +251,7 @@ const traVeHangCho = async (executor, { maLichSu, lyDo }) => {
 module.exports = {
   apDungKetQuaKiemDinh,
   apDungKetQuaVanDon,
+  apDungGiaiDoanSoChe,
   capNhatTrangThaiLo,
   ghiNhanDaXacNhan,
   ghiNhanDaGui,

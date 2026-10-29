@@ -22,6 +22,9 @@ import {
   AlertCircle,
   LogOut,
   Wallet,
+  Users,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import "../../css/donvivanchuyen.css";
 import BlockchainPanel from "../blockchainpannel";
@@ -32,6 +35,14 @@ import {
   rejectTrip,
   confirmPickup,
   confirmArrival,
+  fetchDrivers,
+  createDriver,
+  updateDriver,
+  deleteDriver,
+  fetchVehicles,
+  createVehicle,
+  updateVehicle,
+  deleteVehicle,
 } from "../../../api/donvivanchuyenApi";
 
 const DEFAULT_LOGO_IMG =
@@ -93,13 +104,21 @@ const BadgeChoKy = ({ text }) => (
   </span>
 );
 
+const EMPTY_DRIVER = {
+  ho_ten: "",
+  so_dien_thoai: "",
+  so_giay_phep: "",
+  hang_bang: "",
+};
+const EMPTY_VEHICLE = { bien_so: "", loai_xe: "", tai_trong_kg: "" };
+
 export default function AgriChainLogistics() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   const [currentTab, setCurrentTab] = usePersistentTab(
     "vanchuyen",
     "shipping",
-    ["shipping", "pickup", "delivery", "blockchain"],
+    ["shipping", "pickup", "delivery", "fleet", "blockchain"],
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -110,9 +129,17 @@ export default function AgriChainLogistics() {
 
   const [acceptModalTrip, setAcceptModalTrip] = useState(null);
   const [acceptForm, setAcceptForm] = useState({
-    ten_tai_xe: "",
-    bien_so_xe: "",
+    ma_tai_xe: "",
+    ma_phuong_tien: "",
   });
+
+  // Danh sách tài xế & phương tiện của đơn vị (chọn khi chấp nhận chuyến, quản lý ở tab riêng)
+  const [drivers, setDrivers] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [driverForm, setDriverForm] = useState(EMPTY_DRIVER);
+  const [editingDriver, setEditingDriver] = useState(null);
+  const [vehicleForm, setVehicleForm] = useState(EMPTY_VEHICLE);
+  const [editingVehicle, setEditingVehicle] = useState(null);
 
   const [rejectModalTrip, setRejectModalTrip] = useState(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -215,27 +242,159 @@ export default function AgriChainLogistics() {
     return true;
   };
 
-  // ==================== CHẤP NHẬN / TỪ CHỐI ====================
+  // ==================== QUẢN LÝ TÀI XẾ & PHƯƠNG TIỆN ====================
 
-  const handleOpenAccept = (trip) => {
-    if (chanNeuBenGuiChuaKy(trip)) return;
-    setAcceptModalTrip(trip);
-    setAcceptForm({
-      ten_tai_xe: trip.ten_tai_xe || "",
-      bien_so_xe: trip.bien_so_xe || "",
+  const loadFleet = useCallback(async () => {
+    try {
+      const [d, v] = await Promise.all([fetchDrivers(), fetchVehicles()]);
+      const dsTaiXe = d?.data || [];
+      const dsXe = v?.data || [];
+      setDrivers(dsTaiXe);
+      setVehicles(dsXe);
+      return { drivers: dsTaiXe, vehicles: dsXe };
+    } catch (err) {
+      alert(err.message || "Không thể tải danh sách tài xế / phương tiện");
+      return null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user && currentTab === "fleet") loadFleet();
+  }, [user, currentTab, loadFleet]);
+
+  const handleSaveDriver = async () => {
+    if (!driverForm.ho_ten.trim()) {
+      alert("Vui lòng nhập họ tên tài xế!");
+      return;
+    }
+    try {
+      const payload = {
+        ho_ten: driverForm.ho_ten.trim(),
+        so_dien_thoai: driverForm.so_dien_thoai.trim(),
+        so_giay_phep: driverForm.so_giay_phep.trim(),
+        hang_bang: driverForm.hang_bang.trim(),
+      };
+      const res = editingDriver
+        ? await updateDriver(editingDriver, payload)
+        : await createDriver(payload);
+      setDriverForm(EMPTY_DRIVER);
+      setEditingDriver(null);
+      await loadFleet();
+      alert(res?.message || "Đã lưu tài xế");
+    } catch (err) {
+      alert(err.message || "Không thể lưu tài xế");
+    }
+  };
+
+  const handleEditDriver = (d) => {
+    setEditingDriver(d.ma_tai_xe);
+    setDriverForm({
+      ho_ten: d.ho_ten || "",
+      so_dien_thoai: d.so_dien_thoai || "",
+      so_giay_phep: d.so_giay_phep || "",
+      hang_bang: d.hang_bang || "",
     });
   };
 
+  const handleDeleteDriver = async (d) => {
+    if (!window.confirm(`Xóa tài xế ${d.ho_ten} khỏi danh sách?`)) return;
+    try {
+      await deleteDriver(d.ma_tai_xe);
+      if (editingDriver === d.ma_tai_xe) {
+        setEditingDriver(null);
+        setDriverForm(EMPTY_DRIVER);
+      }
+      await loadFleet();
+    } catch (err) {
+      alert(err.message || "Không thể xóa tài xế");
+    }
+  };
+
+  const handleSaveVehicle = async () => {
+    if (!vehicleForm.bien_so.trim()) {
+      alert("Vui lòng nhập biển số xe!");
+      return;
+    }
+    try {
+      const payload = {
+        bien_so: vehicleForm.bien_so.trim(),
+        loai_xe: vehicleForm.loai_xe.trim(),
+        tai_trong_kg:
+          vehicleForm.tai_trong_kg === ""
+            ? ""
+            : Number(vehicleForm.tai_trong_kg),
+      };
+      const res = editingVehicle
+        ? await updateVehicle(editingVehicle, payload)
+        : await createVehicle(payload);
+      setVehicleForm(EMPTY_VEHICLE);
+      setEditingVehicle(null);
+      await loadFleet();
+      alert(res?.message || "Đã lưu phương tiện");
+    } catch (err) {
+      alert(err.message || "Không thể lưu phương tiện");
+    }
+  };
+
+  const handleEditVehicle = (v) => {
+    setEditingVehicle(v.ma_phuong_tien);
+    setVehicleForm({
+      bien_so: v.bien_so || "",
+      loai_xe: v.loai_xe || "",
+      tai_trong_kg:
+        v.tai_trong_kg === null || v.tai_trong_kg === undefined
+          ? ""
+          : String(Number(v.tai_trong_kg)),
+    });
+  };
+
+  const handleDeleteVehicle = async (v) => {
+    if (!window.confirm(`Xóa phương tiện ${v.bien_so} khỏi danh sách?`)) return;
+    try {
+      await deleteVehicle(v.ma_phuong_tien);
+      if (editingVehicle === v.ma_phuong_tien) {
+        setEditingVehicle(null);
+        setVehicleForm(EMPTY_VEHICLE);
+      }
+      await loadFleet();
+    } catch (err) {
+      alert(err.message || "Không thể xóa phương tiện");
+    }
+  };
+
+  // ==================== CHẤP NHẬN / TỪ CHỐI ====================
+
+  const handleOpenAccept = async (trip) => {
+    if (chanNeuBenGuiChuaKy(trip)) return;
+    const ds = await loadFleet();
+    if (!ds) return;
+    if (ds.drivers.length === 0 || ds.vehicles.length === 0) {
+      const thieu =
+        ds.drivers.length === 0 && ds.vehicles.length === 0
+          ? "tài xế và phương tiện"
+          : ds.drivers.length === 0
+            ? "tài xế"
+            : "phương tiện";
+      alert(
+        `Bạn chưa có ${thieu} nào trong danh sách.\nHãy thêm ở mục "Tài xế & phương tiện" rồi quay lại chấp nhận chuyến.`,
+      );
+      setCurrentTab("fleet");
+      return;
+    }
+    setAcceptModalTrip(trip);
+    setAcceptForm({ ma_tai_xe: "", ma_phuong_tien: "" });
+  };
+
   const handleSubmitAccept = async () => {
-    if (!acceptForm.ten_tai_xe.trim() || !acceptForm.bien_so_xe.trim()) {
-      alert("Vui lòng nhập tên tài xế và biển số xe phụ trách!");
+    if (!acceptForm.ma_tai_xe || !acceptForm.ma_phuong_tien) {
+      alert("Vui lòng chọn tài xế và phương tiện phụ trách từ danh sách!");
       return;
     }
     try {
       await acceptTrip(
         acceptModalTrip.ma_van_don,
-        acceptForm.ten_tai_xe.trim(),
-        acceptForm.bien_so_xe.trim(),
+        acceptForm.ma_tai_xe,
+        acceptForm.ma_phuong_tien,
       );
       setAcceptModalTrip(null);
       await loadTrips();
@@ -497,6 +656,13 @@ export default function AgriChainLogistics() {
                 <span>Xác nhận giao hàng đến</span>
               </button>
               <button
+                onClick={() => setCurrentTab("fleet")}
+                className={`nav-item ${currentTab === "fleet" ? "active" : ""}`}
+              >
+                <Users size={20} />
+                <span>Tài xế & phương tiện</span>
+              </button>
+              <button
                 onClick={() => setCurrentTab("blockchain")}
                 className={`nav-item ${currentTab === "blockchain" ? "active" : ""}`}
               >
@@ -612,7 +778,305 @@ export default function AgriChainLogistics() {
                       trước.
                     </p>
                     <div className="blockchain-panel-full">
-                      <BlockchainPanel thongBaoBangAlert />
+                      <BlockchainPanel thongBaoBangAlert onDaKy={taiLaiNgam} />
+                    </div>
+                  </div>
+                )}
+
+                {currentTab === "fleet" && (
+                  <div className="fleet-wrap">
+                    <p className="fleet-desc">
+                      Danh sách tài xế và phương tiện của đơn vị. Khi chấp nhận
+                      chuyến chỉ cần chọn từ danh sách này, không phải nhập tay;
+                      bên gửi cũng không nhập tài xế hay biển số.
+                    </p>
+
+                    <div className="fleet-grid">
+                      {/* ===== TÀI XẾ ===== */}
+                      <section className="fleet-card">
+                        <div className="fleet-card-head">
+                          <h3>
+                            <Users size={18} /> Tài xế ({drivers.length})
+                          </h3>
+                        </div>
+
+                        <div className="fleet-form">
+                          <div className="form-row-2">
+                            <div className="form-group">
+                              <label>Họ tên (*)</label>
+                              <input
+                                className="form-input"
+                                value={driverForm.ho_ten}
+                                onChange={(e) =>
+                                  setDriverForm({
+                                    ...driverForm,
+                                    ho_ten: e.target.value,
+                                  })
+                                }
+                                placeholder="Nguyễn Văn Hùng"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Số điện thoại</label>
+                              <input
+                                className="form-input"
+                                value={driverForm.so_dien_thoai}
+                                onChange={(e) =>
+                                  setDriverForm({
+                                    ...driverForm,
+                                    so_dien_thoai: e.target.value,
+                                  })
+                                }
+                                placeholder="0901234567"
+                              />
+                            </div>
+                          </div>
+                          <div className="form-row-2">
+                            <div className="form-group">
+                              <label>Số giấy phép lái xe</label>
+                              <input
+                                className="form-input"
+                                value={driverForm.so_giay_phep}
+                                onChange={(e) =>
+                                  setDriverForm({
+                                    ...driverForm,
+                                    so_giay_phep: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Hạng bằng</label>
+                              <input
+                                className="form-input"
+                                value={driverForm.hang_bang}
+                                onChange={(e) =>
+                                  setDriverForm({
+                                    ...driverForm,
+                                    hang_bang: e.target.value,
+                                  })
+                                }
+                                placeholder="C, FC..."
+                              />
+                            </div>
+                          </div>
+                          <div className="fleet-form-actions">
+                            {editingDriver && (
+                              <button
+                                className="btn-cancel"
+                                onClick={() => {
+                                  setEditingDriver(null);
+                                  setDriverForm(EMPTY_DRIVER);
+                                }}
+                              >
+                                Hủy sửa
+                              </button>
+                            )}
+                            <button
+                              className="btn-primary"
+                              onClick={handleSaveDriver}
+                            >
+                              <Plus size={15} />
+                              <span>
+                                {editingDriver ? "Lưu tài xế" : "Thêm tài xế"}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <table className="fleet-table">
+                          <thead>
+                            <tr>
+                              <th>Mã</th>
+                              <th>Họ tên</th>
+                              <th>SĐT</th>
+                              <th>GPLX</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {drivers.length === 0 && (
+                              <tr>
+                                <td colSpan={5} className="fleet-empty">
+                                  Chưa có tài xế nào.
+                                </td>
+                              </tr>
+                            )}
+                            {drivers.map((d) => (
+                              <tr key={d.ma_tai_xe}>
+                                <td>{d.ma_tai_xe}</td>
+                                <td>
+                                  <b>{d.ho_ten}</b>
+                                  {d.dang_chay_chuyen && (
+                                    <span className="fleet-busy">
+                                      Đang chạy {d.dang_chay_chuyen}
+                                    </span>
+                                  )}
+                                </td>
+                                <td>{d.so_dien_thoai || "—"}</td>
+                                <td>
+                                  {[d.hang_bang, d.so_giay_phep]
+                                    .filter(Boolean)
+                                    .join(" - ") || "—"}
+                                </td>
+                                <td className="fleet-row-actions">
+                                  <button
+                                    title="Sửa"
+                                    onClick={() => handleEditDriver(d)}
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button
+                                    title="Xóa"
+                                    className="danger"
+                                    onClick={() => handleDeleteDriver(d)}
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </section>
+
+                      {/* ===== PHƯƠNG TIỆN ===== */}
+                      <section className="fleet-card">
+                        <div className="fleet-card-head">
+                          <h3>
+                            <Truck size={18} /> Phương tiện ({vehicles.length})
+                          </h3>
+                        </div>
+
+                        <div className="fleet-form">
+                          <div className="form-row-2">
+                            <div className="form-group">
+                              <label>Biển số xe (*)</label>
+                              <input
+                                className="form-input"
+                                value={vehicleForm.bien_so}
+                                onChange={(e) =>
+                                  setVehicleForm({
+                                    ...vehicleForm,
+                                    bien_so: e.target.value,
+                                  })
+                                }
+                                placeholder="65C-128.45"
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label>Loại xe</label>
+                              <input
+                                className="form-input"
+                                value={vehicleForm.loai_xe}
+                                onChange={(e) =>
+                                  setVehicleForm({
+                                    ...vehicleForm,
+                                    loai_xe: e.target.value,
+                                  })
+                                }
+                                placeholder="Xe tải đông lạnh"
+                              />
+                            </div>
+                          </div>
+                          <div className="form-group">
+                            <label>Tải trọng (kg)</label>
+                            <input
+                              className="form-input"
+                              type="number"
+                              min="0"
+                              value={vehicleForm.tai_trong_kg}
+                              onChange={(e) =>
+                                setVehicleForm({
+                                  ...vehicleForm,
+                                  tai_trong_kg: e.target.value,
+                                })
+                              }
+                              placeholder="5000"
+                            />
+                          </div>
+                          <div className="fleet-form-actions">
+                            {editingVehicle && (
+                              <button
+                                className="btn-cancel"
+                                onClick={() => {
+                                  setEditingVehicle(null);
+                                  setVehicleForm(EMPTY_VEHICLE);
+                                }}
+                              >
+                                Hủy sửa
+                              </button>
+                            )}
+                            <button
+                              className="btn-primary"
+                              onClick={handleSaveVehicle}
+                            >
+                              <Plus size={15} />
+                              <span>
+                                {editingVehicle
+                                  ? "Lưu phương tiện"
+                                  : "Thêm phương tiện"}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <table className="fleet-table">
+                          <thead>
+                            <tr>
+                              <th>Mã</th>
+                              <th>Biển số</th>
+                              <th>Loại xe</th>
+                              <th>Tải trọng</th>
+                              <th></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {vehicles.length === 0 && (
+                              <tr>
+                                <td colSpan={5} className="fleet-empty">
+                                  Chưa có phương tiện nào.
+                                </td>
+                              </tr>
+                            )}
+                            {vehicles.map((v) => (
+                              <tr key={v.ma_phuong_tien}>
+                                <td>{v.ma_phuong_tien}</td>
+                                <td>
+                                  <b>{v.bien_so}</b>
+                                  {v.dang_chay_chuyen && (
+                                    <span className="fleet-busy">
+                                      Đang chạy {v.dang_chay_chuyen}
+                                    </span>
+                                  )}
+                                </td>
+                                <td>{v.loai_xe || "—"}</td>
+                                <td>
+                                  {v.tai_trong_kg === null ||
+                                  v.tai_trong_kg === undefined
+                                    ? "—"
+                                    : `${Number(v.tai_trong_kg).toLocaleString("vi-VN")} kg`}
+                                </td>
+                                <td className="fleet-row-actions">
+                                  <button
+                                    title="Sửa"
+                                    onClick={() => handleEditVehicle(v)}
+                                  >
+                                    <Pencil size={15} />
+                                  </button>
+                                  <button
+                                    title="Xóa"
+                                    className="danger"
+                                    onClick={() => handleDeleteVehicle(v)}
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </section>
                     </div>
                   </div>
                 )}
@@ -1110,34 +1574,60 @@ export default function AgriChainLogistics() {
                 </p>
                 <div className="form-group">
                   <label>Tài xế phụ trách (*)</label>
-                  <input
-                    type="text"
-                    value={acceptForm.ten_tai_xe}
+                  <select
+                    value={acceptForm.ma_tai_xe}
                     onChange={(e) =>
                       setAcceptForm({
                         ...acceptForm,
-                        ten_tai_xe: e.target.value,
+                        ma_tai_xe: e.target.value,
                       })
                     }
-                    className="form-input"
-                    placeholder="Nguyễn Văn Hùng"
-                  />
+                    className="form-select"
+                  >
+                    <option value="">-- Chọn tài xế từ danh sách --</option>
+                    {drivers.map((d) => (
+                      <option key={d.ma_tai_xe} value={d.ma_tai_xe}>
+                        {d.ho_ten}
+                        {d.so_dien_thoai ? ` - ${d.so_dien_thoai}` : ""}
+                        {d.dang_chay_chuyen
+                          ? ` (đang chạy ${d.dang_chay_chuyen})`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
-                  <label>Biển số xe (*)</label>
-                  <input
-                    type="text"
-                    value={acceptForm.bien_so_xe}
+                  <label>Phương tiện (*)</label>
+                  <select
+                    value={acceptForm.ma_phuong_tien}
                     onChange={(e) =>
                       setAcceptForm({
                         ...acceptForm,
-                        bien_so_xe: e.target.value,
+                        ma_phuong_tien: e.target.value,
                       })
                     }
-                    className="form-input"
-                    placeholder="65C-128.45"
-                  />
+                    className="form-select"
+                  >
+                    <option value="">
+                      -- Chọn phương tiện từ danh sách --
+                    </option>
+                    {vehicles.map((v) => (
+                      <option key={v.ma_phuong_tien} value={v.ma_phuong_tien}>
+                        {v.bien_so}
+                        {v.loai_xe ? ` - ${v.loai_xe}` : ""}
+                        {v.tai_trong_kg
+                          ? ` (${Number(v.tai_trong_kg).toLocaleString("vi-VN")} kg)`
+                          : ""}
+                        {v.dang_chay_chuyen
+                          ? ` (đang chạy ${v.dang_chay_chuyen})`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+                <p style={{ fontSize: 12.5, color: "#6b7280", margin: 0 }}>
+                  Cần thêm tài xế / xe mới? Vào mục "Tài xế & phương tiện".
+                </p>
               </div>
               <div className="modal-footer">
                 <button
