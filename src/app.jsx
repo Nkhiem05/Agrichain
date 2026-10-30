@@ -34,6 +34,7 @@ import Chitietphanphoi from "../src/view/page/nhaphanphoi/chitietphanphoi";
 
 // Đại lý
 import DaiLyPage from "./view/page/daily/daily";
+import ChiTietLoPage from "./view/page/lohang/chitietlo";
 
 // user
 import User from "../src/view/page/user/user";
@@ -81,6 +82,9 @@ const AppRoutes = () => {
 
       {/* Đại lý */}
       <Route path="/dai-ly" element={<DaiLyPage />} />
+
+      {/* Chi tiết lô + mã QR (cho người đã đăng nhập) */}
+      <Route path="/lo-hang/:maLo" element={<ChiTietLoPage />} />
 
       {/*Profile*/}
       <Route path="/trang-ca-nhan" element={<Trangcanhan />} />

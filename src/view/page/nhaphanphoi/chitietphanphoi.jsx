@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import "../../css/chitietphanphoi.css";
+import { kyNgay } from "../kyNgay";
 import {
   fetchDispatchDetail,
   markDispatchShipped,
@@ -71,7 +72,7 @@ const ChiTietPhanPhoiPage = () => {
     try {
       const res = await markDispatchShipped(orderDetail.ma_phieu);
       await loadDetail();
-      if (orderDetail.ma_van_don && res?.message) alert(`${res.message}. Hãy ký xác nhận ở mục Ký blockchain`);
+      if (orderDetail.ma_van_don) await kyNgay(res?.message || "Đã xuất kho.", { taiLai: loadDetail });
     } catch (err) {
       alert(err.message || "Không thể xác nhận xuất kho");
     } finally {
@@ -92,7 +93,7 @@ const ChiTietPhanPhoiPage = () => {
     try {
       const res = await markDispatchDelivered(orderDetail.ma_phieu);
       await loadDetail();
-      if (orderDetail.ma_van_don && res?.message) alert(`${res.message}. Hãy ký xác nhận ở mục Ký blockchain`);
+      if (orderDetail.ma_van_don) await kyNgay(res?.message || "Đã tới nơi.", { taiLai: loadDetail });
     } catch (err) {
       alert(err.message || "Không thể xác nhận giao hàng");
     } finally {

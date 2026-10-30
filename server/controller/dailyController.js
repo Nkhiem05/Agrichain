@@ -141,7 +141,7 @@ const confirmReceive = async (req, res) => {
       await ghiSuKienVanDon(connection, maVanDon, "STOCK_IN_CONFIRMED", maDaiLy);
     });
 
-    return res.json({ success: true, message: "Đã nhận hàng. Hãy ký xác nhận ở mục Ký blockchain" });
+    return res.json({ success: true, message: "Đã nhận hàng." });
   } catch (err) {
     return sendError(res, err, "Lỗi đại lý nhận hàng:", "Không thể xác nhận nhận hàng");
   }
@@ -246,7 +246,7 @@ const completeLot = async (req, res) => {
       });
     });
 
-    return res.json({ success: true, message: "Đã xác nhận bán hết lô. Hãy ký xác nhận ở mục Ký blockchain" });
+    return res.json({ success: true, message: "Đã xác nhận bán hết lô." });
   } catch (err) {
     return sendError(res, err, "Lỗi xác nhận bán hết:", "Không thể xác nhận bán hết lô");
   }

@@ -25,6 +25,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import "../../css/nhaphanphoi.css";
 import BlockchainPanel from "../blockchainpannel";
+import { kyNgay } from "../kyNgay";
 import {
   fetchIncomingShipments,
   confirmReceiveShipment,
@@ -325,7 +326,7 @@ const NhaPhanPhoiPage = () => {
       });
       setShowReceiveModal(false);
       await loadAll();
-      alert(`Đã nhập kho thành công ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}!`);
+      await kyNgay(`Đã nhập kho ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}.`, { taiLai: loadAll });
     } catch (err) {
       alert(err.message || "Không thể xác nhận nhập kho");
     }
@@ -347,6 +348,7 @@ const NhaPhanPhoiPage = () => {
       await rejectReceiveShipment(selectedOrder.ma_van_don, rejectReason.trim());
       setShowRejectModal(false);
       await loadAll();
+      await kyNgay(`Đã từ chối tiếp nhận chuyến ${selectedOrder.ma_van_don}.`, { taiLai: loadAll });
     } catch (err) {
       alert(err.message || "Không thể từ chối tiếp nhận");
     }
@@ -409,7 +411,7 @@ const NhaPhanPhoiPage = () => {
       });
       setShowCreateDispatchModal(false);
       await loadAll();
-      alert(`${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}`);
+      await kyNgay(`${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.`, { taiLai: loadAll });
     } catch (err) {
       alert(err.message || "Không thể lập phiếu xuất kho");
     }
@@ -912,6 +914,15 @@ const NhaPhanPhoiPage = () => {
                                   )}
                                 </td>
                                 <td>
+                                  <button
+                                    type="button"
+                                    className="btn-action-view-outline"
+                                    style={{ marginRight: 6 }}
+                                    title="Xem chi tiết lô và lấy mã QR"
+                                    onClick={() => navigate(`/lo-hang/${encodeURIComponent(lot.ma_lo_nong_san)}`)}
+                                  >
+                                    <Eye size={14} /> Chi tiết &amp; QR
+                                  </button>
                                   {isRevoked ? (
                                     <button
                                       type="button"

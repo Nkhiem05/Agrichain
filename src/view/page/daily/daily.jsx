@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { PackageCheck, Store, Wallet, LogOut, CheckCircle2, XCircle, Truck, Eye } from "lucide-react";
 import "../../css/nhaphanphoi.css";
 import BlockchainPanel from "../blockchainpannel";
+import { kyNgay } from "../kyNgay";
 import {
   fetchHangDangToi,
   xacNhanNhanHang,
@@ -84,8 +85,8 @@ const DaiLyPage = () => {
     setDangXuLy(khoa);
     try {
       const kq = await fn();
-      if (kq?.message) alert(kq.message);
       await loadAll();
+      await kyNgay(kq?.message || "Đã thực hiện.", { taiLai: loadAll });
     } catch (err) {
       alert(err.message || "Có lỗi xảy ra");
     } finally {
@@ -306,6 +307,14 @@ const DaiLyPage = () => {
                             <td style={{ fontWeight: 700 }}>{xong ? "Đã bán hết" : soKg(l.so_luong_hien_tai, l.don_vi_tinh)}</td>
                             <td><span className={`status-pill ${xt.tone}`}>{xt.text}</span></td>
                             <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                              <button
+                                type="button"
+                                className="btn-action-view-outline"
+                                onClick={() => navigate(`/lo-hang/${encodeURIComponent(l.ma_lo_nong_san)}`)}
+                                title="Xem chi tiết lô và lấy mã QR"
+                              >
+                                <Eye size={14} /> Chi tiết &amp; QR
+                              </button>{" "}
                               <a
                                 className="btn-action-view-outline"
                                 href={`/chi-tiet-user?malohang=${encodeURIComponent(l.ma_lo_nong_san)}`}

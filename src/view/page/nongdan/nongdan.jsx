@@ -2265,6 +2265,15 @@ const DashboardPage = () => {
                                       <Eye size={15} />
                                       Xem chi tiết
                                     </div>
+                                    <div
+                                      className="dropdown-item"
+                                      onClick={() =>
+                                        navigate(`/lo-hang/${encodeURIComponent(batch.ma_lo_nong_san)}`)
+                                      }
+                                    >
+                                      <Eye size={15} />
+                                      Chi tiết lô &amp; mã QR
+                                    </div>
                                     <div className="dropdown-divider"></div>
                                     <div
                                       className="dropdown-item"
