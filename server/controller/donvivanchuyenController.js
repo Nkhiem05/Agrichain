@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const {
   ghiSuKienVanDon,
+  goSuKienLenhChuaKy,
   chuaCoViDuyet,
 } = require("../services/blockchain/hook");
 const { apDungKetQuaVanDon } = require("../services/blockchain/ghiNhan");
@@ -18,8 +19,9 @@ Luồng trạng thái do đơn vị vận chuyển điều khiển:
   CHO_LAY_HANG  -> (xác nhận lấy hàng) -> DANG_VAN_CHUYEN
   DANG_VAN_CHUYEN -> (xác nhận đã đến nơi) -> CHO_TIEP_NHAN
   CHO_TIEP_NHAN -> (bên nhận tự xác nhận, không phải đơn vị vận chuyển) -> HOAN_THANH
-Có blockchain: mỗi bước của đơn vị vận chuyển (từ chối / lấy hàng / đến nơi) chỉ tạo sự kiện chờ ký; chuyến chỉ chuyển
-sang bước sau khi đơn vị vận chuyển ký xong (xem ghiNhan.js). Và các bước này chỉ làm được sau khi bên gửi đã ký lệnh.
+Có blockchain: bên gửi KHÔNG ký lúc tạo lệnh. Đơn vị vận chuyển chấp nhận (hoặc từ chối) không cần chữ ký nào; sau khi chấp nhận,
+bên gửi ký xác nhận lấy hàng đi (sự kiện tạo lệnh), rồi đơn vị vận chuyển mới bấm lấy hàng đi: bước lấy hàng / đến nơi chỉ tạo
+sự kiện chờ ký, chuyến chỉ chuyển sang bước sau khi đơn vị vận chuyển ký xong (xem ghiNhan.js).
 ==================================================
 */
 
@@ -97,7 +99,7 @@ const getTransporterId = (req) => {
 };
 
 const CHUA_KY_LENH =
-  "Bên gửi chưa ký lệnh vận chuyển lên blockchain. Hãy chờ bên gửi ký xong rồi mới thực hiện bước này.";
+  "Bên gửi chưa ký xác nhận lấy hàng đi lên blockchain. Hãy chờ bên gửi ký xong rồi mới thực hiện bước này.";
 
 // Trạng thái ký của sự kiện tạo lệnh (bên gửi ký): null = lệnh chưa có sự kiện (lệnh cũ), hoặc trạng thái đồng bộ của nó
 const trangThaiKyLenh = async (executor, maVanDon) => {
@@ -180,7 +182,9 @@ const ganCoKy = async (executor, rows, maDonVi) => {
   );
   rows.forEach((r) => {
     ev.filter((e) => e.ma_van_don === r.ma_van_don).forEach((e) => {
-      if (e.loai === "TRANSPORT_ORDERED") r.chua_ky_lenh = true;
+      // Lệnh còn chờ chấp nhận thì bên gửi chưa phải ký; chỉ sau khi chấp nhận mới là "chờ bên gửi ký xác nhận lấy hàng đi"
+      if (e.loai === "TRANSPORT_ORDERED")
+        r.chua_ky_lenh = r.trang_thai !== "CHO_CHAP_NHAN";
       else if (e.hanh_dong) r.cho_ky = e.hanh_dong;
     });
   });
@@ -299,16 +303,29 @@ const getTripById = async (req, res) => {
 /*
 ==================================================
 TÀI XẾ & PHƯƠNG TIỆN CỦA ĐƠN VỊ VẬN CHUYỂN
-Bảng tự tạo ở lần dùng đầu tiên (CREATE TABLE IF NOT EXISTS), không cần chạy migration thủ công.
+CSDL gốc chỉ có hai cột chép tay ten_tai_xe / bien_so_xe trong lenh_van_chuyen (chưa có bảng danh sách), nên hai bảng này
+tự tạo ở lần dùng đầu tiên (CREATE TABLE IF NOT EXISTS), không cần chạy migration thủ công. Lúc tạo bảng lần đầu, tài xế và
+biển số đã có sẵn trong các chuyến cũ của từng đơn vị được nhập vào danh sách để không phải gõ lại.
 Chuyến vận chuyển vẫn lưu bản sao tên tài xế / biển số (lenh_van_chuyen.ten_tai_xe, bien_so_xe) nên sửa hay xóa danh sách
 không làm đổi dữ liệu các chuyến đã có.
 ==================================================
 */
 
 let daBaoDamBang = null;
+
+const bangDaCo = async (ten) => {
+  const [r] = await db.query(
+    `SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?`,
+    [ten],
+  );
+  return Number(r[0].c) > 0;
+};
+
 const baoDamBangTaiXePhuongTien = () => {
   if (!daBaoDamBang) {
     daBaoDamBang = (async () => {
+      const coBangTaiXe = await bangDaCo("tai_xe");
+      const coBangXe = await bangDaCo("phuong_tien");
       await db.query(
         `
         CREATE TABLE IF NOT EXISTS tai_xe (
@@ -340,6 +357,54 @@ const baoDamBangTaiXePhuongTien = () => {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         `,
       );
+
+      // Bảng vừa được tạo: nhập tài xế / biển số đã có sẵn trong các chuyến cũ của từng đơn vị (chỉ làm một lần)
+      try {
+        if (!coBangTaiXe) {
+          const [cu] = await db.query(
+            `
+            SELECT DISTINCT ma_don_vi_van_chuyen AS ma_don_vi, TRIM(ten_tai_xe) AS ten
+            FROM lenh_van_chuyen
+            WHERE ten_tai_xe IS NOT NULL AND TRIM(ten_tai_xe) <> ''
+            ORDER BY ma_don_vi_van_chuyen, ten
+            `,
+          );
+          for (const r of cu) {
+            const ma = await taoMaMoi(db, "tai_xe", "ma_tai_xe", "TX");
+            await db.query(
+              `INSERT IGNORE INTO tai_xe (ma_tai_xe, ma_don_vi, ho_ten) VALUES (?, ?, ?)`,
+              [ma, r.ma_don_vi, r.ten],
+            );
+          }
+        }
+        if (!coBangXe) {
+          const [cu] = await db.query(
+            `
+            SELECT DISTINCT ma_don_vi_van_chuyen AS ma_don_vi, UPPER(TRIM(bien_so_xe)) AS bien_so
+            FROM lenh_van_chuyen
+            WHERE bien_so_xe IS NOT NULL AND TRIM(bien_so_xe) <> ''
+            ORDER BY ma_don_vi_van_chuyen, bien_so
+            `,
+          );
+          for (const r of cu) {
+            const ma = await taoMaMoi(
+              db,
+              "phuong_tien",
+              "ma_phuong_tien",
+              "PT",
+            );
+            await db.query(
+              `INSERT IGNORE INTO phuong_tien (ma_phuong_tien, ma_don_vi, bien_so) VALUES (?, ?, ?)`,
+              [ma, r.ma_don_vi, r.bien_so],
+            );
+          }
+        }
+      } catch (err) {
+        console.error(
+          "Không nhập được tài xế / biển số có sẵn từ các chuyến cũ:",
+          err.message,
+        );
+      }
     })().catch((err) => {
       daBaoDamBang = null; // lần sau thử lại
       throw err;
@@ -685,7 +750,7 @@ const acceptTrip = async (req, res) => {
       if (rows[0].trang_thai !== "CHO_CHAP_NHAN") {
         throw new ApiError(409, "Chuyến không ở trạng thái chờ chấp nhận");
       }
-      await canBenGuiDaKy(connection, maVanDon);
+      // Chấp nhận không cần chữ ký: bên gửi ký xác nhận lấy hàng đi SAU khi đơn vị vận chuyển chấp nhận
 
       // Tài xế / phương tiện phải thuộc danh sách của chính đơn vị này
       const [taiXe] = await connection.execute(
@@ -749,9 +814,34 @@ const rejectTrip = async (req, res) => {
       if (rows[0].trang_thai !== "CHO_CHAP_NHAN") {
         throw new ApiError(409, "Chuyến không ở trạng thái chờ chấp nhận");
       }
-      await canBenGuiDaKy(connection, maVanDon);
 
-      // Blockchain: đơn vị vận chuyển ký từ chối chuyến (lô ở lại bên gửi). Chuyến chỉ bị từ chối sau khi ký xong.
+      // Bên gửi chưa ký lệnh (luồng mới: chỉ ký sau khi chấp nhận) thì chưa có gì trên chain: từ chối ngay, gỡ sự kiện tạo lệnh
+      // chờ ký, không ai phải ký gì.
+      const trangThaiKy = layCauHinh().daCauHinh
+        ? await trangThaiKyLenh(connection, maVanDon)
+        : null;
+      if (!trangThaiKy || trangThaiKy !== "CONFIRMED") {
+        if (trangThaiKy === "SUBMITTED") {
+          throw new ApiError(
+            409,
+            "Bên gửi vừa ký lệnh, đang chờ blockchain xác nhận. Hãy thử lại sau ít phút",
+          );
+        }
+        if (trangThaiKy && !(await goSuKienLenhChuaKy(connection, maVanDon))) {
+          throw new ApiError(
+            409,
+            "Không gỡ được lệnh đang chờ ký vì lô còn sự kiện khác chờ ký phía sau",
+          );
+        }
+        await apDungKetQuaVanDon(connection, maVanDon, {
+          hanh_dong: "TU_CHOI",
+          ghi_chu: `Đơn vị vận chuyển từ chối: ${lyDo}`,
+        });
+        return false;
+      }
+
+      // Lệnh đã ký lên chain (lệnh tạo từ bản cũ): đơn vị vận chuyển ký từ chối chuyến (lô ở lại bên gửi).
+      // Chuyến chỉ bị từ chối sau khi ký xong.
       return thucHienBuocCoKy(
         connection,
         maVanDon,

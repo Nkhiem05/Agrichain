@@ -9,7 +9,16 @@ import {
   fetchChoKy,
   guiVaXacNhanSuKien,
 } from "../../api/blockchainApi";
-import { TEN_SU_KIEN, rutGon } from "./xacthucblockchain";
+import {
+  TEN_SU_KIEN as TEN_SU_KIEN_CONG_KHAI,
+  rutGon,
+} from "./xacthucblockchain";
+
+// Tên hiển thị cho người ký: sự kiện tạo lệnh là bước bên gửi xác nhận cho xe lấy hàng đi (ký sau khi vận chuyển chấp nhận)
+const TEN_SU_KIEN = {
+  ...TEN_SU_KIEN_CONG_KHAI,
+  TRANSPORT_ORDERED: "Xác nhận lấy hàng đi (ký lệnh vận chuyển)",
+};
 import "../css/blockchain.css";
 
 const TRANG_THAI_DUYET = {

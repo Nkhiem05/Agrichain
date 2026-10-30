@@ -130,13 +130,42 @@ export const fetchDealerHistory = async (maDaiLy) => {
   return parseJson(res);
 };
 
-// 5. Danh sách chọn khi xuất hàng / gắn đại lý (ký blockchain)
-export const fetchTransporters = async () => {
-  const res = await fetch(`${API_URL}/don-vi-van-chuyen`, { headers: authHeaders() });
+// 5. Danh sách chọn khi gắn đại lý (ký blockchain)
+export const fetchDealerAccounts = async () => {
+  const res = await fetch(`${API_URL}/tai-khoan-dai-ly`, {
+    headers: authHeaders(),
+  });
   return parseJson(res);
 };
 
-export const fetchDealerAccounts = async () => {
-  const res = await fetch(`${API_URL}/tai-khoan-dai-ly`, { headers: authHeaders() });
+// 6. Quản lý kho: tạo / sửa / xóa kho, nhập kho chỉ chọn trong danh sách này
+export const fetchWarehouses = async () => {
+  const res = await fetch(`${API_URL}/kho`, { headers: authHeaders() });
+  return parseJson(res);
+};
+
+export const createWarehouse = async (payload) => {
+  const res = await fetch(`${API_URL}/kho`, {
+    method: "POST",
+    headers: jsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return parseJson(res);
+};
+
+export const updateWarehouse = async (maKho, payload) => {
+  const res = await fetch(`${API_URL}/kho/${encodeURIComponent(maKho)}`, {
+    method: "PUT",
+    headers: jsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+  return parseJson(res);
+};
+
+export const deleteWarehouse = async (maKho) => {
+  const res = await fetch(`${API_URL}/kho/${encodeURIComponent(maKho)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
   return parseJson(res);
 };

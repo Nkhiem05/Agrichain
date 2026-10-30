@@ -21,6 +21,8 @@ import {
   Power,
   LogOut,
   Wallet,
+  Warehouse,
+  Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import "../../css/nhaphanphoi.css";
@@ -38,8 +40,11 @@ import {
   updateDealer,
   toggleDealerStatus,
   fetchDealerHistory,
-  fetchTransporters,
   fetchDealerAccounts,
+  fetchWarehouses,
+  createWarehouse,
+  updateWarehouse,
+  deleteWarehouse,
 } from "../../../api/nhaphanphoiApi";
 
 const DEFAULT_LOGO_IMG =
@@ -48,10 +53,22 @@ const DEFAULT_LOGO_IMG =
 // Nhãn + badge cho trạng thái lệnh vận chuyển (lenh_van_chuyen.trang_thai) -
 // các bước trước CHO_TIEP_NHAN do đơn vị vận chuyển tự điều khiển.
 const INCOMING_STATUS = {
-  CHO_CHAP_NHAN: { text: "Chờ đơn vị vận chuyển xác nhận", tone: "warning", icon: Clock },
+  CHO_CHAP_NHAN: {
+    text: "Chờ đơn vị vận chuyển xác nhận",
+    tone: "warning",
+    icon: Clock,
+  },
   CHO_LAY_HANG: { text: "Chờ xe đến lấy hàng", tone: "info", icon: Truck },
-  DANG_VAN_CHUYEN: { text: "Đang vận chuyển tới kho", tone: "info", icon: Truck },
-  CHO_TIEP_NHAN: { text: "Đã đến nơi - Sẵn sàng tiếp nhận", tone: "purple", icon: Clock },
+  DANG_VAN_CHUYEN: {
+    text: "Đang vận chuyển tới kho",
+    tone: "info",
+    icon: Truck,
+  },
+  CHO_TIEP_NHAN: {
+    text: "Đã đến nơi - Sẵn sàng tiếp nhận",
+    tone: "purple",
+    icon: Clock,
+  },
   HOAN_THANH: { text: "Đã nhập kho", tone: "success", icon: CheckCircle2 },
   TU_CHOI: { text: "Đã từ chối", tone: "danger", icon: XCircle },
 };
@@ -88,7 +105,18 @@ const NhaPhanPhoiPage = () => {
   // ==========================================
   // 1. QUẢN LÝ TAB
   // ==========================================
-  const [activeTab, setActiveTab] = usePersistentTab("nhaphanphoi", "tab-import", ["tab-import","tab-inventory","tab-dispatch","tab-dealers","blockchain"]);
+  const [activeTab, setActiveTab] = usePersistentTab(
+    "nhaphanphoi",
+    "tab-import",
+    [
+      "tab-import",
+      "tab-inventory",
+      "tab-warehouse",
+      "tab-dispatch",
+      "tab-dealers",
+      "blockchain",
+    ],
+  );
 
   // ==========================================
   // 2. QUẢN LÝ DROPDOWN MENU THAO TÁC (⋮)
@@ -152,7 +180,7 @@ const NhaPhanPhoiPage = () => {
   const [receiveForm, setReceiveForm] = useState({
     thucNhan: "",
     haoHut: 0,
-    viTriKho: "",
+    maKho: "",
     hanLuuKho: "",
   });
   const [rejectReason, setRejectReason] = useState("");
@@ -163,23 +191,27 @@ const NhaPhanPhoiPage = () => {
   const [selectedWarehouse, setSelectedWarehouse] = useState("ALL");
   const [inventoryList, setInventoryList] = useState([]);
 
+  // Danh sách kho do nhà phân phối tạo ở mục Quản lý kho (nhập kho chỉ chọn trong danh sách này)
+  const [warehouses, setWarehouses] = useState([]);
+  const [showWarehouseModal, setShowWarehouseModal] = useState(false);
+  const [editingWarehouse, setEditingWarehouse] = useState(null);
+  const [warehouseForm, setWarehouseForm] = useState({
+    tenKho: "",
+    diaChi: "",
+    ghiChu: "",
+  });
+
   // ==========================================
   // 5. DỮ LIỆU TAB 3: PHÂN PHỐI CHO ĐẠI LÝ
   // ==========================================
   const [dispatchOrders, setDispatchOrders] = useState([]);
   const [showCreateDispatchModal, setShowCreateDispatchModal] = useState(false);
+  // Giao hàng cho đại lý dùng đơn vị vận chuyển nội bộ của nhà phân phối nên phiếu chỉ cần đại lý, lô và số lượng
   const [dispatchForm, setDispatchForm] = useState({
     daiLyId: "",
     maLo: "",
     soLuongXuat: "",
-    hinhThuc: "TU_GIAO",
-    tenDonViVC: "",
-    maDonViVC: "",
-    taiXe: "",
-    bienSo: "",
   });
-  // Đơn vị vận chuyển có tài khoản: họ ký lấy hàng / giao hàng lên blockchain
-  const [transporters, setTransporters] = useState([]);
 
   // ==========================================
   // 6. DỮ LIỆU TAB 4: ĐẠI LÝ
@@ -221,20 +253,27 @@ const NhaPhanPhoiPage = () => {
     setLoading(true);
     setErrorMsg("");
     try {
-      const [incoming, inventory, dispatch, dealerList, transporterList, accountList] = await Promise.all([
+      const [
+        incoming,
+        inventory,
+        dispatch,
+        dealerList,
+        accountList,
+        warehouseList,
+      ] = await Promise.all([
         fetchIncomingShipments(),
         fetchInventory(),
         fetchDispatchOrders(),
         fetchDealers(),
-        fetchTransporters().catch(() => null),
         fetchDealerAccounts().catch(() => null),
+        fetchWarehouses().catch(() => null),
       ]);
       setImportOrders(incoming?.data || []);
       setInventoryList(inventory?.data || []);
       setDispatchOrders(dispatch?.data || []);
       setDealers(dealerList?.data || []);
-      setTransporters(transporterList?.data || []);
       setDealerAccounts(accountList?.data || []);
+      setWarehouses(warehouseList?.data || []);
     } catch (err) {
       setErrorMsg(err.message || "Không thể tải dữ liệu từ máy chủ");
     } finally {
@@ -250,7 +289,8 @@ const NhaPhanPhoiPage = () => {
   // TÍNH TOÁN METRICS
   // ==========================================
   const incomingActiveCount = importOrders.filter(
-    (o) => o.trang_thai === "DANG_VAN_CHUYEN" || o.trang_thai === "CHO_TIEP_NHAN",
+    (o) =>
+      o.trang_thai === "DANG_VAN_CHUYEN" || o.trang_thai === "CHO_TIEP_NHAN",
   ).length;
   const totalStockKg = inventoryList.reduce(
     (acc, cur) => acc + Number(cur.so_luong_hien_tai),
@@ -269,8 +309,12 @@ const NhaPhanPhoiPage = () => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
+  // Bộ lọc kho: kho đã tạo + tên kho còn sót ở các lô cũ
   const warehouseOptions = Array.from(
-    new Set(inventoryList.map((i) => i.vi_tri_luu_kho).filter(Boolean)),
+    new Set([
+      ...warehouses.map((w) => w.ten_kho),
+      ...inventoryList.map((i) => i.vi_tri_luu_kho).filter(Boolean),
+    ]),
   );
 
   // ==========================================
@@ -289,13 +333,28 @@ const NhaPhanPhoiPage = () => {
     setOpenDropdown(null);
   };
 
-  const handleOpenReceiveModal = (order) => {
+  const handleOpenReceiveModal = async (order) => {
     setOpenDropdown(null);
+    // Lấy danh sách kho mới nhất; chưa có kho nào thì chuyển sang mục Quản lý kho để tạo trước
+    let dsKho = warehouses;
+    try {
+      dsKho = (await fetchWarehouses())?.data || [];
+      setWarehouses(dsKho);
+    } catch {
+      /* dùng danh sách đã có */
+    }
+    if (dsKho.length === 0) {
+      alert(
+        'Bạn chưa có kho nào. Hãy tạo kho ở mục "Quản lý kho" rồi quay lại nhập kho.',
+      );
+      setActiveTab("tab-warehouse");
+      return;
+    }
     setSelectedOrder(order);
     setReceiveForm({
       thucNhan: order.khoi_luong,
       haoHut: 0,
-      viTriKho: "",
+      maKho: dsKho.length === 1 ? dsKho[0].ma_kho : "",
       hanLuuKho: "",
     });
     setShowReceiveModal(true);
@@ -313,20 +372,23 @@ const NhaPhanPhoiPage = () => {
       alert("Vui lòng nhập khối lượng thực nhận hợp lệ!");
       return;
     }
-    if (!receiveForm.viTriKho.trim()) {
-      alert("Vui lòng nhập vị trí lưu kho!");
+    if (!receiveForm.maKho) {
+      alert("Vui lòng chọn kho lưu hàng!");
       return;
     }
 
     try {
       await confirmReceiveShipment(selectedOrder.ma_van_don, {
         khoi_luong_thuc_te: Number(receiveForm.thucNhan),
-        vi_tri_luu_kho: receiveForm.viTriKho.trim(),
+        ma_kho: receiveForm.maKho,
         han_luu_kho: receiveForm.hanLuuKho || undefined,
       });
       setShowReceiveModal(false);
       await loadAll();
-      await kyNgay(`Đã nhập kho ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}.`, { taiLai: loadAll });
+      await kyNgay(
+        `Đã nhập kho ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}.`,
+        { taiLai: loadAll },
+      );
     } catch (err) {
       alert(err.message || "Không thể xác nhận nhập kho");
     }
@@ -345,10 +407,15 @@ const NhaPhanPhoiPage = () => {
       return;
     }
     try {
-      await rejectReceiveShipment(selectedOrder.ma_van_don, rejectReason.trim());
+      await rejectReceiveShipment(
+        selectedOrder.ma_van_don,
+        rejectReason.trim(),
+      );
       setShowRejectModal(false);
       await loadAll();
-      await kyNgay(`Đã từ chối tiếp nhận chuyến ${selectedOrder.ma_van_don}.`, { taiLai: loadAll });
+      await kyNgay(`Đã từ chối tiếp nhận chuyến ${selectedOrder.ma_van_don}.`, {
+        taiLai: loadAll,
+      });
     } catch (err) {
       alert(err.message || "Không thể từ chối tiếp nhận");
     }
@@ -357,25 +424,45 @@ const NhaPhanPhoiPage = () => {
   // ==========================================
   // HÀNH ĐỘNG TAB 3: PHÂN PHỐI ĐẠI LÝ
   // ==========================================
-  const handleOpenCreateDispatch = () => {
+  const handleOpenCreateDispatch = async () => {
+    // Tải lại danh sách đại lý để chọn (đại lý vừa thêm ở tab Đại lý có ngay trong danh sách)
+    let dsDaiLy = dealers;
+    try {
+      dsDaiLy = (await fetchDealers())?.data || [];
+      setDealers(dsDaiLy);
+    } catch {
+      /* dùng danh sách đã có */
+    }
+    if (!dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG")) {
+      alert(
+        'Chưa có đại lý nào đang hợp tác. Hãy thêm đại lý ở mục "Đại lý" rồi lập phiếu phân phối.',
+      );
+      setActiveTab("tab-dealers");
+      return;
+    }
+
     const validLots = inventoryList
-      .filter((lot) => lot.trang_thai_chung_thu !== "REVOKED" && Number(lot.so_luong_hien_tai) > 0)
-      .sort((a, b) => new Date(a.han_luu_kho || "9999-12-31") - new Date(b.han_luu_kho || "9999-12-31"));
+      .filter(
+        (lot) =>
+          lot.trang_thai_chung_thu !== "REVOKED" &&
+          Number(lot.so_luong_hien_tai) > 0,
+      )
+      .sort(
+        (a, b) =>
+          new Date(a.han_luu_kho || "9999-12-31") -
+          new Date(b.han_luu_kho || "9999-12-31"),
+      );
 
     setDispatchForm({
       // Ưu tiên đại lý đã gắn tài khoản (đại lý ký nhận hàng trên blockchain bằng tài khoản đó)
       daiLyId:
         (
-          dealers.find((d) => d.trang_thai === "HOAT_DONG" && d.ma_nguoi_dung) ||
-          dealers.find((d) => d.trang_thai === "HOAT_DONG")
+          dsDaiLy.find(
+            (d) => d.trang_thai === "HOAT_DONG" && d.ma_nguoi_dung,
+          ) || dsDaiLy.find((d) => d.trang_thai === "HOAT_DONG")
         )?.ma_dai_ly || "",
       maLo: validLots[0]?.ma_lo_nong_san || "",
       soLuongXuat: "",
-      hinhThuc: "TU_GIAO",
-      tenDonViVC: "",
-      maDonViVC: transporters[0]?.ma_nguoi_dung || "",
-      taiXe: "",
-      bienSo: "",
     });
     setShowCreateDispatchModal(true);
   };
@@ -385,33 +472,20 @@ const NhaPhanPhoiPage = () => {
     if (!dispatchForm.maLo) return alert("Vui lòng chọn lô xuất hàng!");
     const xuatKg = Number(dispatchForm.soLuongXuat);
     if (!xuatKg || xuatKg <= 0) return alert("Số lượng xuất phải lớn hơn 0!");
-    if (dispatchForm.hinhThuc === "TU_GIAO" && (!dispatchForm.taiXe.trim() || !dispatchForm.bienSo.trim())) {
-      return alert("Vui lòng điền tài xế và biển số xe!");
-    }
-    if (dispatchForm.hinhThuc === "DV_VAN_CHUYEN") {
-      if (transporters.length > 0 && !dispatchForm.maDonViVC) {
-        return alert("Vui lòng chọn đơn vị vận chuyển!");
-      }
-      if (transporters.length === 0 && !dispatchForm.tenDonViVC.trim()) {
-        return alert("Vui lòng nhập tên đơn vị vận chuyển!");
-      }
-    }
 
     try {
       const res = await createDispatch({
         ma_dai_ly: dispatchForm.daiLyId,
         ma_lo_nong_san: dispatchForm.maLo,
         so_luong_xuat: xuatKg,
-        hinh_thuc: dispatchForm.hinhThuc,
-        ten_don_vi_van_chuyen: dispatchForm.tenDonViVC.trim() || undefined,
-        ma_don_vi_van_chuyen:
-          dispatchForm.hinhThuc === "DV_VAN_CHUYEN" ? dispatchForm.maDonViVC || undefined : undefined,
-        ten_tai_xe: dispatchForm.taiXe.trim() || undefined,
-        bien_so_xe: dispatchForm.bienSo.trim() || undefined,
+        hinh_thuc: "TU_GIAO", // đơn vị vận chuyển nội bộ của nhà phân phối
       });
       setShowCreateDispatchModal(false);
       await loadAll();
-      await kyNgay(`${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.`, { taiLai: loadAll });
+      await kyNgay(
+        `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.`,
+        { taiLai: loadAll },
+      );
     } catch (err) {
       alert(err.message || "Không thể lập phiếu xuất kho");
     }
@@ -422,6 +496,60 @@ const NhaPhanPhoiPage = () => {
     if (selectedWarehouse === "ALL") return true;
     return item.vi_tri_luu_kho === selectedWarehouse;
   });
+
+  // ==========================================
+  // HÀNH ĐỘNG: QUẢN LÝ KHO
+  // ==========================================
+  const handleOpenCreateWarehouse = () => {
+    setEditingWarehouse(null);
+    setWarehouseForm({ tenKho: "", diaChi: "", ghiChu: "" });
+    setShowWarehouseModal(true);
+  };
+
+  const handleOpenEditWarehouse = (kho) => {
+    setEditingWarehouse(kho);
+    setWarehouseForm({
+      tenKho: kho.ten_kho,
+      diaChi: kho.dia_chi || "",
+      ghiChu: kho.ghi_chu || "",
+    });
+    setShowWarehouseModal(true);
+  };
+
+  const handleSaveWarehouse = async () => {
+    if (!warehouseForm.tenKho.trim()) {
+      alert("Vui lòng nhập tên kho!");
+      return;
+    }
+    const payload = {
+      ten_kho: warehouseForm.tenKho.trim(),
+      dia_chi: warehouseForm.diaChi.trim() || undefined,
+      ghi_chu: warehouseForm.ghiChu.trim() || undefined,
+    };
+    try {
+      if (editingWarehouse) {
+        await updateWarehouse(editingWarehouse.ma_kho, payload);
+        alert("Cập nhật kho thành công!");
+      } else {
+        await createWarehouse(payload);
+        alert("Tạo kho thành công!");
+      }
+      setShowWarehouseModal(false);
+      await loadAll();
+    } catch (err) {
+      alert(err.message || "Không thể lưu kho");
+    }
+  };
+
+  const handleDeleteWarehouse = async (kho) => {
+    if (!window.confirm(`Xóa kho "${kho.ten_kho}"?`)) return;
+    try {
+      await deleteWarehouse(kho.ma_kho);
+      await loadAll();
+    } catch (err) {
+      alert(err.message || "Không thể xóa kho");
+    }
+  };
 
   // ==========================================
   // HÀNH ĐỘNG TAB 4: ĐẠI LÝ
@@ -516,7 +644,12 @@ const NhaPhanPhoiPage = () => {
               <img
                 src={`http://localhost:3000${user.anh_dai_dien}`}
                 alt="avatar"
-                style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  borderRadius: "50%",
+                }}
               />
             ) : (
               (user.ho_ten || "NPP").slice(0, 2).toUpperCase()
@@ -558,6 +691,15 @@ const NhaPhanPhoiPage = () => {
               >
                 <Boxes size={20} />
                 <span>Kho hàng</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab("tab-warehouse")}
+                className={`nav-item-btn ${activeTab === "tab-warehouse" ? "active" : ""}`}
+              >
+                <Warehouse size={20} />
+                <span>Quản lý kho</span>
               </button>
 
               <button
@@ -695,7 +837,10 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {importOrders.length === 0 ? (
                           <tr>
-                            <td colSpan={8} style={{ padding: 24, color: "#6b7280" }}>
+                            <td
+                              colSpan={8}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
                               Chưa có lệnh vận chuyển nào gửi tới kho của bạn.
                             </td>
                           </tr>
@@ -703,7 +848,9 @@ const NhaPhanPhoiPage = () => {
                           importOrders.map((order) => {
                             const isDropdownActive =
                               openDropdown === `order-${order.ma_van_don}`;
-                            const statusInfo = INCOMING_STATUS[order.trang_thai] || {
+                            const statusInfo = INCOMING_STATUS[
+                              order.trang_thai
+                            ] || {
                               text: order.trang_thai,
                               tone: "info",
                               icon: Clock,
@@ -713,9 +860,13 @@ const NhaPhanPhoiPage = () => {
                             return (
                               <tr
                                 key={order.ma_van_don}
-                                className={isDropdownActive ? "row-has-open-menu" : ""}
+                                className={
+                                  isDropdownActive ? "row-has-open-menu" : ""
+                                }
                               >
-                                <td style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                                <td
+                                  style={{ fontWeight: 700, color: "#1d4ed8" }}
+                                >
                                   {order.ma_van_don}
                                 </td>
                                 <td>
@@ -730,18 +881,32 @@ const NhaPhanPhoiPage = () => {
                                     {order.ma_lo_nong_san}
                                   </span>
                                 </td>
-                                <td style={{ fontWeight: 600, color: "#1f2937" }}>
+                                <td
+                                  style={{ fontWeight: 600, color: "#1f2937" }}
+                                >
                                   {order.ten_san_pham}
                                 </td>
                                 <td>{order.ten_nguoi_gui}</td>
-                                <td style={{ fontWeight: 700, color: "rgb(31, 41, 55)" }}>
-                                  {formatWeight(order.khoi_luong, order.don_vi_tinh)}
+                                <td
+                                  style={{
+                                    fontWeight: 700,
+                                    color: "rgb(31, 41, 55)",
+                                  }}
+                                >
+                                  {formatWeight(
+                                    order.khoi_luong,
+                                    order.don_vi_tinh,
+                                  )}
                                 </td>
-                                <td style={{ color: "#64748b", fontSize: 12.5 }}>
+                                <td
+                                  style={{ color: "#64748b", fontSize: 12.5 }}
+                                >
                                   {order.thoi_gian_xuat}
                                 </td>
                                 <td>
-                                  <span className={`status-pill ${statusInfo.tone}`}>
+                                  <span
+                                    className={`status-pill ${statusInfo.tone}`}
+                                  >
                                     <StatusIcon size={13} /> {statusInfo.text}
                                   </span>
                                 </td>
@@ -755,7 +920,10 @@ const NhaPhanPhoiPage = () => {
                                         <CheckCircle2 size={16} />
                                       </span>
                                     ) : (
-                                      <span className="status-icon-modern empty" title="Chưa nhập kho">
+                                      <span
+                                        className="status-icon-modern empty"
+                                        title="Chưa nhập kho"
+                                      >
                                         <span className="empty-indicator"></span>
                                       </span>
                                     )}
@@ -765,7 +933,12 @@ const NhaPhanPhoiPage = () => {
                                         type="button"
                                         className="btn-more-dots"
                                         title="Thao tác"
-                                        onClick={(e) => handleToggleMenu(e, `order-${order.ma_van_don}`)}
+                                        onClick={(e) =>
+                                          handleToggleMenu(
+                                            e,
+                                            `order-${order.ma_van_don}`,
+                                          )
+                                        }
                                       >
                                         <MoreVertical size={18} />
                                       </button>
@@ -775,22 +948,43 @@ const NhaPhanPhoiPage = () => {
                                           className={`dropdown-menu dropdown-fixed ${menuPos.up ? "dropdown-up" : ""}`}
                                           style={{
                                             right: menuPos.right,
-                                            ...(menuPos.up ? { bottom: menuPos.bottom } : { top: menuPos.top }),
+                                            ...(menuPos.up
+                                              ? { bottom: menuPos.bottom }
+                                              : { top: menuPos.top }),
                                           }}
                                         >
-                                          <div className="dropdown-item" onClick={() => handleOpenDetailModal(order)}>
+                                          <div
+                                            className="dropdown-item"
+                                            onClick={() =>
+                                              handleOpenDetailModal(order)
+                                            }
+                                          >
                                             <Eye size={15} />
                                             Xem chi tiết
                                           </div>
 
-                                          {order.trang_thai === "CHO_TIEP_NHAN" && (
+                                          {order.trang_thai ===
+                                            "CHO_TIEP_NHAN" && (
                                             <>
                                               <div className="dropdown-divider"></div>
-                                              <div className="dropdown-item" onClick={() => handleOpenReceiveModal(order)}>
-                                                <Check size={15} color="#15803d" />
+                                              <div
+                                                className="dropdown-item"
+                                                onClick={() =>
+                                                  handleOpenReceiveModal(order)
+                                                }
+                                              >
+                                                <Check
+                                                  size={15}
+                                                  color="#15803d"
+                                                />
                                                 Nghiệm thu & Nhập kho
                                               </div>
-                                              <div className="dropdown-item danger" onClick={() => handleOpenRejectModal(order)}>
+                                              <div
+                                                className="dropdown-item danger"
+                                                onClick={() =>
+                                                  handleOpenRejectModal(order)
+                                                }
+                                              >
                                                 <XCircle size={15} />
                                                 Từ chối nhận
                                               </div>
@@ -828,7 +1022,12 @@ const NhaPhanPhoiPage = () => {
                     <div style={{ width: 250 }}>
                       <select
                         className="filter-select"
-                        style={{ width: "100%", height: 38, cursor: "pointer", fontWeight: 500 }}
+                        style={{
+                          width: "100%",
+                          height: 38,
+                          cursor: "pointer",
+                          fontWeight: 500,
+                        }}
                         value={selectedWarehouse}
                         onChange={(e) => setSelectedWarehouse(e.target.value)}
                       >
@@ -858,36 +1057,74 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {filteredInventory.length === 0 ? (
                           <tr>
-                            <td colSpan={7} style={{ padding: 24, color: "#6b7280" }}>
+                            <td
+                              colSpan={7}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
                               Không có lô hàng nào tồn trong khu vực kho này.
                             </td>
                           </tr>
                         ) : (
                           filteredInventory.map((lot) => {
                             const daysLeft = getDaysRemaining(lot.han_luu_kho);
-                            const isRevoked = lot.trang_thai_chung_thu === "REVOKED";
-                            const isExpiringSoon = daysLeft !== null && daysLeft <= 7 && daysLeft > 0;
-                            const isExpired = daysLeft !== null && daysLeft <= 0;
+                            const isRevoked =
+                              lot.trang_thai_chung_thu === "REVOKED";
+                            const isExpiringSoon =
+                              daysLeft !== null &&
+                              daysLeft <= 7 &&
+                              daysLeft > 0;
+                            const isExpired =
+                              daysLeft !== null && daysLeft <= 0;
 
                             return (
-                              <tr key={lot.ma_lo_nong_san} className={isRevoked ? "row-locked" : ""}>
-                                <td style={{ fontWeight: 700 }}>{lot.ma_lo_nong_san}</td>
-                                <td style={{ fontWeight: 600, color: "#1e293b" }}>{lot.ten_san_pham}</td>
-                                <td style={{ color: "#1e293b", fontWeight: 500 }}>
+                              <tr
+                                key={lot.ma_lo_nong_san}
+                                className={isRevoked ? "row-locked" : ""}
+                              >
+                                <td style={{ fontWeight: 700 }}>
+                                  {lot.ma_lo_nong_san}
+                                </td>
+                                <td
+                                  style={{ fontWeight: 600, color: "#1e293b" }}
+                                >
+                                  {lot.ten_san_pham}
+                                </td>
+                                <td
+                                  style={{ color: "#1e293b", fontWeight: 500 }}
+                                >
                                   {lot.vi_tri_luu_kho || "—"}
                                 </td>
-                                <td style={{ fontWeight: 700, color: "#1e293b" }}>
-                                  {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
+                                <td
+                                  style={{ fontWeight: 700, color: "#1e293b" }}
+                                >
+                                  {formatWeight(
+                                    lot.so_luong_hien_tai,
+                                    lot.don_vi_tinh,
+                                  )}
                                 </td>
                                 <td>
                                   {lot.han_luu_kho || "—"}
                                   {isExpiringSoon && (
-                                    <span style={{ display: "block", fontSize: 11, color: "#b45309", fontWeight: 600 }}>
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        fontSize: 11,
+                                        color: "#b45309",
+                                        fontWeight: 600,
+                                      }}
+                                    >
                                       (Cận date: còn {daysLeft} ngày)
                                     </span>
                                   )}
                                   {isExpired && (
-                                    <span style={{ display: "block", fontSize: 11, color: "#b91c1c", fontWeight: 600 }}>
+                                    <span
+                                      style={{
+                                        display: "block",
+                                        fontSize: 11,
+                                        color: "#b91c1c",
+                                        fontWeight: 600,
+                                      }}
+                                    >
                                       (Đã hết hạn lưu kho)
                                     </span>
                                   )}
@@ -907,10 +1144,13 @@ const NhaPhanPhoiPage = () => {
                                     </span>
                                   ) : lot.trang_thai_chung_thu === "VALID" ? (
                                     <span className="status-pill success">
-                                      <CheckCircle2 size={14} /> Đã kiểm định đạt
+                                      <CheckCircle2 size={14} /> Đã kiểm định
+                                      đạt
                                     </span>
                                   ) : (
-                                    <span className="status-pill info">Chưa có kiểm định</span>
+                                    <span className="status-pill info">
+                                      Chưa có kiểm định
+                                    </span>
                                   )}
                                 </td>
                                 <td>
@@ -919,7 +1159,11 @@ const NhaPhanPhoiPage = () => {
                                     className="btn-action-view-outline"
                                     style={{ marginRight: 6 }}
                                     title="Xem chi tiết lô và lấy mã QR"
-                                    onClick={() => navigate(`/lo-hang/${encodeURIComponent(lot.ma_lo_nong_san)}`)}
+                                    onClick={() =>
+                                      navigate(
+                                        `/lo-hang/${encodeURIComponent(lot.ma_lo_nong_san)}`,
+                                      )
+                                    }
                                   >
                                     <Eye size={14} /> Chi tiết &amp; QR
                                   </button>
@@ -937,13 +1181,19 @@ const NhaPhanPhoiPage = () => {
                                         cursor: "not-allowed",
                                       }}
                                     >
-                                      <Lock size={13} style={{ marginRight: 4 }} /> Bị khóa xuất
+                                      <Lock
+                                        size={13}
+                                        style={{ marginRight: 4 }}
+                                      />{" "}
+                                      Bị khóa xuất
                                     </button>
                                   ) : (
                                     <button
                                       type="button"
                                       className="btn-action-view"
-                                      onClick={() => setActiveTab("tab-dispatch")}
+                                      onClick={() =>
+                                        setActiveTab("tab-dispatch")
+                                      }
                                     >
                                       Xuất bán
                                     </button>
@@ -960,18 +1210,115 @@ const NhaPhanPhoiPage = () => {
               )}
 
               {/* ================= TAB 3: PHÂN PHỐI CHO ĐẠI LÝ ================= */}
+              {activeTab === "tab-warehouse" && (
+                <div>
+                  <div className="tab-section-header" style={{ marginTop: 20 }}>
+                    <div>
+                      <h3 className="tab-section-title">Quản Lý Kho</h3>
+                      <p className="tab-section-desc">
+                        Tạo các kho của bạn; khi nhập kho chỉ cần chọn kho trong
+                        danh sách này.
+                      </p>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        className="btn-primary-action"
+                        onClick={handleOpenCreateWarehouse}
+                      >
+                        <PlusCircle size={17} />
+                        <span>Tạo Kho</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="table-container custom-scrollbar">
+                    <table className="batch-table">
+                      <thead>
+                        <tr>
+                          <th>Mã Kho</th>
+                          <th>Tên Kho</th>
+                          <th>Địa Chỉ</th>
+                          <th>Số Lô Đang Chứa</th>
+                          <th>Tổng Khối Lượng</th>
+                          <th>Ghi Chú</th>
+                          <th>Thao Tác</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {warehouses.length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={7}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
+                              Chưa có kho nào, bấm "Tạo Kho" để bắt đầu.
+                            </td>
+                          </tr>
+                        ) : (
+                          warehouses.map((kho) => (
+                            <tr key={kho.ma_kho}>
+                              <td style={{ fontWeight: 700 }}>{kho.ma_kho}</td>
+                              <td style={{ fontWeight: 600 }}>{kho.ten_kho}</td>
+                              <td>{kho.dia_chi || "—"}</td>
+                              <td>{kho.so_lo}</td>
+                              <td style={{ fontWeight: 700 }}>
+                                {formatWeight(kho.tong_khoi_luong, "kg")}
+                              </td>
+                              <td>{kho.ghi_chu || "—"}</td>
+                              <td>
+                                <div style={{ display: "inline-flex", gap: 8 }}>
+                                  <button
+                                    type="button"
+                                    className="btn-action-view-outline"
+                                    title="Sửa kho"
+                                    onClick={() => handleOpenEditWarehouse(kho)}
+                                  >
+                                    <Pencil size={14} />
+                                    <span>Sửa</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-action-view-outline"
+                                    style={{
+                                      color: "#dc2626",
+                                      borderColor: "#fecaca",
+                                    }}
+                                    title="Xóa kho"
+                                    onClick={() => handleDeleteWarehouse(kho)}
+                                  >
+                                    <Trash2 size={14} />
+                                    <span>Xóa</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {activeTab === "tab-dispatch" && (
                 <div>
                   <div className="metrics-row">
                     <div className="metric-card">
                       <div className="metric-title">Phiếu chờ xuất kho</div>
                       <div className="metric-number">
-                        {dispatchOrders.filter((o) => o.trang_thai === "CHO_XUAT").length}
+                        {
+                          dispatchOrders.filter(
+                            (o) => o.trang_thai === "CHO_XUAT",
+                          ).length
+                        }
                         <span className="metric-unit">PHIẾU</span>
                       </div>
                     </div>
                     <div className="metric-card">
-                      <div className="metric-title">Phiếu đang trên đường giao</div>
+                      <div className="metric-title">
+                        Phiếu đang trên đường giao
+                      </div>
                       <div className="metric-number">
                         {shippingDispatchCount}
                         <span className="metric-unit">ĐANG GIAO</span>
@@ -980,12 +1327,20 @@ const NhaPhanPhoiPage = () => {
                     <div className="metric-card">
                       <div className="metric-title">Đã giao thành công</div>
                       <div className="metric-number">
-                        {dispatchOrders.filter((o) => o.trang_thai === "DA_GIAO").length}
+                        {
+                          dispatchOrders.filter(
+                            (o) => o.trang_thai === "DA_GIAO",
+                          ).length
+                        }
                         <span className="metric-unit">ĐƠN</span>
                       </div>
                     </div>
                     <div className="actions-box">
-                      <button type="button" className="btn-primary-action" onClick={handleOpenCreateDispatch}>
+                      <button
+                        type="button"
+                        className="btn-primary-action"
+                        onClick={handleOpenCreateDispatch}
+                      >
                         <PlusCircle size={17} /> Lập Phiếu Phân Phối
                       </button>
                     </div>
@@ -997,7 +1352,8 @@ const NhaPhanPhoiPage = () => {
                         Nhật Ký Phiếu Xuất Giao Cho Đại Lý & Siêu Thị
                       </h3>
                       <p className="tab-section-desc">
-                        Theo dõi trạng thái giao nhận hàng và xem chi tiết đơn hàng.
+                        Theo dõi trạng thái giao nhận hàng và xem chi tiết đơn
+                        hàng.
                       </p>
                     </div>
                   </div>
@@ -1017,20 +1373,31 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {dispatchOrders.length === 0 ? (
                           <tr>
-                            <td colSpan={6} style={{ padding: 24, color: "#6b7280" }}>
+                            <td
+                              colSpan={6}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
                               Chưa lập phiếu xuất kho nào.
                             </td>
                           </tr>
                         ) : (
                           dispatchOrders.map((order) => (
                             <tr key={order.ma_phieu}>
-                              <td style={{ fontWeight: 700, color: "#1d4ed8" }}>{order.ma_phieu}</td>
-                              <td style={{ fontWeight: 600 }}>{order.ten_dai_ly}</td>
+                              <td style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                                {order.ma_phieu}
+                              </td>
+                              <td style={{ fontWeight: 600 }}>
+                                {order.ten_dai_ly}
+                              </td>
                               <td>
-                                <strong>{order.ma_lo_nong_san}</strong> - {order.ten_san_pham}
+                                <strong>{order.ma_lo_nong_san}</strong> -{" "}
+                                {order.ten_san_pham}
                               </td>
                               <td style={{ fontWeight: 700 }}>
-                                {formatWeight(order.so_luong_xuat, order.don_vi_tinh)}
+                                {formatWeight(
+                                  order.so_luong_xuat,
+                                  order.don_vi_tinh,
+                                )}
                               </td>
                               <td>
                                 <span
@@ -1044,18 +1411,29 @@ const NhaPhanPhoiPage = () => {
                                           : "warning"
                                   }`}
                                 >
-                                  {order.trang_thai === "DANG_GIAO" && order.trang_thai_van_don === "CHO_TIEP_NHAN"
+                                  {order.trang_thai === "DANG_GIAO" &&
+                                  order.trang_thai_van_don === "CHO_TIEP_NHAN"
                                     ? "Đã tới nơi - Chờ đại lý nhận"
-                                    : DISPATCH_STATUS_LABEL[order.trang_thai] || order.trang_thai}
+                                    : DISPATCH_STATUS_LABEL[order.trang_thai] ||
+                                      order.trang_thai}
                                 </span>
                               </td>
                               <td>
-                                <div style={{ display: "inline-flex", justifyContent: "center" }}>
+                                <div
+                                  style={{
+                                    display: "inline-flex",
+                                    justifyContent: "center",
+                                  }}
+                                >
                                   <button
                                     type="button"
                                     className="btn-action-view-outline"
                                     title="Xem chi tiết đơn phân phối"
-                                    onClick={() => handleNavigateChiTietPhanPhoi(order.ma_phieu)}
+                                    onClick={() =>
+                                      handleNavigateChiTietPhanPhoi(
+                                        order.ma_phieu,
+                                      )
+                                    }
                                   >
                                     <Eye size={14} />
                                     <span>Xem chi tiết</span>
@@ -1072,15 +1450,18 @@ const NhaPhanPhoiPage = () => {
               )}
 
               {activeTab === "blockchain" && (
-            <div style={{ maxWidth: 980, paddingTop: 16 }}>
-              <p style={{ fontSize: 13.5, color: "#4b5563", margin: "0 0 12px", lineHeight: 1.5 }}>
-                Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận) hoặc từ chối nhận, khi lập phiếu xuất cho đại lý (tách lô xuất + lệnh giao) và khi tự giao (lấy hàng, tới nơi). Các bước của một lô ký theo thứ tự.
-              </p>
-              <BlockchainPanel />
-            </div>
-          )}
+                <div className="bc-tab">
+                  <p className="bc-tab-desc">
+                    Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận)
+                    hoặc từ chối nhận, khi lập phiếu xuất cho đại lý (tách lô
+                    xuất + lệnh giao) và khi tự giao (lấy hàng, tới nơi). Các
+                    bước của một lô ký theo thứ tự.
+                  </p>
+                  <BlockchainPanel />
+                </div>
+              )}
 
-          {/* ================= TAB 4: ĐẠI LÝ ================= */}
+              {/* ================= TAB 4: ĐẠI LÝ ================= */}
               {activeTab === "tab-dealers" && (
                 <div>
                   <div className="tab-section-header" style={{ marginTop: 20 }}>
@@ -1089,7 +1470,8 @@ const NhaPhanPhoiPage = () => {
                         Danh Sách Đại Lý & Kênh Bán Lẻ Hợp Tác
                       </h3>
                       <p className="tab-section-desc">
-                        Quản lý đầu mối nhận hàng, địa chỉ và thông tin hợp tác phân phối.
+                        Quản lý đầu mối nhận hàng, địa chỉ và thông tin hợp tác
+                        phân phối.
                       </p>
                     </div>
                     <div>
@@ -1098,7 +1480,13 @@ const NhaPhanPhoiPage = () => {
                         className="btn-primary-action"
                         onClick={() => {
                           setEditingDealer(null);
-                          setDealerForm({ ten: "", nguoiLienHe: "", sdt: "", diaChi: "", maNguoiDung: "" });
+                          setDealerForm({
+                            ten: "",
+                            nguoiLienHe: "",
+                            sdt: "",
+                            diaChi: "",
+                            maNguoiDung: "",
+                          });
                           setShowDealerModal(true);
                         }}
                       >
@@ -1125,43 +1513,76 @@ const NhaPhanPhoiPage = () => {
                       <tbody>
                         {dealers.length === 0 ? (
                           <tr>
-                            <td colSpan={8} style={{ padding: 24, color: "#6b7280" }}>
-                              Chưa có đại lý nào, bấm "Thêm Đại Lý Mới" để bắt đầu.
+                            <td
+                              colSpan={8}
+                              style={{ padding: 24, color: "#6b7280" }}
+                            >
+                              Chưa có đại lý nào, bấm "Thêm Đại Lý Mới" để bắt
+                              đầu.
                             </td>
                           </tr>
                         ) : (
                           dealers.map((d) => {
-                            const isDropdownActive = openDropdown === `dealer-${d.ma_dai_ly}`;
+                            const isDropdownActive =
+                              openDropdown === `dealer-${d.ma_dai_ly}`;
 
                             return (
-                              <tr key={d.ma_dai_ly} className={isDropdownActive ? "row-has-open-menu" : ""}>
-                                <td style={{ fontWeight: 700 }}>{d.ma_dai_ly}</td>
+                              <tr
+                                key={d.ma_dai_ly}
+                                className={
+                                  isDropdownActive ? "row-has-open-menu" : ""
+                                }
+                              >
+                                <td style={{ fontWeight: 700 }}>
+                                  {d.ma_dai_ly}
+                                </td>
                                 <td style={{ fontWeight: 600 }}>{d.ten}</td>
                                 <td>{d.nguoi_lien_he}</td>
-                                <td style={{ color: "#2563eb" }}>{d.so_dien_thoai}</td>
+                                <td style={{ color: "#2563eb" }}>
+                                  {d.so_dien_thoai}
+                                </td>
                                 <td>{d.dia_chi}</td>
                                 <td>
                                   {d.tai_khoan ? (
-                                    <span style={{ fontWeight: 600 }}>{d.tai_khoan}</span>
+                                    <span style={{ fontWeight: 600 }}>
+                                      {d.tai_khoan}
+                                    </span>
                                   ) : (
-                                    <span style={{ color: "#b45309", fontSize: 12.5 }}>Chưa gắn</span>
+                                    <span
+                                      style={{
+                                        color: "#b45309",
+                                        fontSize: 12.5,
+                                      }}
+                                    >
+                                      Chưa gắn
+                                    </span>
                                   )}
                                 </td>
                                 <td>
                                   {d.trang_thai === "HOAT_DONG" ? (
-                                    <span className="status-pill success">Đang hợp tác</span>
+                                    <span className="status-pill success">
+                                      Đang hợp tác
+                                    </span>
                                   ) : (
-                                    <span className="status-pill gray">Tạm ngưng</span>
+                                    <span className="status-pill gray">
+                                      Tạm ngưng
+                                    </span>
                                   )}
                                 </td>
                                 <td>
                                   <div className="status-icon-cell">
                                     {d.trang_thai === "HOAT_DONG" ? (
-                                      <span className="status-icon-modern success" title="Đang hợp tác">
+                                      <span
+                                        className="status-icon-modern success"
+                                        title="Đang hợp tác"
+                                      >
                                         <CheckCircle2 size={16} />
                                       </span>
                                     ) : (
-                                      <span className="status-icon-modern empty" title="Tạm ngưng hợp tác">
+                                      <span
+                                        className="status-icon-modern empty"
+                                        title="Tạm ngưng hợp tác"
+                                      >
                                         <span className="empty-indicator"></span>
                                       </span>
                                     )}
@@ -1171,7 +1592,12 @@ const NhaPhanPhoiPage = () => {
                                         type="button"
                                         className="btn-more-dots"
                                         title="Thao tác"
-                                        onClick={(e) => handleToggleMenu(e, `dealer-${d.ma_dai_ly}`)}
+                                        onClick={(e) =>
+                                          handleToggleMenu(
+                                            e,
+                                            `dealer-${d.ma_dai_ly}`,
+                                          )
+                                        }
                                       >
                                         <MoreVertical size={18} />
                                       </button>
@@ -1181,15 +1607,27 @@ const NhaPhanPhoiPage = () => {
                                           className={`dropdown-menu dropdown-fixed ${menuPos.up ? "dropdown-up" : ""}`}
                                           style={{
                                             right: menuPos.right,
-                                            ...(menuPos.up ? { bottom: menuPos.bottom } : { top: menuPos.top }),
+                                            ...(menuPos.up
+                                              ? { bottom: menuPos.bottom }
+                                              : { top: menuPos.top }),
                                           }}
                                         >
-                                          <div className="dropdown-item" onClick={() => handleOpenEditDealer(d)}>
+                                          <div
+                                            className="dropdown-item"
+                                            onClick={() =>
+                                              handleOpenEditDealer(d)
+                                            }
+                                          >
                                             <Pencil size={15} />
                                             Sửa thông tin
                                           </div>
 
-                                          <div className="dropdown-item" onClick={() => handleOpenDealerHistory(d)}>
+                                          <div
+                                            className="dropdown-item"
+                                            onClick={() =>
+                                              handleOpenDealerHistory(d)
+                                            }
+                                          >
                                             <History size={15} />
                                             Lịch sử nhận hàng
                                           </div>
@@ -1198,10 +1636,16 @@ const NhaPhanPhoiPage = () => {
 
                                           <div
                                             className={`dropdown-item ${d.trang_thai === "HOAT_DONG" ? "danger" : ""}`}
-                                            onClick={() => handleToggleDealerStatus(d.ma_dai_ly)}
+                                            onClick={() =>
+                                              handleToggleDealerStatus(
+                                                d.ma_dai_ly,
+                                              )
+                                            }
                                           >
                                             <Power size={15} />
-                                            {d.trang_thai === "HOAT_DONG" ? "Tạm ngưng hợp tác" : "Kích hoạt hợp tác"}
+                                            {d.trang_thai === "HOAT_DONG"
+                                              ? "Tạm ngưng hợp tác"
+                                              : "Kích hoạt hợp tác"}
                                           </div>
                                         </div>
                                       )}
@@ -1233,11 +1677,15 @@ const NhaPhanPhoiPage = () => {
               <div className="form-grid-2 readonly-grid">
                 <div className="readonly-item">
                   <label>Mã vận đơn</label>
-                  <span style={{ fontWeight: 700, color: "#1d4ed8" }}>{selectedOrder.ma_van_don}</span>
+                  <span style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                    {selectedOrder.ma_van_don}
+                  </span>
                 </div>
                 <div className="readonly-item">
                   <label>Mã lô nông sản</label>
-                  <span style={{ fontWeight: 700 }}>{selectedOrder.ma_lo_nong_san}</span>
+                  <span style={{ fontWeight: 700 }}>
+                    {selectedOrder.ma_lo_nong_san}
+                  </span>
                 </div>
                 <div className="readonly-item">
                   <label>Tên sản phẩm</label>
@@ -1254,7 +1702,10 @@ const NhaPhanPhoiPage = () => {
                 <div className="readonly-item">
                   <label>Khối lượng</label>
                   <span style={{ fontWeight: 700, color: "#15803d" }}>
-                    {formatWeight(selectedOrder.khoi_luong, selectedOrder.don_vi_tinh)}
+                    {formatWeight(
+                      selectedOrder.khoi_luong,
+                      selectedOrder.don_vi_tinh,
+                    )}
                   </span>
                 </div>
                 <div className="readonly-item">
@@ -1272,13 +1723,18 @@ const NhaPhanPhoiPage = () => {
                 <div className="readonly-item">
                   <label>Trạng thái</label>
                   <span style={{ fontWeight: 600 }}>
-                    {INCOMING_STATUS[selectedOrder.trang_thai]?.text || selectedOrder.trang_thai}
+                    {INCOMING_STATUS[selectedOrder.trang_thai]?.text ||
+                      selectedOrder.trang_thai}
                   </span>
                 </div>
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowDetailModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowDetailModal(false)}
+              >
                 Đóng
               </button>
             </div>
@@ -1294,12 +1750,21 @@ const NhaPhanPhoiPage = () => {
               <h3>Biên Bản Kiểm Đếm & Nghiệm Thu Nhập Kho</h3>
             </div>
             <div className="modal-body">
-              <div style={{ backgroundColor: "#f8fafc", padding: "10px 14px", borderRadius: 6, marginBottom: 14, fontSize: 13 }}>
+              <div
+                style={{
+                  backgroundColor: "#f8fafc",
+                  padding: "10px 14px",
+                  borderRadius: 6,
+                  marginBottom: 14,
+                  fontSize: 13,
+                }}
+              >
                 <p>
                   Mã vận đơn: <b>{selectedOrder.ma_van_don}</b>
                 </p>
                 <p>
-                  Lô hàng: <b>{selectedOrder.ma_lo_nong_san}</b> - {selectedOrder.ten_san_pham}
+                  Lô hàng: <b>{selectedOrder.ma_lo_nong_san}</b> -{" "}
+                  {selectedOrder.ten_san_pham}
                 </p>
                 <p>
                   Khối lượng theo lệnh VC:{" "}
@@ -1310,7 +1775,9 @@ const NhaPhanPhoiPage = () => {
               </div>
 
               <div className="form-group">
-                <label>Khối Lượng Cân Thực Nhận ({selectedOrder.don_vi_tinh}) (*)</label>
+                <label>
+                  Khối Lượng Cân Thực Nhận ({selectedOrder.don_vi_tinh}) (*)
+                </label>
                 <input
                   type="number"
                   value={receiveForm.thucNhan}
@@ -1320,7 +1787,9 @@ const NhaPhanPhoiPage = () => {
 
               <div className="form-grid-2">
                 <div className="form-group">
-                  <label>Khối lượng hao hụt ({selectedOrder.don_vi_tinh})</label>
+                  <label>
+                    Khối lượng hao hụt ({selectedOrder.don_vi_tinh})
+                  </label>
                   <input
                     type="number"
                     readOnly
@@ -1329,13 +1798,21 @@ const NhaPhanPhoiPage = () => {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Vị Trí Lưu Kho (*)</label>
-                  <input
-                    type="text"
-                    placeholder="VD: Kho Mát A (Kệ Pallet 01)"
-                    value={receiveForm.viTriKho}
-                    onChange={(e) => setReceiveForm({ ...receiveForm, viTriKho: e.target.value })}
-                  />
+                  <label>Kho Lưu Hàng (*)</label>
+                  <select
+                    value={receiveForm.maKho}
+                    onChange={(e) =>
+                      setReceiveForm({ ...receiveForm, maKho: e.target.value })
+                    }
+                  >
+                    <option value="">-- Chọn kho --</option>
+                    {warehouses.map((kho) => (
+                      <option key={kho.ma_kho} value={kho.ma_kho}>
+                        {kho.ten_kho}
+                        {kho.dia_chi ? ` (${kho.dia_chi})` : ""}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -1344,15 +1821,28 @@ const NhaPhanPhoiPage = () => {
                 <input
                   type="date"
                   value={receiveForm.hanLuuKho}
-                  onChange={(e) => setReceiveForm({ ...receiveForm, hanLuuKho: e.target.value })}
+                  onChange={(e) =>
+                    setReceiveForm({
+                      ...receiveForm,
+                      hanLuuKho: e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowReceiveModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowReceiveModal(false)}
+              >
                 Hủy
               </button>
-              <button type="button" className="btn-save" onClick={handleConfirmReceive}>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleConfirmReceive}
+              >
                 Xác Nhận Lưu Kho
               </button>
             </div>
@@ -1383,10 +1873,18 @@ const NhaPhanPhoiPage = () => {
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowRejectModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowRejectModal(false)}
+              >
                 Đóng
               </button>
-              <button type="button" className="btn-save danger" onClick={handleConfirmReject}>
+              <button
+                type="button"
+                className="btn-save danger"
+                onClick={handleConfirmReject}
+              >
                 Xác Nhận Từ Chối
               </button>
             </div>
@@ -1406,14 +1904,20 @@ const NhaPhanPhoiPage = () => {
                 <label>Chọn Đại Lý Nhận Hàng (*)</label>
                 <select
                   value={dispatchForm.daiLyId}
-                  onChange={(e) => setDispatchForm({ ...dispatchForm, daiLyId: e.target.value })}
+                  onChange={(e) =>
+                    setDispatchForm({
+                      ...dispatchForm,
+                      daiLyId: e.target.value,
+                    })
+                  }
                 >
                   <option value="">-- Chọn đại lý --</option>
                   {dealers
                     .filter((d) => d.trang_thai === "HOAT_DONG")
                     .map((d) => (
                       <option key={d.ma_dai_ly} value={d.ma_dai_ly}>
-                        {d.ten} ({d.dia_chi}){d.ma_nguoi_dung ? "" : " - chưa gắn tài khoản"}
+                        {d.ten} ({d.dia_chi})
+                        {d.ma_nguoi_dung ? "" : " - chưa gắn tài khoản"}
                       </option>
                     ))}
                 </select>
@@ -1424,14 +1928,21 @@ const NhaPhanPhoiPage = () => {
                   <label>Chọn Lô Hàng Xuất (Hạn gần nhất trước) (*)</label>
                   <select
                     value={dispatchForm.maLo}
-                    onChange={(e) => setDispatchForm({ ...dispatchForm, maLo: e.target.value })}
+                    onChange={(e) =>
+                      setDispatchForm({ ...dispatchForm, maLo: e.target.value })
+                    }
                   >
                     <option value="">-- Chọn lô --</option>
                     {inventoryList.map((lot) => {
                       const isRevoked = lot.trang_thai_chung_thu === "REVOKED";
                       return (
-                        <option key={lot.ma_lo_nong_san} value={lot.ma_lo_nong_san} disabled={isRevoked}>
-                          {lot.ma_lo_nong_san} - {lot.ten_san_pham} (Tồn: {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
+                        <option
+                          key={lot.ma_lo_nong_san}
+                          value={lot.ma_lo_nong_san}
+                          disabled={isRevoked}
+                        >
+                          {lot.ma_lo_nong_san} - {lot.ten_san_pham} (Tồn:{" "}
+                          {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
                           {lot.han_luu_kho ? ` - Hạn: ${lot.han_luu_kho}` : ""})
                           {isRevoked ? " [BỊ THU HỒI - KHÓA]" : ""}
                         </option>
@@ -1446,91 +1957,118 @@ const NhaPhanPhoiPage = () => {
                     type="number"
                     placeholder="VD: 300"
                     value={dispatchForm.soLuongXuat}
-                    onChange={(e) => setDispatchForm({ ...dispatchForm, soLuongXuat: e.target.value })}
+                    onChange={(e) =>
+                      setDispatchForm({
+                        ...dispatchForm,
+                        soLuongXuat: e.target.value,
+                      })
+                    }
                   />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label>Hình Thức Vận Chuyển</label>
-                <div style={{ display: "flex", gap: 20, padding: "6px 0" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                    <input
-                      type="radio"
-                      name="hinhThuc"
-                      checked={dispatchForm.hinhThuc === "TU_GIAO"}
-                      onChange={() => setDispatchForm({ ...dispatchForm, hinhThuc: "TU_GIAO" })}
-                    />
-                    Tự giao xe kho
-                  </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-                    <input
-                      type="radio"
-                      name="hinhThuc"
-                      checked={dispatchForm.hinhThuc === "DV_VAN_CHUYEN"}
-                      onChange={() => setDispatchForm({ ...dispatchForm, hinhThuc: "DV_VAN_CHUYEN" })}
-                    />
-                    Đơn vị vận chuyển đối tác
-                  </label>
-                </div>
-              </div>
+              <p
+                style={{
+                  fontSize: 12.5,
+                  color: "#4b5563",
+                  margin: 0,
+                  lineHeight: 1.5,
+                }}
+              >
+                Hàng được giao bằng đơn vị vận chuyển nội bộ của nhà phân phối,
+                không cần chọn đơn vị vận chuyển, tài xế hay biển số.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowCreateDispatchModal(false)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSaveDispatch}
+              >
+                Tạo Phiếu Xuất Kho
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {dispatchForm.hinhThuc === "TU_GIAO" ? (
-                <div className="form-grid-2">
-                  <div className="form-group">
-                    <label>Tài Xế Phụ Trách (*)</label>
-                    <input
-                      type="text"
-                      value={dispatchForm.taiXe}
-                      onChange={(e) => setDispatchForm({ ...dispatchForm, taiXe: e.target.value })}
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Biển Số Xe (*)</label>
-                    <input
-                      type="text"
-                      value={dispatchForm.bienSo}
-                      onChange={(e) => setDispatchForm({ ...dispatchForm, bienSo: e.target.value })}
-                    />
-                  </div>
-                </div>
-              ) : (
-                transporters.length > 0 ? (
-                  <div className="form-group">
-                    <label>Đơn Vị Vận Chuyển (*)</label>
-                    <select
-                      value={dispatchForm.maDonViVC}
-                      onChange={(e) => setDispatchForm({ ...dispatchForm, maDonViVC: e.target.value })}
-                    >
-                      {transporters.map((t) => (
-                        <option key={t.ma_nguoi_dung} value={t.ma_nguoi_dung}>
-                          {t.ho_ten} ({t.ma_nguoi_dung})
-                        </option>
-                      ))}
-                    </select>
-                    <small style={{ color: "#6b7280" }}>
-                      Đơn vị vận chuyển xác nhận lấy hàng / giao hàng và ký trên trang Vận chuyển của họ.
-                    </small>
-                  </div>
-                ) : (
-                  <div className="form-group">
-                    <label>Tên Đơn Vị Vận Chuyển Đối Tác (*)</label>
-                    <input
-                      type="text"
-                      placeholder="VD: Giao Hàng Tiết Kiệm / Viettel Post"
-                      value={dispatchForm.tenDonViVC}
-                      onChange={(e) => setDispatchForm({ ...dispatchForm, tenDonViVC: e.target.value })}
-                    />
-                  </div>
-                )
+      {/* ================= POPUP: TẠO / SỬA KHO ================= */}
+      {showWarehouseModal && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>{editingWarehouse ? "Cập Nhật Kho" : "Tạo Kho Mới"}</h3>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>Tên Kho (*)</label>
+                <input
+                  type="text"
+                  placeholder="VD: Kho Mát A"
+                  value={warehouseForm.tenKho}
+                  onChange={(e) =>
+                    setWarehouseForm({
+                      ...warehouseForm,
+                      tenKho: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="form-group">
+                <label>Địa Chỉ Kho</label>
+                <input
+                  type="text"
+                  placeholder="VD: 12 Đường số 5, KCN Vĩnh Lộc, TP.HCM"
+                  value={warehouseForm.diaChi}
+                  onChange={(e) =>
+                    setWarehouseForm({
+                      ...warehouseForm,
+                      diaChi: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="form-group">
+                <label>Ghi Chú</label>
+                <input
+                  type="text"
+                  placeholder="VD: Nhiệt độ 8-12°C, 6 kệ pallet"
+                  value={warehouseForm.ghiChu}
+                  onChange={(e) =>
+                    setWarehouseForm({
+                      ...warehouseForm,
+                      ghiChu: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              {editingWarehouse && (
+                <small style={{ color: "#6b7280" }}>
+                  Đổi tên kho thì các lô đang lưu trong kho này đổi theo.
+                </small>
               )}
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowCreateDispatchModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowWarehouseModal(false)}
+              >
                 Hủy
               </button>
-              <button type="button" className="btn-save" onClick={handleSaveDispatch}>
-                Tạo Phiếu Xuất Kho
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSaveWarehouse}
+              >
+                {editingWarehouse ? "Lưu Kho" : "Tạo Kho"}
               </button>
             </div>
           </div>
@@ -1542,7 +2080,11 @@ const NhaPhanPhoiPage = () => {
         <div className="modal-overlay">
           <div className="modal-container">
             <div className="modal-header">
-              <h3>{editingDealer ? "Cập Nhật Thông Tin Đại Lý" : "Thêm Đại Lý Mới"}</h3>
+              <h3>
+                {editingDealer
+                  ? "Cập Nhật Thông Tin Đại Lý"
+                  : "Thêm Đại Lý Mới"}
+              </h3>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -1551,7 +2093,9 @@ const NhaPhanPhoiPage = () => {
                   type="text"
                   placeholder="VD: Siêu thị Co.opMart"
                   value={dealerForm.ten}
-                  onChange={(e) => setDealerForm({ ...dealerForm, ten: e.target.value })}
+                  onChange={(e) =>
+                    setDealerForm({ ...dealerForm, ten: e.target.value })
+                  }
                 />
               </div>
               <div className="form-grid-2">
@@ -1561,7 +2105,12 @@ const NhaPhanPhoiPage = () => {
                     type="text"
                     placeholder="VD: Nguyễn Văn A"
                     value={dealerForm.nguoiLienHe}
-                    onChange={(e) => setDealerForm({ ...dealerForm, nguoiLienHe: e.target.value })}
+                    onChange={(e) =>
+                      setDealerForm({
+                        ...dealerForm,
+                        nguoiLienHe: e.target.value,
+                      })
+                    }
                   />
                 </div>
                 <div className="form-group">
@@ -1570,7 +2119,9 @@ const NhaPhanPhoiPage = () => {
                     type="text"
                     placeholder="VD: 0908123456"
                     value={dealerForm.sdt}
-                    onChange={(e) => setDealerForm({ ...dealerForm, sdt: e.target.value })}
+                    onChange={(e) =>
+                      setDealerForm({ ...dealerForm, sdt: e.target.value })
+                    }
                   />
                 </div>
               </div>
@@ -1580,14 +2131,21 @@ const NhaPhanPhoiPage = () => {
                   rows={2}
                   placeholder="Địa chỉ giao hàng..."
                   value={dealerForm.diaChi}
-                  onChange={(e) => setDealerForm({ ...dealerForm, diaChi: e.target.value })}
+                  onChange={(e) =>
+                    setDealerForm({ ...dealerForm, diaChi: e.target.value })
+                  }
                 />
               </div>
               <div className="form-group">
                 <label>Tài Khoản Đại Lý</label>
                 <select
                   value={dealerForm.maNguoiDung}
-                  onChange={(e) => setDealerForm({ ...dealerForm, maNguoiDung: e.target.value })}
+                  onChange={(e) =>
+                    setDealerForm({
+                      ...dealerForm,
+                      maNguoiDung: e.target.value,
+                    })
+                  }
                 >
                   <option value="">-- Chưa gắn tài khoản --</option>
                   {dealerAccounts
@@ -1604,15 +2162,24 @@ const NhaPhanPhoiPage = () => {
                     ))}
                 </select>
                 <small style={{ color: "#6b7280" }}>
-                  Đại lý dùng tài khoản này để xác nhận nhận hàng và ký lên blockchain. Bắt buộc khi xuất hàng có ghi blockchain.
+                  Đại lý dùng tài khoản này để xác nhận nhận hàng và ký lên
+                  blockchain. Bắt buộc khi xuất hàng có ghi blockchain.
                 </small>
               </div>
             </div>
             <div className="modal-footer">
-              <button type="button" className="btn-cancel" onClick={() => setShowDealerModal(false)}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={() => setShowDealerModal(false)}
+              >
                 Hủy
               </button>
-              <button type="button" className="btn-save" onClick={handleSaveDealer}>
+              <button
+                type="button"
+                className="btn-save"
+                onClick={handleSaveDealer}
+              >
                 Lưu Đại Lý
               </button>
             </div>
@@ -1629,7 +2196,9 @@ const NhaPhanPhoiPage = () => {
             </div>
             <div className="modal-body">
               {dealerHistory.length === 0 ? (
-                <p style={{ textAlign: "center", padding: 20, color: "#6b7280" }}>
+                <p
+                  style={{ textAlign: "center", padding: 20, color: "#6b7280" }}
+                >
                   Chưa có lịch sử giao hàng nào cho đại lý này.
                 </p>
               ) : (
@@ -1647,7 +2216,9 @@ const NhaPhanPhoiPage = () => {
                     <tbody>
                       {dealerHistory.map((h) => (
                         <tr key={h.ma_phieu}>
-                          <td style={{ fontWeight: 700, color: "#1d4ed8" }}>{h.ma_phieu}</td>
+                          <td style={{ fontWeight: 700, color: "#1d4ed8" }}>
+                            {h.ma_phieu}
+                          </td>
                           <td>{h.ma_lo_nong_san}</td>
                           <td>
                             {formatWeight(h.so_luong_xuat, h.don_vi_tinh)}
@@ -1664,10 +2235,13 @@ const NhaPhanPhoiPage = () => {
                                       : "warning"
                               }`}
                             >
-                              {DISPATCH_STATUS_LABEL[h.trang_thai] || h.trang_thai}
+                              {DISPATCH_STATUS_LABEL[h.trang_thai] ||
+                                h.trang_thai}
                             </span>
                           </td>
-                          <td>{new Date(h.created_at).toLocaleDateString("vi-VN")}</td>
+                          <td>
+                            {new Date(h.created_at).toLocaleDateString("vi-VN")}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

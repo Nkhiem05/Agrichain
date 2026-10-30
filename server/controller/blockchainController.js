@@ -189,10 +189,13 @@ const lienKetVi = async (req, res) => {
         `SELECT dia_chi_vi, trang_thai_duyet FROM vi_blockchain WHERE ma_nguoi_dung = ? FOR UPDATE`,
         [maNguoiDung],
       );
+      // Tài khoản thường đã có ví được duyệt thì phải nhờ admin đổi. Admin thì được tự đổi ví: ví admin không có vai trò
+      // trên contract, và cần đổi khi deploy lại hợp đồng bằng ví mới (nếu chặn thì không ai đổi được ví admin)
       if (
         cu.length > 0 &&
         cu[0].trang_thai_duyet === "DA_DUYET" &&
-        cu[0].dia_chi_vi !== diaChi
+        cu[0].dia_chi_vi !== diaChi &&
+        req.user.vai_tro !== "ADMIN"
       ) {
         throw new ApiError(
           409,
@@ -701,6 +704,24 @@ const choKy = async (req, res) => {
       );
     }
 
+    // Trạng thái lệnh vận chuyển của các sự kiện tạo lệnh: bên gửi chỉ ký sau khi đơn vị vận chuyển đã chấp nhận
+    const trangThaiLenh = new Map();
+    const dsVanDon = [
+      ...new Set(
+        items
+          .filter((it) => it.outbox.ham === "orderTransport")
+          .map((it) => it.outbox.tham_so?.ma_van_don)
+          .filter(Boolean),
+      ),
+    ];
+    if (dsVanDon.length > 0) {
+      const [lenh] = await db.query(
+        `SELECT ma_van_don, trang_thai FROM lenh_van_chuyen WHERE ma_van_don IN (?)`,
+        [dsVanDon],
+      );
+      lenh.forEach((l) => trangThaiLenh.set(l.ma_van_don, l.trang_thai));
+    }
+
     const viCua = await layViDaDuyet([...cacNguoi]);
     const viCuaToiAddr = viCua.get(maNguoiDung) || null;
 
@@ -762,6 +783,15 @@ const choKy = async (req, res) => {
           if (min !== undefined && min <= seqs[i])
             lyDo = `Đang chờ lô nguồn ${lo} được ký xong`;
         });
+      }
+
+      // Tạo lệnh vận chuyển: bên gửi chỉ ký xác nhận lấy hàng đi sau khi đơn vị vận chuyển đã chấp nhận lệnh
+      if (
+        !lyDo &&
+        it.outbox.ham === "orderTransport" &&
+        trangThaiLenh.get(ts.ma_van_don) === "CHO_CHAP_NHAN"
+      ) {
+        lyDo = `Chờ ${nhanDien(ts.ma_don_vi_van_chuyen)} chấp nhận lệnh vận chuyển, sau đó bạn mới ký xác nhận lấy hàng đi`;
       }
 
       const dung = dungThamSoGoiHam(it.outbox, viCua);

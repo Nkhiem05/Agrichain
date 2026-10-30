@@ -1416,7 +1416,6 @@ const DashboardPage = () => {
     setSavingShipping(true);
 
     try {
-      const maLo = shippingForm.ma_lo_nong_san;
       const { ok, data } = await taoLenhVanChuyen(shippingForm);
 
       if (!ok) {
@@ -1424,34 +1423,9 @@ const DashboardPage = () => {
         return;
       }
 
-      const maVanDon = data.data.ma_van_don;
+      // Tạo lệnh không cần ký ngay: bên gửi ký xác nhận lấy hàng đi SAU khi đơn vị vận chuyển chấp nhận
+      alert(`${data.message}. Mã vận đơn: ${data.data.ma_van_don}`);
       handleCloseShippingModal();
-      await fetchShippingOrders();
-
-      // Tạo lệnh xong: mở MetaMask ký lệnh ngay (đơn vị vận chuyển chỉ thực hiện được sau khi bên gửi ký).
-      // Hủy hoặc lỗi thì lệnh vẫn nằm ở tab "Ký blockchain" để ký sau.
-      try {
-        const kq = await kyCacSuKienDangCho({ maLo });
-        if (kq.soDaKy > 0) {
-          alert(
-            kq.soChoXacNhan > 0
-              ? `Đã tạo lệnh ${maVanDon} và gửi ký, đang chờ blockchain xác nhận (hệ thống tự cập nhật).`
-              : `Đã tạo lệnh ${maVanDon} và ký lên blockchain. Đơn vị vận chuyển có thể thực hiện lệnh.`,
-          );
-        } else {
-          alert(
-            `Đã tạo lệnh ${maVanDon} nhưng chưa ký blockchain: ${kq.lyDo}.\nĐơn vị vận chuyển chỉ thực hiện được sau khi bạn ký: vào tab "Ký blockchain" để ký.`,
-          );
-        }
-      } catch (loi) {
-        const lyDo =
-          loi?.code === "ACTION_REJECTED" || loi?.code === 4001
-            ? "bạn đã từ chối trong MetaMask"
-            : loi?.reason || loi?.shortMessage || loi?.message;
-        alert(
-          `Đã tạo lệnh ${maVanDon} nhưng chưa ký blockchain (${lyDo}).\nĐơn vị vận chuyển chỉ thực hiện được sau khi bạn ký: vào tab "Ký blockchain" để ký lại.`,
-        );
-      }
       await fetchShippingOrders();
     } catch (error) {
       console.error("Lỗi tạo lệnh vận chuyển:", error);
@@ -1475,6 +1449,31 @@ const DashboardPage = () => {
       console.error("Lỗi lấy chi tiết lệnh vận chuyển:", error);
       alert("Không thể kết nối tới backend");
     }
+  };
+
+  // Bên gửi ký xác nhận lấy hàng đi (sau khi đơn vị vận chuyển đã chấp nhận): mở MetaMask ký sự kiện tạo lệnh.
+  // Hủy hoặc lỗi thì sự kiện vẫn nằm ở tab "Ký blockchain" để ký sau.
+  const handleKyLenhVanChuyen = async (order) => {
+    try {
+      const kq = await kyCacSuKienDangCho({ maLo: order.ma_lo_nong_san });
+      alert(
+        kq.soDaKy > 0
+          ? kq.soChoXacNhan > 0
+            ? `Đã ký lệnh ${order.ma_van_don}, đang chờ blockchain xác nhận (hệ thống tự cập nhật). Sau đó xe mới lấy hàng đi được.`
+            : `Đã ký xác nhận lấy hàng đi cho lệnh ${order.ma_van_don}. Đơn vị vận chuyển có thể lấy hàng.`
+          : `Chưa ký được lệnh ${order.ma_van_don}: ${kq.lyDo}.`,
+      );
+    } catch (loi) {
+      const lyDo =
+        loi?.code === "ACTION_REJECTED" || loi?.code === 4001
+          ? "bạn đã từ chối trong MetaMask"
+          : loi?.reason || loi?.shortMessage || loi?.message;
+      alert(
+        `Chưa ký lệnh ${order.ma_van_don} (${lyDo}).\nĐơn vị vận chuyển chưa lấy hàng được cho tới khi bạn ký: bấm lại nút ký hoặc vào tab "Ký blockchain".`,
+      );
+    }
+    setShippingDetail(null);
+    await fetchShippingOrders();
   };
 
   const handleCancelShipping = async (maVanDon) => {
@@ -2265,15 +2264,6 @@ const DashboardPage = () => {
                                       <Eye size={15} />
                                       Xem chi tiết
                                     </div>
-                                    <div
-                                      className="dropdown-item"
-                                      onClick={() =>
-                                        navigate(`/lo-hang/${encodeURIComponent(batch.ma_lo_nong_san)}`)
-                                      }
-                                    >
-                                      <Eye size={15} />
-                                      Chi tiết lô &amp; mã QR
-                                    </div>
                                     <div className="dropdown-divider"></div>
                                     <div
                                       className="dropdown-item"
@@ -2600,8 +2590,30 @@ const DashboardPage = () => {
                               )}
                               {status.label}
                             </span>
+                            {order.can_ky_lenh && (
+                              <div
+                                style={{
+                                  marginTop: 6,
+                                  fontSize: 12.5,
+                                  fontWeight: 600,
+                                  color: "#b45309",
+                                }}
+                              >
+                                Chờ bạn ký xác nhận lấy hàng đi
+                              </div>
+                            )}
                           </td>
                           <td className="col-actions">
+                            {order.can_ky_lenh && (
+                              <button
+                                type="button"
+                                className="btn-save"
+                                style={{ marginRight: 8 }}
+                                onClick={() => handleKyLenhVanChuyen(order)}
+                              >
+                                Ký xác nhận lấy hàng đi
+                              </button>
+                            )}
                             <button
                               type="button"
                               className="btn-action-detail"
@@ -3551,6 +3563,16 @@ const DashboardPage = () => {
               >
                 Đóng
               </button>
+
+              {shippingDetail.can_ky_lenh && (
+                <button
+                  type="button"
+                  className="btn-save"
+                  onClick={() => handleKyLenhVanChuyen(shippingDetail)}
+                >
+                  Ký xác nhận lấy hàng đi
+                </button>
+              )}
 
               {shippingDetail.co_the_huy && (
                 <button

@@ -8,36 +8,6 @@
   padding-bottom: 40px;
 }
 
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 14px 24px;
-  background-color: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-}
-
-.header-logo-icon {
-  height: 38px;
-  width: auto;
-  object-fit: contain;
-}
-
-.header-brand-title {
-  font-size: 18px;
-  font-weight: 800;
-  color: #16a34a;
-  letter-spacing: 0.5px;
-}
-
 .chain-badge {
   display: flex;
   align-items: center;
@@ -67,22 +37,43 @@
 
 .back-bar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: 16px;
 }
 
-.back-btn {
+.batch-code-row {
   display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.batch-code-row .batch-code-label {
+  margin-bottom: 0;
+}
+
+.back-btn {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: none;
-  background: none;
-  color: #16a34a;
-  font-weight: 700;
-  font-size: 13px;
+  padding: 6px 12px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background-color: #f0fdf4;
+  color: #15803d;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
-  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.back-btn:hover {
+  background-color: #dcfce7;
+  border-color: #86efac;
+  transform: translateX(-2px);
 }
 
 .chain-verify-status {
@@ -366,4 +357,239 @@
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+}
+
+/* ===== Mã QR bên phải tiêu đề hồ sơ dòng đời ===== */
+.timeline-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.timeline-title-row .timeline-header-title {
+  margin-bottom: 0;
+}
+
+.trace-qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.trace-qr-box {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.trace-qr-box:hover {
+  border-color: #278d49;
+  background-color: #f0fdf4;
+  box-shadow: 0 2px 8px rgba(39, 141, 73, 0.12);
+}
+
+.trace-qr-img {
+  width: 66px;
+  height: 66px;
+  padding: 3px;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.trace-qr-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.trace-qr-cap {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #278d49;
+}
+
+.trace-qr-code {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #111827;
+  font-family: monospace;
+}
+
+.trace-qr-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: #278d49;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.trace-qr-zoom:hover {
+  text-decoration: underline;
+}
+
+.trace-qr-doi {
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: right;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: #b45309;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ===== Popup phóng to mã QR ===== */
+.trace-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.trace-qr-modal {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.trace-qr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.trace-qr-modal-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.trace-qr-modal-x {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+.trace-qr-modal-x:hover {
+  color: #1f2937;
+}
+
+.trace-qr-modal-body {
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.trace-qr-frame {
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 2px dashed #278d49;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.trace-qr-large {
+  width: 230px;
+  height: 230px;
+  display: block;
+}
+
+.trace-qr-modal-batch {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #111827;
+  font-family: monospace;
+  margin-bottom: 4px;
+}
+
+.trace-qr-modal-desc {
+  font-size: 0.85rem;
+  color: #6b7280;
+  max-width: 320px;
+  margin: 0;
+}
+
+.trace-qr-modal-footer {
+  padding: 14px 20px;
+  background-color: #f9fafb;
+  border-top: 1px solid #f0f2f5;
+  display: flex;
+  gap: 10px;
+}
+
+.trace-qr-btn-link {
+  flex: 1;
+  padding: 9px 16px;
+  background-color: #278d49;
+  color: #ffffff;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.trace-qr-btn-link:hover {
+  background-color: #1e7041;
+}
+
+.trace-qr-btn-close {
+  padding: 9px 18px;
+  background-color: #e5e7eb;
+  color: #374151;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.trace-qr-btn-close:hover {
+  background-color: #d1d5db;
+}
+
+@media (max-width: 720px) {
+  .timeline-title-row {
+    flex-wrap: wrap;
+  }
 }

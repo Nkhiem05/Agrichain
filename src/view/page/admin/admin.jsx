@@ -135,7 +135,17 @@ export default function AdminDashboard() {
   };
 
   // ================= TABS =================
-  const [activeTab, setActiveTab] = usePersistentTab("admin", "overview", ["overview","farms","users","catalog","batches","inspection","shipping","integrity","wallets"]);
+  const [activeTab, setActiveTab] = usePersistentTab("admin", "overview", [
+    "overview",
+    "farms",
+    "users",
+    "catalog",
+    "batches",
+    "inspection",
+    "shipping",
+    "integrity",
+    "wallets",
+  ]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // ================= MODALS STATE =================
@@ -1494,7 +1504,7 @@ export default function AdminDashboard() {
                                       setOpenDropdownUser(null);
                                     }}
                                   >
-                                    <Eye size={15} color="#2563eb" />
+                                    <Eye size={15} color="#111827" />
                                     <span>Xem chi tiết</span>
                                   </button>
 
@@ -1506,7 +1516,7 @@ export default function AdminDashboard() {
                                       setOpenDropdownUser(null);
                                     }}
                                   >
-                                    <UserCheck size={15} color="#16a34a" />
+                                    <UserCheck size={15} color="#111827" />
                                     <span>Phân quyền & Vai trò</span>
                                   </button>
 
@@ -1523,7 +1533,7 @@ export default function AdminDashboard() {
                                       setOpenDropdownUser(null);
                                     }}
                                   >
-                                    <Pencil size={15} color="#2563eb" />
+                                    <Pencil size={15} color="#111827" />
                                     <span>Sửa thông tin</span>
                                   </button>
 
@@ -1536,7 +1546,7 @@ export default function AdminDashboard() {
                                       setOpenDropdownUser(null);
                                     }}
                                   >
-                                    <KeyRound size={15} color="#7c3aed" />
+                                    <KeyRound size={15} color="#111827" />
                                     <span>Đặt lại mật khẩu</span>
                                   </button>
 

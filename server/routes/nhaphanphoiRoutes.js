@@ -8,18 +8,31 @@ router.use(checkAuth, requireRole("DISTRIBUTOR"));
 
 // 1. Tiếp nhận hàng từ cơ sở sơ chế
 router.get("/tiep-nhan", nhaphanphoiController.getIncomingShipments);
-router.put("/tiep-nhan/:maVanDon/xac-nhan", nhaphanphoiController.confirmReceive);
+router.put(
+  "/tiep-nhan/:maVanDon/xac-nhan",
+  nhaphanphoiController.confirmReceive,
+);
 router.put("/tiep-nhan/:maVanDon/tu-choi", nhaphanphoiController.rejectReceive);
 
-// 2. Kho hàng
+// 2. Kho hàng + quản lý kho (tạo / sửa / xóa kho để chọn khi nhập kho)
 router.get("/kho-hang", nhaphanphoiController.getInventory);
+router.get("/kho", nhaphanphoiController.getWarehouses);
+router.post("/kho", nhaphanphoiController.createWarehouse);
+router.put("/kho/:maKho", nhaphanphoiController.updateWarehouse);
+router.delete("/kho/:maKho", nhaphanphoiController.deleteWarehouse);
 
 // 3. Phân phối cho đại lý
 router.get("/xuat-kho", nhaphanphoiController.getDispatchOrders);
 router.post("/xuat-kho", nhaphanphoiController.createDispatch);
 router.get("/xuat-kho/:maPhieu", nhaphanphoiController.getDispatchDetail);
-router.put("/xuat-kho/:maPhieu/xuat-kho", nhaphanphoiController.markDispatchShipped);
-router.put("/xuat-kho/:maPhieu/da-giao", nhaphanphoiController.markDispatchDelivered);
+router.put(
+  "/xuat-kho/:maPhieu/xuat-kho",
+  nhaphanphoiController.markDispatchShipped,
+);
+router.put(
+  "/xuat-kho/:maPhieu/da-giao",
+  nhaphanphoiController.markDispatchDelivered,
+);
 
 router.get("/don-vi-van-chuyen", nhaphanphoiController.getTransporters);
 
@@ -28,7 +41,10 @@ router.get("/tai-khoan-dai-ly", nhaphanphoiController.getDealerAccounts);
 router.get("/dai-ly", nhaphanphoiController.getDealers);
 router.post("/dai-ly", nhaphanphoiController.createDealer);
 router.put("/dai-ly/:maDaiLy", nhaphanphoiController.updateDealer);
-router.put("/dai-ly/:maDaiLy/trang-thai", nhaphanphoiController.toggleDealerStatus);
+router.put(
+  "/dai-ly/:maDaiLy/trang-thai",
+  nhaphanphoiController.toggleDealerStatus,
+);
 router.get("/dai-ly/:maDaiLy/lich-su", nhaphanphoiController.getDealerHistory);
 
 module.exports = router;

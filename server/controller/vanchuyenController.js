@@ -1,10 +1,10 @@
 const db = require("../config/db");
 const {
   ghiSuKienVanDon,
+  goSuKienLenhChuaKy,
   chuaCoViDuyet,
 } = require("../services/blockchain/hook");
 const { layCauHinh } = require("../services/blockchain/chainClient");
-const { capNhatTrangThaiLo } = require("../services/blockchain/ghiNhan");
 
 /*
 ==================================================
@@ -593,7 +593,7 @@ const createOrder = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Tạo lệnh vận chuyển & bàn giao thành công${canhBaoVi}`,
+      message: `Tạo lệnh vận chuyển & bàn giao thành công. Không cần ký lúc này: sau khi đơn vị vận chuyển chấp nhận, bạn ký xác nhận lấy hàng đi (nút "Ký xác nhận lấy hàng đi" ở lệnh đó, hoặc tab Ký blockchain) rồi xe mới lấy hàng được${canhBaoVi}`,
       data: { ma_van_don },
     });
   } catch (err) {
@@ -612,6 +612,30 @@ DANH SÁCH LỆNH CỦA TÔI + SỐ LIỆU 3 Ô ĐẦU TRANG
 ==================================================
 */
 
+// Cờ ký lệnh cho bên gửi: cho_ky_lenh = lệnh chưa ký xác nhận lấy hàng đi; can_ky_lenh = ký được ngay
+// (đơn vị vận chuyển đã chấp nhận). Lệnh vừa tạo, chưa ai chấp nhận thì chưa ký (cũng không cần ký).
+const ganCoKyLenh = async (executor, rows) => {
+  rows.forEach((r) => {
+    r.cho_ky_lenh = false;
+    r.can_ky_lenh = false;
+  });
+  if (rows.length === 0 || !layCauHinh().daCauHinh) return;
+  const [ev] = await executor.query(
+    `
+    SELECT JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) AS ma_van_don
+    FROM lich_su_truy_xuat_lo
+    WHERE loai_hoat_dong = 'TRANSPORT_ORDERED' AND blockchain_sync_status <> 'CONFIRMED'
+      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) IN (?)
+    `,
+    [rows.map((r) => r.ma_van_don)],
+  );
+  const chuaKy = new Set(ev.map((e) => e.ma_van_don));
+  rows.forEach((r) => {
+    r.cho_ky_lenh = chuaKy.has(r.ma_van_don);
+    r.can_ky_lenh = r.cho_ky_lenh && ["CHO_LAY_HANG"].includes(r.trang_thai);
+  });
+};
+
 const getMyOrders = async (req, res) => {
   try {
     const maNguoiDung = getFarmerId(req);
@@ -624,6 +648,7 @@ const getMyOrders = async (req, res) => {
       `,
       [maNguoiDung],
     );
+    await ganCoKyLenh(db, rows);
 
     const stats = {
       dang_van_chuyen: rows.filter((row) =>
@@ -681,6 +706,8 @@ const getOrderById = async (req, res) => {
       });
     }
 
+    await ganCoKyLenh(db, rows);
+
     return res.json({
       success: true,
       data: {
@@ -703,48 +730,6 @@ const getOrderById = async (req, res) => {
 HỦY LỆNH (khi xe chưa lấy hàng)
 ==================================================
 */
-
-// Lệnh vừa tạo mà sự kiện tạo lệnh CHƯA ký (chưa lên blockchain) và đang là sự kiện cuối của lô: gỡ luôn sự kiện chờ ký
-// để hủy lệnh không cần ký gì (chưa có gì trên chain để hủy). Trả true nếu đã gỡ.
-const goSuKienLenhChuaKy = async (connection, maVanDon) => {
-  const [ev] = await connection.query(
-    `
-    SELECT ma_lich_su, ma_lo_nong_san, so_thu_tu_su_kien, ma_bam_su_kien_truoc, blockchain_sync_status
-    FROM lich_su_truy_xuat_lo
-    WHERE loai_hoat_dong = 'TRANSPORT_ORDERED'
-      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) = ?
-    LIMIT 1
-    `,
-    [maVanDon],
-  );
-  if (ev.length === 0 || ev[0].blockchain_sync_status !== "QUEUED")
-    return false;
-  const e = ev[0];
-
-  const [lo] = await connection.query(
-    `SELECT latest_event_sequence FROM lo_nong_san WHERE ma_lo_nong_san = ? FOR UPDATE`,
-    [e.ma_lo_nong_san],
-  );
-  if (
-    lo.length === 0 ||
-    Number(lo[0].latest_event_sequence) !== Number(e.so_thu_tu_su_kien)
-  )
-    return false;
-
-  await connection.query(`DELETE FROM blockchain_outbox WHERE event_id = ?`, [
-    e.ma_lich_su,
-  ]);
-  await connection.query(
-    `DELETE FROM lich_su_truy_xuat_lo WHERE ma_lich_su = ?`,
-    [e.ma_lich_su],
-  );
-  await connection.query(
-    `UPDATE lo_nong_san SET latest_event_sequence = ?, latest_event_hash = ? WHERE ma_lo_nong_san = ?`,
-    [Number(e.so_thu_tu_su_kien) - 1, e.ma_bam_su_kien_truoc, e.ma_lo_nong_san],
-  );
-  await capNhatTrangThaiLo(connection, e.ma_lo_nong_san);
-  return true;
-};
 
 const cancelOrder = async (req, res) => {
   const { maVanDon } = req.params;

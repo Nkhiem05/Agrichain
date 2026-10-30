@@ -30,9 +30,11 @@ import {
   MoreVertical,
   LogOut,
   Wallet,
+  PackageCheck,
 } from "lucide-react";
 import "../../css/soche.css";
 import BlockchainPanel from "../blockchainpannel";
+import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
 import { useNavigate } from "react-router-dom";
 import {
   fetchIncomingShipments,
@@ -58,7 +60,6 @@ import {
 const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
-// Nhãn + màu badge cho trạng thái lệnh vận chuyển (lenh_van_chuyen.trang_thai)
 const SHIPMENT_STATUS_LABEL = {
   CHO_CHAP_NHAN: {
     text: "Chờ đơn vị vận chuyển xác nhận",
@@ -96,8 +97,6 @@ const formatWeight = (value, unit) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return `- ${unit || ""}`;
 
-  // Lưu trữ luôn theo kg; hiển thị tự quy đổi sang Tấn khi đạt 1.000kg trở lên
-  // cho dễ đọc (vd: 3500 -> "3,5 Tấn"), dưới mức đó vẫn hiện kg (vd: "900 kg").
   if ((unit || "").toLowerCase() === "kg" && num >= 1000) {
     const tons = num / 1000;
     return `${tons.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} Tấn`;
@@ -110,7 +109,6 @@ const ProcessingPage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
-  // Tab chính: reception -> processing -> batch-split-merge -> shipping
   const [activeTab, setActiveTab] = usePersistentTab("soche", "reception", [
     "reception",
     "processing",
@@ -123,7 +121,6 @@ const ProcessingPage = () => {
   const [processingFilter, setProcessingFilter] = useState("ALL");
   const [shippingFilter, setShippingFilter] = useState("ALL");
 
-  // Dữ liệu thật từ API
   const [incomingShipments, setIncomingShipments] = useState([]);
   const [processingBatches, setProcessingBatches] = useState([]);
   const [availableRawLots, setAvailableRawLots] = useState([]);
@@ -138,7 +135,6 @@ const ProcessingPage = () => {
 
   const [openDropdownId, setOpenDropdownId] = useState(null);
 
-  // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -155,7 +151,6 @@ const ProcessingPage = () => {
 
   const [showHandoverModal, setShowHandoverModal] = useState(false);
   const [handoverBatch, setHandoverBatch] = useState(null);
-  // Khác null khi mở từ nút "Tạo lệnh bàn giao" mà có nhiều lô sẵn sàng: người dùng phải chọn lô trong hộp thoại
   const [handoverPickList, setHandoverPickList] = useState(null);
   const [handoverForm, setHandoverForm] = useState({
     ma_don_vi_van_chuyen: "",
@@ -167,15 +162,12 @@ const ProcessingPage = () => {
   const [showShippingDetailModal, setShowShippingDetailModal] = useState(false);
   const [selectedShippingDetail, setSelectedShippingDetail] = useState(null);
 
-  // Tạo lô sơ chế
   const [createForm, setCreateForm] = useState({
     ma_lo_nguon: "",
-    tieu_de: "",
     khu_vuc_so_che: "Dây chuyền rửa Ozon A",
     quy_cach_tieu_chuan: "",
   });
 
-  // Sửa thông tin lô sơ chế (tên gọi, khu vực, quy cách)
   const [editForm, setEditForm] = useState({
     ma_so_che: "",
     ma_lo_moi: "",
@@ -184,11 +176,9 @@ const ProcessingPage = () => {
     quy_cach_tieu_chuan: "",
   });
 
-  // Cập nhật trạng thái sơ chế
   const [selectedBatchId, setSelectedBatchId] = useState("");
   const [newStage, setNewStage] = useState("DANG_RUA_KHU_KHUAN");
 
-  // Tách lô
   const [splitForm, setSplitForm] = useState({
     ma_lo_goc: "",
     child1Weight: "",
@@ -197,11 +187,8 @@ const ProcessingPage = () => {
     child2Grade: "Loại 2 Nội Địa",
   });
 
-  // Gộp lô
   const [mergeSelected, setMergeSelected] = useState([]);
   const [mergeTitle, setMergeTitle] = useState("");
-
-  // ==================== TẢI DỮ LIỆU ====================
 
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
@@ -223,7 +210,6 @@ const ProcessingPage = () => {
     navigate("/dang-nhap");
   };
 
-  // nen = true: tải lại âm thầm (không hiện "Đang tải" che mất tab đang mở, vd tab Ký blockchain đang chờ MetaMask)
   const loadAll = useCallback(async (nen = false) => {
     if (!nen) setLoading(true);
     setErrorMsg("");
@@ -269,7 +255,19 @@ const ProcessingPage = () => {
     if (user) loadAll();
   }, [user, loadAll]);
 
-  // Quay lại các tab nghiệp vụ (vd sau khi ký ở tab Ký blockchain) thì tải lại để thấy lô / bước đã ký, không cần F5
+  useEffect(() => {
+    if (!user) return undefined;
+    const lamMoi = () => {
+      if (document.visibilityState === "visible") loadAll(true);
+    };
+    window.addEventListener("focus", lamMoi);
+    document.addEventListener("visibilitychange", lamMoi);
+    return () => {
+      window.removeEventListener("focus", lamMoi);
+      document.removeEventListener("visibilitychange", lamMoi);
+    };
+  }, [user, loadAll]);
+
   useEffect(() => {
     if (user && activeTab !== "blockchain") loadAll(true);
   }, [activeTab, user, loadAll]);
@@ -284,13 +282,35 @@ const ProcessingPage = () => {
     return () => document.removeEventListener("click", handleOutsideClick);
   }, []);
 
-  // Thao tác có ký blockchain: báo rõ bước vừa tạo và chuyển sang tab Ký blockchain để ký ngay
-  const baoChoKy = (res, macDinh) => {
-    alert(res?.message || macDinh);
-    if (res?.cho_ky) setActiveTab("blockchain");
+  const kyBangMetaMask = async (loiBao) => {
+    let ketQua;
+    try {
+      const kq = await kyCacSuKienDangCho();
+      ketQua =
+        kq.soDaKy > 0
+          ? kq.soChoXacNhan > 0
+            ? `${loiBao}\nĐã gửi giao dịch ký, đang chờ blockchain xác nhận (hệ thống tự cập nhật).`
+            : `${loiBao}\nĐã ký ${kq.soDaKy} sự kiện lên blockchain, bước này đã có hiệu lực.`
+          : `Đã gửi yêu cầu nhưng chưa ký blockchain: ${kq.lyDo}.\nBước này chỉ có hiệu lực sau khi bạn ký: bấm "Ký ngay" trên thẻ đó hoặc vào tab "Ký blockchain".`;
+    } catch (loi) {
+      const lyDo =
+        loi?.code === "ACTION_REJECTED" || loi?.code === 4001
+          ? "bạn đã từ chối trong MetaMask"
+          : loi?.reason || loi?.shortMessage || loi?.message;
+      ketQua = `Đã gửi yêu cầu nhưng chưa ký blockchain (${lyDo}).\nBước này chỉ có hiệu lực sau khi bạn ký: bấm "Ký ngay" trên thẻ đó hoặc vào tab "Ký blockchain".`;
+    }
+    alert(ketQua);
+    await loadAll(true);
   };
 
-  // Lô còn sự kiện chưa ký thì báo lý do và không làm tiếp (trả true nếu bị chặn)
+  const baoChoKy = async (res, macDinh) => {
+    if (!res?.cho_ky) {
+      alert(res?.message || macDinh);
+      return;
+    }
+    await kyBangMetaMask(macDinh || res.message);
+  };
+
   const chanNeuChuaKy = (item) => {
     if (item?.chua_ky_lo) {
       alert(item.ly_do_chua_ky);
@@ -366,7 +386,6 @@ const ProcessingPage = () => {
   const handleOpenCreateModal = () => {
     setCreateForm({
       ma_lo_nguon: availableRawLots[0]?.ma_lo_nong_san || "",
-      tieu_de: "",
       khu_vuc_so_che: "Dây chuyền rửa Ozon A",
       quy_cach_tieu_chuan: "",
     });
@@ -374,10 +393,8 @@ const ProcessingPage = () => {
   };
 
   const handleSubmitCreate = async () => {
-    const { ma_lo_nguon, tieu_de, khu_vuc_so_che, quy_cach_tieu_chuan } =
-      createForm;
+    const { ma_lo_nguon, khu_vuc_so_che, quy_cach_tieu_chuan } = createForm;
     if (!ma_lo_nguon) return alert("Vui lòng chọn lô đã tiếp nhận!");
-    if (!tieu_de.trim()) return alert("Vui lòng nhập tên gọi lô sơ chế!");
 
     if (
       chanNeuChuaKy(
@@ -389,7 +406,6 @@ const ProcessingPage = () => {
     try {
       const res = await createProcessingBatch({
         ma_lo_nguon,
-        tieu_de: tieu_de.trim(),
         khu_vuc_so_che,
         quy_cach_tieu_chuan: quy_cach_tieu_chuan.trim(),
       });
@@ -548,12 +564,33 @@ const ProcessingPage = () => {
       return;
     }
     if (readyToShip.length > 1) {
-      // Nhiều lô sẵn sàng bàn giao: không tự chọn đại 1 lô, bắt buộc người dùng chọn rõ trong hộp thoại.
       handleOpenHandover(null);
       setHandoverPickList(readyToShip);
       return;
     }
     handleOpenHandover(readyToShip[0]);
+  };
+
+  const handleKyLenhBanGiao = async (row) => {
+    try {
+      const kq = await kyCacSuKienDangCho({ maLo: row.ma_lo_nong_san });
+      alert(
+        kq.soDaKy > 0
+          ? kq.soChoXacNhan > 0
+            ? `Đã ký lệnh ${row.ma_van_don}, đang chờ blockchain xác nhận (hệ thống tự cập nhật). Sau đó xe mới lấy hàng đi được.`
+            : `Đã ký xác nhận lấy hàng đi cho lệnh ${row.ma_van_don}. Đơn vị vận chuyển có thể lấy hàng.`
+          : `Chưa ký được lệnh ${row.ma_van_don}: ${kq.lyDo}.`,
+      );
+    } catch (loi) {
+      const lyDo =
+        loi?.code === "ACTION_REJECTED" || loi?.code === 4001
+          ? "bạn đã từ chối trong MetaMask"
+          : loi?.reason || loi?.shortMessage || loi?.message;
+      alert(
+        `Chưa ký lệnh ${row.ma_van_don} (${lyDo}).\nXe chưa lấy hàng được cho tới khi bạn ký: bấm lại nút ký hoặc vào tab "Ký blockchain".`,
+      );
+    }
+    await loadAll(true);
   };
 
   const handleOpenShippingDetail = (item) => {
@@ -586,7 +623,8 @@ const ProcessingPage = () => {
         baoChoKy(res);
       } else {
         alert(
-          `Đã tạo vận đơn ${res?.data?.ma_van_don || ""} cho đơn vị vận chuyển thành công!`,
+          res?.message ||
+            `Đã tạo vận đơn ${res?.data?.ma_van_don || ""} cho đơn vị vận chuyển thành công!`,
         );
         setActiveTab("shipping");
       }
@@ -768,15 +806,8 @@ const ProcessingPage = () => {
               ) : (
                 <>
                   {activeTab === "blockchain" && (
-                    <div style={{ maxWidth: 980, paddingTop: 16 }}>
-                      <p
-                        style={{
-                          fontSize: 13.5,
-                          color: "#4b5563",
-                          margin: "0 0 12px",
-                          lineHeight: 1.5,
-                        }}
-                      >
+                    <div className="bc-tab">
+                      <p className="bc-tab-desc">
                         Mỗi bước của cơ sở (nhận / từ chối hàng, tạo lô, đóng
                         gói, tách / gộp, tạo lệnh bàn giao) chỉ có hiệu lực sau
                         khi bạn ký ở đây. Các bước của một lô ký theo thứ tự.
@@ -862,7 +893,6 @@ const ProcessingPage = () => {
                             SHIPMENT_STATUS_LABEL[shipment.trang_thai] ||
                             SHIPMENT_STATUS_LABEL.CHO_CHAP_NHAN;
                           const StatusIcon = statusInfo.icon;
-                          // Chỉ tiếp nhận/từ chối được khi đơn vị vận chuyển đã báo đến nơi
                           const canAct =
                             shipment.trang_thai === "CHO_TIEP_NHAN";
 
@@ -910,7 +940,7 @@ const ProcessingPage = () => {
                                   </span>
                                   <span>
                                     Khối lượng:{" "}
-                                    <strong>
+                                    <strong className="highlight-weight">
                                       {formatWeight(
                                         shipment.khoi_luong,
                                         shipment.don_vi_tinh,
@@ -969,23 +999,29 @@ const ProcessingPage = () => {
                                 {canAct && shipment.cho_ky && (
                                   <button
                                     className="btn-action-outline blue"
-                                    onClick={() => setActiveTab("blockchain")}
+                                    onClick={() =>
+                                      kyBangMetaMask(
+                                        shipment.cho_ky === "NHAN_HANG"
+                                          ? `Đã tiếp nhận lô ${shipment.ma_lo_nong_san} vào kho.`
+                                          : `Đã từ chối tiếp nhận lô ${shipment.ma_lo_nong_san}.`,
+                                      )
+                                    }
                                   >
-                                    <Clock size={16} /> Đi tới Ký blockchain
+                                    <Clock size={16} /> Ký ngay
                                   </button>
                                 )}
                                 {canAct && !shipment.cho_ky && (
                                   <>
                                     <button
-                                      className="btn-action-outline blue"
+                                      className="btn-receive"
                                       onClick={() =>
                                         handleOpenReceiveModal(shipment)
                                       }
                                     >
-                                      <Scale size={16} /> Tiếp nhận lô
+                                      <PackageCheck size={16} /> Tiếp nhận lô
                                     </button>
                                     <button
-                                      className="btn-action-outline danger"
+                                      className="btn-reject"
                                       onClick={() =>
                                         handleOpenRejectModal(shipment)
                                       }
@@ -1191,7 +1227,13 @@ const ProcessingPage = () => {
                                       type="button"
                                       className="btn-detail-table"
                                       style={{ marginLeft: 8 }}
-                                      onClick={() => setActiveTab("blockchain")}
+                                      onClick={() =>
+                                        kyBangMetaMask(
+                                          b.cho_ky_giai_doan
+                                            ? `Đã chuyển lô ${b.ma_lo_moi} sang giai đoạn mới.`
+                                            : `Đã ký bước của lô ${b.ma_lo_moi}.`,
+                                        )
+                                      }
                                     >
                                       Ký ngay
                                     </button>
@@ -1232,19 +1274,6 @@ const ProcessingPage = () => {
                                         <Eye size={15} /> Xem chi tiết
                                       </button>
 
-                                      <button
-                                        type="button"
-                                        className="dropdown-item-btn"
-                                        onClick={() => {
-                                          setOpenDropdownId(null);
-                                          navigate(`/lo-hang/${encodeURIComponent(b.ma_lo_moi)}`);
-                                        }}
-                                      >
-                                        <Eye size={15} /> Chi tiết lô &amp; mã QR
-                                      </button>
-
-                                      {/* Lô đã đóng gói mà không còn trong danh sách sẵn sàng bàn giao
-                                          (đã bàn giao) thì không sửa thông tin nữa */}
                                       {(!isPackaged ||
                                         readyToShip.some(
                                           (r) => r.ma_so_che === b.ma_so_che,
@@ -1735,13 +1764,27 @@ const ProcessingPage = () => {
                                       {row.cho_ky_lenh && (
                                         <div style={{ marginTop: 6 }}>
                                           <span className="badge-status-line warning">
-                                            <Clock size={12} /> Chờ bạn ký lệnh
-                                            bàn giao
+                                            <Clock size={12} />{" "}
+                                            {row.trang_thai === "CHO_CHAP_NHAN"
+                                              ? "Chờ đơn vị vận chuyển chấp nhận (chưa cần ký)"
+                                              : "Chờ bạn ký xác nhận lấy hàng đi"}
                                           </span>
                                         </div>
                                       )}
                                     </td>
                                     <td>
+                                      {row.cho_ky_lenh &&
+                                        row.trang_thai === "CHO_LAY_HANG" && (
+                                          <button
+                                            className="btn-detail-table"
+                                            style={{ marginRight: 6 }}
+                                            onClick={() =>
+                                              handleKyLenhBanGiao(row)
+                                            }
+                                          >
+                                            Ký xác nhận lấy hàng đi
+                                          </button>
+                                        )}
                                       <button
                                         className="btn-detail-table"
                                         onClick={() =>
@@ -1772,8 +1815,8 @@ const ProcessingPage = () => {
             <div className="modal-container">
               <div className="modal-header">
                 <h3>
-                  <Scale size={18} color="#2e8b57" /> Xác Nhận Tiếp Nhận & Cân
-                  Thực Tế
+                  <PackageCheck size={18} color="#278d49" /> Xác Nhận Tiếp Nhận
+                  & Cân Thực Tế
                 </h3>
                 <button
                   className="modal-close-btn"
@@ -1896,7 +1939,7 @@ const ProcessingPage = () => {
             <div className="modal-container">
               <div className="modal-header">
                 <h3>
-                  <Truck size={18} color="#2e8b57" /> Bàn Giao Vận Chuyển Hàng
+                  <Truck size={18} color="#278d49" /> Bàn Giao Vận Chuyển Hàng
                   Hoá
                 </h3>
                 <button
@@ -2220,7 +2263,7 @@ const ProcessingPage = () => {
             <div className="modal-container">
               <div className="modal-header">
                 <h3>
-                  <PlusCircle size={18} color="#2e8b57" /> Bắt Đầu Sơ Chế Lô Đã
+                  <PlusCircle size={18} color="#278d49" /> Bắt Đầu Sơ Chế Lô Đã
                   Nhận
                 </h3>
                 <button
@@ -2257,17 +2300,6 @@ const ProcessingPage = () => {
                     </select>
                   )}
                 </div>
-                <div className="form-group">
-                  <label>Tên Gọi Lô Sơ Chế (*)</label>
-                  <input
-                    type="text"
-                    placeholder="Ví dụ: Quýt Đường tuyển chọn size VIP"
-                    value={createForm.tieu_de}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, tieu_de: e.target.value })
-                    }
-                  />
-                </div>
                 <p
                   style={{
                     fontSize: "12.5px",
@@ -2276,8 +2308,9 @@ const ProcessingPage = () => {
                     lineHeight: 1.5,
                   }}
                 >
-                  Sơ chế làm trực tiếp trên lô đã nhận: lô giữ nguyên mã do nông
-                  dân tạo, không sinh mã lô mới.
+                  Sơ chế làm trực tiếp trên lô đã nhận và lấy luôn tên lô hiện
+                  tại: lô giữ nguyên mã và tên do nông dân tạo, không cần đặt
+                  tên mới.
                 </p>
                 <div className="form-group">
                   <label>Khu Vực Sơ Chế</label>
@@ -2330,7 +2363,7 @@ const ProcessingPage = () => {
             <div className="modal-container">
               <div className="modal-header">
                 <h3>
-                  <Edit3 size={18} color="#2e8b57" /> Sửa Thông Tin Lô Sơ Chế
+                  <Edit3 size={18} color="#278d49" /> Sửa Thông Tin Lô Sơ Chế
                 </h3>
                 <button
                   className="modal-close-btn"
@@ -2342,7 +2375,7 @@ const ProcessingPage = () => {
               <div className="modal-body">
                 <p style={{ color: "#4b5563", marginBottom: "12px" }}>
                   Lô sơ chế{" "}
-                  <strong style={{ color: "#2e8b57" }}>
+                  <strong style={{ color: "#278d49" }}>
                     {editForm.ma_so_che}
                   </strong>{" "}
                   (mã lô {editForm.ma_lo_moi}). Khối lượng không sửa được ở đây;
@@ -2416,7 +2449,7 @@ const ProcessingPage = () => {
             <div className="modal-container">
               <div className="modal-header">
                 <h3>
-                  <Check size={18} color="#2e8b57" /> Cập Nhật Trạng Thái
+                  <Check size={18} color="#278d49" /> Cập Nhật Trạng Thái
                 </h3>
                 <button
                   className="modal-close-btn"
@@ -2428,7 +2461,7 @@ const ProcessingPage = () => {
               <div className="modal-body">
                 <p style={{ color: "#4b5563", marginBottom: "12px" }}>
                   Đang cập nhật cho mã lô:{" "}
-                  <strong style={{ color: "#2e8b57" }}>
+                  <strong style={{ color: "#278d49" }}>
                     {selectedBatchId}
                   </strong>
                 </p>
@@ -2469,7 +2502,7 @@ const ProcessingPage = () => {
             <div className="modal-container">
               <div className="modal-header">
                 <h3>
-                  <Split size={18} color="#2e8b57" /> Tách Lô Hàng
+                  <Split size={18} color="#278d49" /> Tách Lô Hàng
                 </h3>
                 <button
                   className="modal-close-btn"
@@ -2583,7 +2616,7 @@ const ProcessingPage = () => {
             <div className="modal-container">
               <div className="modal-header">
                 <h3>
-                  <Combine size={18} color="#2e8b57" /> Gộp Các Lô Nông Sản
+                  <Combine size={18} color="#278d49" /> Gộp Các Lô Nông Sản
                 </h3>
                 <button
                   className="modal-close-btn"

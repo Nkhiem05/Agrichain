@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Truck,
   PackageCheck,
-  MapPin,
   ClipboardCheck,
   Plus,
   Navigation,
@@ -25,6 +24,7 @@ import {
   Users,
   Pencil,
   Trash2,
+  MoreVertical,
 } from "lucide-react";
 import "../../css/donvivanchuyen.css";
 import BlockchainPanel from "../blockchainpannel";
@@ -49,7 +49,7 @@ const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
 const STATUS_LABEL = {
-  CHO_CHAP_NHAN: { text: "Chờ chấp nhận", tone: "purple", icon: Clock },
+  CHO_CHAP_NHAN: { text: "Chờ chấp nhận", tone: "amber", icon: Clock },
   CHO_LAY_HANG: { text: "Chờ lấy hàng", tone: "amber", icon: PackageSearch },
   DANG_VAN_CHUYEN: { text: "Đang vận chuyển", tone: "blue", icon: Navigation },
   CHO_TIEP_NHAN: {
@@ -66,8 +66,6 @@ const formatWeight = (value, unit) => {
   const num = Number(value);
   if (!Number.isFinite(num)) return `- ${unit || ""}`;
 
-  // Lưu trữ luôn theo kg; hiển thị tự quy đổi sang Tấn khi đạt 1.000kg trở lên
-  // cho dễ đọc (vd: 3500 -> "3,5 Tấn"), dưới mức đó vẫn hiện kg (vd: "900 kg").
   if ((unit || "").toLowerCase() === "kg" && num >= 1000) {
     const tons = num / 1000;
     return `${tons.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} Tấn`;
@@ -79,7 +77,6 @@ const formatWeight = (value, unit) => {
 const tripRoute = (t) =>
   `${t.ten_nguoi_gui || "—"} ➔ ${t.ten_ben_nhan || t.dia_chi_giao_hang || "—"}`;
 
-// Bước vận chuyển đã bấm nhưng còn chờ ký: chuyến giữ nguyên bước cũ cho tới khi ký xong
 const TEN_CHO_KY = {
   LAY_HANG: "Chờ ký lấy hàng",
   DEN_NOI: "Chờ ký đến nơi",
@@ -127,13 +124,15 @@ export default function AgriChainLogistics() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Dropdown menu của từng thẻ chuyến xe
+  const [openDropdown, setOpenDropdown] = useState(null);
+
   const [acceptModalTrip, setAcceptModalTrip] = useState(null);
   const [acceptForm, setAcceptForm] = useState({
     ma_tai_xe: "",
     ma_phuong_tien: "",
   });
 
-  // Danh sách tài xế & phương tiện của đơn vị (chọn khi chấp nhận chuyến, quản lý ở tab riêng)
   const [drivers, setDrivers] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [driverForm, setDriverForm] = useState(EMPTY_DRIVER);
@@ -163,6 +162,24 @@ export default function AgriChainLogistics() {
     }
   }, [navigate]);
 
+  // Đóng dropdown khi nhấp chuột ra ngoài
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest(".dropdown-container")) {
+        setOpenDropdown(null);
+      }
+    };
+    document.addEventListener("click", handleClickOutside);
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, []);
+
+  const handleToggleMenu = (e, maVanDon) => {
+    e.stopPropagation();
+    setOpenDropdown((prev) => (prev === maVanDon ? null : maVanDon));
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -186,7 +203,6 @@ export default function AgriChainLogistics() {
     if (user) loadTrips();
   }, [user, loadTrips]);
 
-  // Tải lại danh sách không hiện màn hình "Đang tải" (dùng khi chờ giao dịch được xác nhận)
   const taiLaiNgam = useCallback(async () => {
     try {
       const res = await fetchMyTrips();
@@ -196,7 +212,25 @@ export default function AgriChainLogistics() {
     }
   }, []);
 
-  // Có chuyến đã bấm bước nhưng còn chờ ký / chờ blockchain xác nhận: tự cập nhật để chuyến chuyển bước khi ký xong
+  useEffect(() => {
+    if (user && currentTab !== "blockchain") taiLaiNgam();
+  }, [currentTab, user, taiLaiNgam]);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    const lamMoi = () => {
+      if (document.visibilityState === "visible") taiLaiNgam();
+    };
+    window.addEventListener("focus", lamMoi);
+    document.addEventListener("visibilitychange", lamMoi);
+    const timer = setInterval(lamMoi, 10000);
+    return () => {
+      window.removeEventListener("focus", lamMoi);
+      document.removeEventListener("visibilitychange", lamMoi);
+      clearInterval(timer);
+    };
+  }, [user, taiLaiNgam]);
+
   const coChuyenChoKy = trips.some((t) => t.cho_ky);
   useEffect(() => {
     if (!coChuyenChoKy) return undefined;
@@ -204,8 +238,6 @@ export default function AgriChainLogistics() {
     return () => clearInterval(timer);
   }, [coChuyenChoKy, taiLaiNgam]);
 
-  // Mở MetaMask để đơn vị vận chuyển ký sự kiện của bước vừa bấm. Chuyến chỉ chuyển sang bước tiếp theo SAU KHI ký xong;
-  // chưa ký được (từ chối, thiếu điều kiện...) thì chuyến giữ nguyên và bấm lại nút để ký lại.
   const kySauThaoTac = async (loiBao) => {
     try {
       const kq = await kyCacSuKienDangCho();
@@ -231,11 +263,10 @@ export default function AgriChainLogistics() {
     await loadTrips();
   };
 
-  // Bước chỉ làm được sau khi bên gửi đã ký lệnh vận chuyển lên blockchain
   const chanNeuBenGuiChuaKy = (trip) => {
     if (!trip.chua_ky_lenh) return false;
     alert(
-      `Bên gửi (${trip.ten_nguoi_gui || "—"}) chưa ký lệnh vận chuyển ${trip.ma_van_don} lên blockchain.\nHãy chờ bên gửi ký xong rồi mới thực hiện bước này.${
+      `Bên gửi (${trip.ten_nguoi_gui || "—"}) chưa ký xác nhận lấy hàng đi cho chuyến ${trip.ma_van_don} lên blockchain.\nHãy chờ bên gửi ký xong rồi mới bấm lấy hàng đi.${
         trip.ly_do_chua_ky_lenh ? `\n\n${trip.ly_do_chua_ky_lenh}` : ""
       }`,
     );
@@ -365,7 +396,7 @@ export default function AgriChainLogistics() {
   // ==================== CHẤP NHẬN / TỪ CHỐI ====================
 
   const handleOpenAccept = async (trip) => {
-    if (chanNeuBenGuiChuaKy(trip)) return;
+    setOpenDropdown(null);
     const ds = await loadFleet();
     if (!ds) return;
     if (ds.drivers.length === 0 || ds.vehicles.length === 0) {
@@ -405,9 +436,8 @@ export default function AgriChainLogistics() {
   };
 
   const handleOpenReject = async (trip) => {
-    if (chanNeuBenGuiChuaKy(trip)) return;
+    setOpenDropdown(null);
     if (trip.cho_ky === "TU_CHOI") {
-      // Đã gửi yêu cầu từ chối trước đó nhưng chưa ký: ký lại
       await kySauThaoTac(`Chuyến ${trip.ma_van_don} đang chờ ký từ chối.`);
       return;
     }
@@ -438,9 +468,21 @@ export default function AgriChainLogistics() {
   // ==================== LẤY HÀNG ====================
 
   const handleOpenPickup = async (trip) => {
-    if (chanNeuBenGuiChuaKy(trip)) return;
+    setOpenDropdown(null);
+    let hienTai = trip;
+    if (trip.chua_ky_lenh) {
+      try {
+        const res = await fetchMyTrips();
+        const ds = res?.data || [];
+        setTrips(ds);
+        hienTai = ds.find((t) => t.ma_van_don === trip.ma_van_don) || trip;
+      } catch {
+        /* giữ trạng thái đang có */
+      }
+    }
+    if (chanNeuBenGuiChuaKy(hienTai)) return;
+    trip = hienTai;
     if (trip.cho_ky === "LAY_HANG") {
-      // Đã gửi yêu cầu lấy hàng trước đó nhưng chưa ký: ký lại
       await kySauThaoTac(
         `Chuyến ${trip.ma_van_don} đang chờ ký xác nhận lấy hàng.`,
       );
@@ -471,8 +513,8 @@ export default function AgriChainLogistics() {
   // ==================== ĐẾN NƠI ====================
 
   const handleConfirmArrival = async (trip) => {
+    setOpenDropdown(null);
     if (trip.cho_ky === "DEN_NOI") {
-      // Đã gửi yêu cầu xác nhận đến nơi trước đó nhưng chưa ký: ký lại
       await kySauThaoTac(
         `Chuyến ${trip.ma_van_don} đang chờ ký xác nhận đến nơi.`,
       );
@@ -1166,16 +1208,20 @@ export default function AgriChainLogistics() {
                             STATUS_LABEL[trip.trang_thai] ||
                             STATUS_LABEL.CHO_CHAP_NHAN;
                           const StatusIcon = statusInfo.icon;
+                          const isMenuOpen = openDropdown === trip.ma_van_don;
 
                           return (
-                            <div key={trip.ma_van_don} className="trip-card">
+                            <div
+                              key={trip.ma_van_don}
+                              className={`trip-card ${isMenuOpen ? "has-open-menu" : ""}`}
+                            >
                               <div className="trip-card-left">
                                 <div
                                   className={`icon-avatar ${
                                     trip.trang_thai === "DANG_VAN_CHUYEN"
                                       ? "blue"
                                       : trip.trang_thai === "CHO_CHAP_NHAN"
-                                        ? "purple"
+                                        ? "amber"
                                         : trip.trang_thai === "CHO_TIEP_NHAN"
                                           ? "emerald"
                                           : "amber"
@@ -1241,61 +1287,98 @@ export default function AgriChainLogistics() {
                                       />
                                     )}
                                     {trip.chua_ky_lenh && (
-                                      <BadgeChoKy text="Chờ bên gửi ký lệnh" />
+                                      <BadgeChoKy text="Chờ bên gửi ký xác nhận lấy hàng đi" />
                                     )}
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="actions-vertical">
-                                <button
-                                  onClick={() => setDetailTrip(trip)}
-                                  className="btn-action-detail"
-                                >
-                                  <Eye size={15} />
-                                  <span>Xem chi tiết</span>
-                                </button>
-
-                                {trip.trang_thai === "CHO_CHAP_NHAN" && (
-                                  <>
-                                    <button
-                                      onClick={() => handleOpenAccept(trip)}
-                                      className="btn-primary"
-                                      style={{ backgroundColor: "#7c3aed" }}
-                                    >
-                                      <CheckCircle2 size={16} />
-                                      <span>Chấp nhận vận chuyển</span>
-                                    </button>
-                                    <button
-                                      onClick={() => handleOpenReject(trip)}
-                                      className="btn-secondary"
-                                      style={{ color: "#dc2626" }}
-                                    >
-                                      <XCircle size={16} />
-                                      <span>Từ chối</span>
-                                    </button>
-                                  </>
-                                )}
-
-                                {trip.trang_thai === "CHO_LAY_HANG" && (
+                              <div className="trip-card-actions">
+                                <div className="dropdown-container">
                                   <button
-                                    onClick={() => handleOpenPickup(trip)}
-                                    className="btn-primary"
+                                    type="button"
+                                    className="btn-more-dots"
+                                    title="Tùy chọn thao tác"
+                                    onClick={(e) =>
+                                      handleToggleMenu(e, trip.ma_van_don)
+                                    }
                                   >
-                                    <ArrowUpRight size={16} />
-                                    <span>Xác nhận lấy hàng đi</span>
+                                    <MoreVertical size={18} />
                                   </button>
-                                )}
 
-                                {trip.trang_thai === "DANG_VAN_CHUYEN" && (
-                                  <button
-                                    onClick={() => handleConfirmArrival(trip)}
-                                    className="btn-primary"
-                                  >
-                                    <CheckCircle size={14} />
-                                    <span>Xác nhận đã đến nơi</span>
-                                  </button>
-                                )}
+                                  {isMenuOpen && (
+                                    <div className="dropdown-menu">
+                                      <div
+                                        className="dropdown-item"
+                                        onClick={() => {
+                                          setOpenDropdown(null);
+                                          setDetailTrip(trip);
+                                        }}
+                                      >
+                                        <Eye size={15} />
+                                        <span>Xem chi tiết</span>
+                                      </div>
+
+                                      {trip.trang_thai === "CHO_CHAP_NHAN" && (
+                                        <>
+                                          <div className="dropdown-divider"></div>
+                                          <div
+                                            className="dropdown-item"
+                                            style={{ color: "#16a34a" }}
+                                            onClick={() =>
+                                              handleOpenAccept(trip)
+                                            }
+                                          >
+                                            <CheckCircle2 size={15} />
+                                            <span>Chấp nhận vận chuyển</span>
+                                          </div>
+                                          <div
+                                            className="dropdown-item danger"
+                                            onClick={() =>
+                                              handleOpenReject(trip)
+                                            }
+                                          >
+                                            <XCircle size={15} />
+                                            <span>Từ chối</span>
+                                          </div>
+                                        </>
+                                      )}
+
+                                      {trip.trang_thai === "CHO_LAY_HANG" && (
+                                        <>
+                                          <div className="dropdown-divider"></div>
+                                          <div
+                                            className="dropdown-item"
+                                            style={{ color: "#2563eb" }}
+                                            onClick={() =>
+                                              handleOpenPickup(trip)
+                                            }
+                                          >
+                                            <ArrowUpRight size={15} />
+                                            <span>Xác nhận lấy hàng đi</span>
+                                          </div>
+                                        </>
+                                      )}
+
+                                      {trip.trang_thai ===
+                                        "DANG_VAN_CHUYEN" && (
+                                        <>
+                                          <div className="dropdown-divider"></div>
+                                          <div
+                                            className="dropdown-item"
+                                            style={{ color: "#16a34a" }}
+                                            onClick={() =>
+                                              handleConfirmArrival(trip)
+                                            }
+                                          >
+                                            <CheckCircle size={15} />
+                                            <span>Xác nhận đã đến nơi</span>
+                                          </div>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           );
@@ -1362,7 +1445,7 @@ export default function AgriChainLogistics() {
                                   <BadgeChoKy text={TEN_CHO_KY[trip.cho_ky]} />
                                 )}
                                 {trip.chua_ky_lenh && (
-                                  <BadgeChoKy text="Chờ bên gửi ký lệnh" />
+                                  <BadgeChoKy text="Chờ bên gửi ký xác nhận lấy hàng đi" />
                                 )}
                               </p>
                             </div>
@@ -1556,7 +1639,7 @@ export default function AgriChainLogistics() {
             <div className="modal-content">
               <div className="modal-header">
                 <h3>
-                  <CheckCircle2 size={20} color="#2e8b57" /> Chấp Nhận Chuyến
+                  <CheckCircle2 size={20} color="#278d49" /> Chấp Nhận Chuyến
                   Vận Chuyển
                 </h3>
                 <button
@@ -1701,7 +1784,7 @@ export default function AgriChainLogistics() {
             <div className="modal-content">
               <div className="modal-header">
                 <h3>
-                  <PackageCheck size={20} color="#2e8b57" /> Xác Nhận Lấy Hàng
+                  <PackageCheck size={20} color="#278d49" /> Xác Nhận Lấy Hàng
                   Lên Xe
                 </h3>
                 <button

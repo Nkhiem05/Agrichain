@@ -168,21 +168,251 @@ const getIncomingShipments = async (req, res) => {
   }
 };
 
+/*
+==================================================
+QUẢN LÝ KHO CỦA NHÀ PHÂN PHỐI
+Bảng kho_phan_phoi tự tạo ở lần dùng đầu tiên (không cần chạy migration). CSDL gốc chỉ lưu tên kho dạng chữ trong
+lo_nong_san.vi_tri_luu_kho nên lúc tạo bảng lần đầu, các tên kho đã dùng ở các lô cũ được nhập sẵn vào danh sách.
+Nhập kho chỉ chọn kho trong danh sách này; tên kho được lưu vào lo_nong_san.vi_tri_luu_kho như trước nên màn hình
+Kho hàng, bộ lọc kho và phiếu xuất không đổi.
+==================================================
+*/
+
+let daBaoDamBangKho = null;
+
+const taoMaKho = async (executor) =>
+  generateCode(executor, "kho_phan_phoi", "ma_kho", "KHO", 3);
+
+const baoDamBangKho = () => {
+  if (!daBaoDamBangKho) {
+    daBaoDamBangKho = (async () => {
+      const [co] = await db.query(
+        `SELECT COUNT(*) AS c FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'kho_phan_phoi'`,
+      );
+      const daCoBang = Number(co[0].c) > 0;
+      await db.query(
+        `
+        CREATE TABLE IF NOT EXISTS kho_phan_phoi (
+          ma_kho varchar(32) NOT NULL,
+          ma_nha_phan_phoi varchar(50) NOT NULL COMMENT 'Nhà phân phối sở hữu kho',
+          ten_kho varchar(150) NOT NULL,
+          dia_chi varchar(255) DEFAULT NULL,
+          ghi_chu varchar(255) DEFAULT NULL,
+          created_at datetime NOT NULL DEFAULT current_timestamp(),
+          updated_at datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+          PRIMARY KEY (ma_kho),
+          UNIQUE KEY uq_kho_ten (ma_nha_phan_phoi, ten_kho)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        `,
+      );
+      if (!daCoBang) {
+        try {
+          const [cu] = await db.query(
+            `
+            SELECT DISTINCT ma_nguoi_quan_ly AS ma_npp, TRIM(vi_tri_luu_kho) AS ten
+            FROM lo_nong_san
+            WHERE vi_tri_luu_kho IS NOT NULL AND TRIM(vi_tri_luu_kho) <> ''
+              AND ma_nguoi_quan_ly IN (SELECT ma_nguoi_dung FROM nguoi_dung WHERE vai_tro = 'DISTRIBUTOR')
+            ORDER BY ma_nguoi_quan_ly, ten
+            `,
+          );
+          for (const r of cu) {
+            await db.query(
+              `INSERT IGNORE INTO kho_phan_phoi (ma_kho, ma_nha_phan_phoi, ten_kho) VALUES (?, ?, ?)`,
+              [await taoMaKho(db), r.ma_npp, r.ten],
+            );
+          }
+        } catch (err) {
+          console.error(
+            "Không nhập được các kho có sẵn từ lô cũ:",
+            err.message,
+          );
+        }
+      }
+    })().catch((err) => {
+      daBaoDamBangKho = null; // lần sau thử lại
+      throw err;
+    });
+  }
+  return daBaoDamBangKho;
+};
+
+const docThongTinKho = (body) => {
+  const ten = cleanText(body?.ten_kho);
+  const diaChi = cleanText(body?.dia_chi);
+  const ghiChu = cleanText(body?.ghi_chu);
+  if (!ten) throw new ApiError(400, "Vui lòng nhập tên kho");
+  if (ten.length > 150) throw new ApiError(400, "Tên kho tối đa 150 ký tự");
+  if (diaChi && diaChi.length > 255)
+    throw new ApiError(400, "Địa chỉ kho tối đa 255 ký tự");
+  if (ghiChu && ghiChu.length > 255)
+    throw new ApiError(400, "Ghi chú tối đa 255 ký tự");
+  return { ten, diaChi, ghiChu };
+};
+
+const getWarehouses = async (req, res) => {
+  try {
+    const maNpp = getDistributorId(req);
+    await baoDamBangKho();
+    const [rows] = await db.query(
+      `
+      SELECT k.ma_kho, k.ten_kho, k.dia_chi, k.ghi_chu,
+             (SELECT COUNT(*) FROM lo_nong_san lo
+               WHERE lo.ma_nguoi_quan_ly = k.ma_nha_phan_phoi AND lo.vi_tri_luu_kho = k.ten_kho
+                 AND lo.tinh_trang_su_dung = 'ACTIVE' AND lo.so_luong_hien_tai > 0) AS so_lo,
+             (SELECT COALESCE(SUM(lo.so_luong_hien_tai), 0) FROM lo_nong_san lo
+               WHERE lo.ma_nguoi_quan_ly = k.ma_nha_phan_phoi AND lo.vi_tri_luu_kho = k.ten_kho
+                 AND lo.tinh_trang_su_dung = 'ACTIVE' AND lo.so_luong_hien_tai > 0) AS tong_khoi_luong
+      FROM kho_phan_phoi k
+      WHERE k.ma_nha_phan_phoi = ?
+      ORDER BY k.ten_kho ASC
+      `,
+      [maNpp],
+    );
+    return res.json({ success: true, data: rows });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi lấy danh sách kho:",
+      "Không thể lấy danh sách kho",
+    );
+  }
+};
+
+const createWarehouse = async (req, res) => {
+  try {
+    const maNpp = getDistributorId(req);
+    await baoDamBangKho();
+    const t = docThongTinKho(req.body);
+
+    let ma;
+    for (let lan = 1; ; lan++) {
+      try {
+        ma = await taoMaKho(db);
+        await db.query(
+          `INSERT INTO kho_phan_phoi (ma_kho, ma_nha_phan_phoi, ten_kho, dia_chi, ghi_chu) VALUES (?, ?, ?, ?, ?)`,
+          [ma, maNpp, t.ten, t.diaChi, t.ghiChu],
+        );
+        break;
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY" && /uq_kho_ten/.test(err.message)) {
+          throw new ApiError(409, `Kho "${t.ten}" đã có trong danh sách`);
+        }
+        if (err.code === "ER_DUP_ENTRY" && lan < 3) continue;
+        throw err;
+      }
+    }
+    return res
+      .status(201)
+      .json({ success: true, message: "Đã tạo kho", data: { ma_kho: ma } });
+  } catch (err) {
+    return sendError(res, err, "Lỗi tạo kho:", "Không thể tạo kho");
+  }
+};
+
+const updateWarehouse = async (req, res) => {
+  const { maKho } = req.params;
+  try {
+    const maNpp = getDistributorId(req);
+    await baoDamBangKho();
+    const t = docThongTinKho(req.body);
+
+    await withTransaction(async (connection) => {
+      const [rows] = await connection.query(
+        `SELECT ten_kho FROM kho_phan_phoi WHERE ma_kho = ? AND ma_nha_phan_phoi = ? LIMIT 1 FOR UPDATE`,
+        [maKho, maNpp],
+      );
+      if (rows.length === 0) throw new ApiError(404, "Không tìm thấy kho");
+      try {
+        await connection.query(
+          `UPDATE kho_phan_phoi SET ten_kho = ?, dia_chi = ?, ghi_chu = ? WHERE ma_kho = ?`,
+          [t.ten, t.diaChi, t.ghiChu, maKho],
+        );
+      } catch (err) {
+        if (err.code === "ER_DUP_ENTRY")
+          throw new ApiError(409, `Kho "${t.ten}" đã có trong danh sách`);
+        throw err;
+      }
+      // Đổi tên kho thì các lô đang lưu ở kho đó đổi theo (tên kho được lưu trong từng lô)
+      if (rows[0].ten_kho !== t.ten) {
+        await connection.query(
+          `UPDATE lo_nong_san SET vi_tri_luu_kho = ? WHERE ma_nguoi_quan_ly = ? AND vi_tri_luu_kho = ?`,
+          [t.ten, maNpp, rows[0].ten_kho],
+        );
+      }
+    });
+    return res.json({ success: true, message: "Đã cập nhật kho" });
+  } catch (err) {
+    return sendError(res, err, "Lỗi sửa kho:", "Không thể cập nhật kho");
+  }
+};
+
+const deleteWarehouse = async (req, res) => {
+  const { maKho } = req.params;
+  try {
+    const maNpp = getDistributorId(req);
+    await baoDamBangKho();
+    const [rows] = await db.query(
+      `SELECT ten_kho FROM kho_phan_phoi WHERE ma_kho = ? AND ma_nha_phan_phoi = ? LIMIT 1`,
+      [maKho, maNpp],
+    );
+    if (rows.length === 0) throw new ApiError(404, "Không tìm thấy kho");
+    const [lo] = await db.query(
+      `
+      SELECT COUNT(*) AS c FROM lo_nong_san
+      WHERE ma_nguoi_quan_ly = ? AND vi_tri_luu_kho = ? AND tinh_trang_su_dung = 'ACTIVE' AND so_luong_hien_tai > 0
+      `,
+      [maNpp, rows[0].ten_kho],
+    );
+    if (Number(lo[0].c) > 0) {
+      throw new ApiError(
+        409,
+        `Kho đang chứa ${lo[0].c} lô hàng, hãy xuất hết hàng khỏi kho trước khi xóa`,
+      );
+    }
+    await db.query(
+      `DELETE FROM kho_phan_phoi WHERE ma_kho = ? AND ma_nha_phan_phoi = ?`,
+      [maKho, maNpp],
+    );
+    return res.json({ success: true, message: "Đã xóa kho" });
+  } catch (err) {
+    return sendError(res, err, "Lỗi xóa kho:", "Không thể xóa kho");
+  }
+};
+
 const confirmReceive = async (req, res) => {
   const { maVanDon } = req.params;
 
   try {
     const maNpp = getDistributorId(req);
     const khoiLuongThucTe = toPositiveNumber(req.body?.khoi_luong_thuc_te);
-    const viTriKho = cleanText(req.body?.vi_tri_luu_kho);
+    const maKho = cleanText(req.body?.ma_kho);
+    const tenKhoGui = cleanText(req.body?.vi_tri_luu_kho);
     const hanLuuKho = cleanText(req.body?.han_luu_kho);
 
     if (!khoiLuongThucTe) {
       throw new ApiError(400, "Vui lòng nhập khối lượng cân thực tế hợp lệ");
     }
-    if (!viTriKho) {
-      throw new ApiError(400, "Vui lòng nhập vị trí lưu kho");
+    if (!maKho && !tenKhoGui) {
+      throw new ApiError(400, "Vui lòng chọn kho lưu hàng");
     }
+
+    // Kho phải là kho đã tạo ở mục Quản lý kho của chính nhà phân phối này
+    await baoDamBangKho();
+    const [khoRows] = await db.query(
+      maKho
+        ? `SELECT ten_kho FROM kho_phan_phoi WHERE ma_kho = ? AND ma_nha_phan_phoi = ? LIMIT 1`
+        : `SELECT ten_kho FROM kho_phan_phoi WHERE ten_kho = ? AND ma_nha_phan_phoi = ? LIMIT 1`,
+      [maKho || tenKhoGui, maNpp],
+    );
+    if (khoRows.length === 0) {
+      throw new ApiError(
+        400,
+        'Kho không có trong danh sách. Hãy tạo kho ở mục "Quản lý kho" rồi chọn kho đó',
+      );
+    }
+    const viTriKho = khoRows[0].ten_kho;
 
     await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
@@ -1064,13 +1294,11 @@ const createDealer = async (req, res) => {
       return newCode;
     });
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Đã thêm đại lý mới",
-        data: { ma_dai_ly: maDaiLy },
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Đã thêm đại lý mới",
+      data: { ma_dai_ly: maDaiLy },
+    });
   } catch (err) {
     return sendError(res, err, "Lỗi thêm đại lý:", "Không thể thêm đại lý");
   }
@@ -1197,6 +1425,10 @@ const getDealerHistory = async (req, res) => {
 };
 
 module.exports = {
+  getWarehouses,
+  createWarehouse,
+  updateWarehouse,
+  deleteWarehouse,
   getIncomingShipments,
   confirmReceive,
   rejectReceive,

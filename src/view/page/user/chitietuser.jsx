@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import QRCode from "qrcode";
 import {
   Sprout,
   Award,
@@ -9,17 +10,23 @@ import {
   ShieldCheck,
   AlertCircle,
   Loader2,
+  Maximize2,
 } from "lucide-react";
 import "../../css/chitietuser.css";
 import { fetchChiTietUser } from "../../../api/chitietuserApi";
-import {
-  ChuoiKhoiBadge,
-  ChuoiKhoiChip,
-  XacThucBlockchainCard,
-} from "../xacthucblockchain";
+import { ChuoiKhoiChip, XacThucBlockchainCard } from "../xacthucblockchain";
 
-const DEFAULT_LOGO_IMG =
-  "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
+// Địa chỉ gốc của website ghi trong mã QR (dùng chung với trang chi tiết lô: cùng khóa lưu trong trình duyệt).
+// Mặc định là địa chỉ đang mở trang; điện thoại quét được thì địa chỉ này phải truy cập được từ điện thoại
+// (IP máy tính trong mạng LAN hoặc tên miền), không dùng localhost.
+const KHOA_DIA_CHI = "agrichain_dia_chi_qr";
+const layDiaChiGoc = () => {
+  try {
+    return localStorage.getItem(KHOA_DIA_CHI) || window.location.origin;
+  } catch {
+    return window.location.origin;
+  }
+};
 
 const formatDate = (dateStr) => {
   if (!dateStr) return "Chưa cập nhật";
@@ -39,6 +46,53 @@ const TraceDetailPage = ({ onBack }) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [diaChiGoc, setDiaChiGoc] = useState(layDiaChiGoc);
+  const [anhQr, setAnhQr] = useState("");
+  const [showQrModal, setShowQrModal] = useState(false);
+
+  // Mã QR của chính trang này: quét bằng điện thoại sẽ mở đúng trang truy xuất của lô
+  const diaChiSach = diaChiGoc.trim().replace(/\/+$/, "");
+  const lienKet = useMemo(
+    () =>
+      `${diaChiSach}/chi-tiet-user?malohang=${encodeURIComponent(currentBatchCode)}`,
+    [diaChiSach, currentBatchCode],
+  );
+  const dangDungLocalhost = /\/\/(localhost|127\.0\.0\.1)/i.test(diaChiSach);
+
+  useEffect(() => {
+    if (!currentBatchCode || !/^https?:\/\//i.test(diaChiSach)) {
+      setAnhQr("");
+      return undefined;
+    }
+    let huy = false;
+    QRCode.toDataURL(lienKet, {
+      width: 512,
+      margin: 1,
+      errorCorrectionLevel: "M",
+    })
+      .then((url) => !huy && setAnhQr(url))
+      .catch(() => !huy && setAnhQr(""));
+    return () => {
+      huy = true;
+    };
+  }, [lienKet, currentBatchCode, diaChiSach]);
+
+  const doiDiaChi = () => {
+    const v = window.prompt(
+      "Nhập địa chỉ website mà điện thoại truy cập được (ví dụ http://192.168.1.10:5173):",
+      diaChiSach,
+    );
+    if (v && /^https?:\/\/\S+$/i.test(v.trim())) {
+      setDiaChiGoc(v.trim());
+      try {
+        localStorage.setItem(KHOA_DIA_CHI, v.trim());
+      } catch {
+        /* không lưu được thì thôi */
+      }
+    } else if (v) {
+      alert("Địa chỉ phải bắt đầu bằng http:// hoặc https://");
+    }
+  };
 
   const handleBack = () => {
     if (onBack) {
@@ -114,33 +168,27 @@ const TraceDetailPage = ({ onBack }) => {
 
   return (
     <div className="trace-page">
-      {/* HEADER */}
-      <header className="dashboard-header">
-        <div className="header-left" onClick={handleBack}>
-          <img src={DEFAULT_LOGO_IMG} alt="Logo" className="header-logo-icon" />
-          <div>
-            <span className="header-brand-title">AGRICHAIN</span>
-          </div>
-        </div>
-
-        {/* Trạng thái đối chiếu blockchain thật của lô */}
-        <ChuoiKhoiBadge maLo={batch?.ma_lo_nong_san || currentBatchCode} />
-      </header>
-
       {/* CHI TIẾT SẢN PHẨM TRUY XUẤT */}
       <div className="detail-container">
         <div className="back-bar">
-          <button className="back-btn" onClick={handleBack}>
-            <ArrowLeft size={16} /> Quay lại màn hình quét
+          <button className="back-btn" onClick={handleBack} title="Quay lại">
+            <ArrowLeft size={15} />
+            <span>Quay lại trang trước</span>
           </button>
-          <ChuoiKhoiChip maLo={batch?.ma_lo_nong_san || currentBatchCode} />
         </div>
 
         <div className="detail-grid">
           {/* THÔNG TIN CHUNG & BLOCKCHAIN */}
           <div className="info-column">
             <div className="timeline-box">
-              <span className="batch-code-label">#{batch?.ma_lo_nong_san}</span>
+              <div className="batch-code-row">
+                <span className="batch-code-label">
+                  #{batch?.ma_lo_nong_san}
+                </span>
+                <ChuoiKhoiChip
+                  maLo={batch?.ma_lo_nong_san || currentBatchCode}
+                />
+              </div>
               <h2 className="batch-product-title">{batch?.ten_san_pham}</h2>
               <p className="batch-description">
                 {batch?.mo_ta_san_pham ||
@@ -178,14 +226,60 @@ const TraceDetailPage = ({ onBack }) => {
             </div>
 
             {/* Xác thực thật: đối chiếu dữ liệu với blockchain, từng bước kèm người ký và giao dịch */}
-            <XacThucBlockchainCard maLo={batch?.ma_lo_nong_san || currentBatchCode} />
+            <XacThucBlockchainCard
+              maLo={batch?.ma_lo_nong_san || currentBatchCode}
+            />
           </div>
 
           {/* DÒNG ĐỜI SẢN PHẨM */}
           <div className="timeline-box">
-            <h3 className="timeline-header-title">
-              Hồ Sơ Dòng Đời Sản Phẩm Minh Bạch
-            </h3>
+            <div className="timeline-title-row">
+              <h3 className="timeline-header-title">
+                Hồ Sơ Dòng Đời Sản Phẩm Minh Bạch
+              </h3>
+
+              {/* Mã QR của trang này (giống trang chi tiết mùa vụ): bấm để phóng to */}
+              {anhQr && (
+                <div className="trace-qr-wrap">
+                  <div
+                    className="trace-qr-box"
+                    onClick={() => setShowQrModal(true)}
+                    title="Bấm vào để phóng to mã QR và quét"
+                  >
+                    <img
+                      src={anhQr}
+                      alt={`Mã QR lô ${currentBatchCode}`}
+                      className="trace-qr-img"
+                    />
+                    <div className="trace-qr-text">
+                      <span className="trace-qr-cap">
+                        QR Truy xuất nguồn gốc
+                      </span>
+                      <span className="trace-qr-code">
+                        {batch?.ma_lo_nong_san || currentBatchCode}
+                      </span>
+                      <button
+                        type="button"
+                        className="trace-qr-zoom"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowQrModal(true);
+                        }}
+                      >
+                        <Maximize2 size={13} /> Phóng to để quét
+                      </button>
+                    </div>
+                  </div>
+                  {dangDungLocalhost && (
+                    <button
+                      type="button"
+                      className="trace-qr-doi"
+                      onClick={doiDiaChi}
+                    ></button>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="timeline-vertical">
               {/* 1. Nông Trại */}
@@ -356,6 +450,62 @@ const TraceDetailPage = ({ onBack }) => {
           </div>
         </div>
       </div>
+
+      {/* POPUP PHÓNG TO MÃ QR ĐỂ QUÉT */}
+      {showQrModal && anhQr && (
+        <div
+          className="trace-modal-overlay"
+          onClick={() => setShowQrModal(false)}
+        >
+          <div className="trace-qr-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="trace-qr-modal-header">
+              <h3>Mã QR Lô Nông Sản</h3>
+              <button
+                type="button"
+                className="trace-qr-modal-x"
+                onClick={() => setShowQrModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="trace-qr-modal-body">
+              <div className="trace-qr-frame">
+                <img
+                  src={anhQr}
+                  alt={`Mã QR lô ${currentBatchCode}`}
+                  className="trace-qr-large"
+                />
+              </div>
+              <div className="trace-qr-modal-batch">
+                Mã lô: #{batch?.ma_lo_nong_san || currentBatchCode}
+              </div>
+              <p className="trace-qr-modal-desc">
+                Sử dụng camera điện thoại hoặc thiết bị quét QR để truy xuất
+                thông tin nhật ký nguồn gốc nông sản
+              </p>
+            </div>
+
+            <div className="trace-qr-modal-footer">
+              <button
+                type="button"
+                className="trace-qr-btn-close"
+                onClick={() => setShowQrModal(false)}
+              >
+                Đóng
+              </button>
+              <a
+                href={lienKet}
+                target="_blank"
+                rel="noreferrer"
+                className="trace-qr-btn-link"
+              >
+                Xem trang liên kết
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -314,7 +314,7 @@
 
   .soche-dashboard .btn-primary-action {
     height: 40px;
-    background-color: #2e8b57;
+    background-color: #278d49;
     color: #ffffff;
     border: none;
     border-radius: 8px;
@@ -329,7 +329,7 @@
   }
 
   .soche-dashboard .btn-primary-action:hover {
-    background-color: #257247;
+    background-color: #20733b;
   }
 
   .soche-dashboard .btn-secondary-action {
@@ -394,8 +394,8 @@
   .soche-dashboard .form-group select:focus,
   .soche-dashboard .form-group input:focus,
   .soche-dashboard .form-group textarea:focus {
-    border-color: #2e8b57;
-    box-shadow: 0 0 0 3px rgba(46, 139, 87, 0.15);
+    border-color: #278d49;
+    box-shadow: 0 0 0 3px rgba(39, 141, 73, 0.15);
     background-color: #ffffff;
   }
 
@@ -417,7 +417,16 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
     position: relative;
     align-items: flex-start;
+    justify-content: space-between;
     width: 100%;
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .soche-dashboard .card-item:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   }
 
   .soche-dashboard .card-icon-box {
@@ -461,7 +470,7 @@
   }
 
   .soche-dashboard .card-title {
-    font-size: 16.5px;
+    font-size: 17px;
     font-weight: 700;
     color: #111827;
   }
@@ -475,19 +484,19 @@
   }
 
   .soche-dashboard .tag-badge.green {
-    background-color: #86efac;
-    color: #065f46;
+    background-color: #dcfce7;
+    color: #166534;
   }
 
   .soche-dashboard .tag-badge.gray {
-    background-color: #cbd5e1;
-    color: #334155;
+    background-color: #e2e8f0;
+    color: #475569;
   }
 
   .soche-dashboard .card-meta-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 20px;
+    gap: 8px 24px;
     font-size: 13px;
     color: #4b5563;
     margin-bottom: 8px;
@@ -495,6 +504,11 @@
 
   .soche-dashboard .card-meta-row strong {
     color: #111827;
+  }
+
+  .soche-dashboard .card-meta-row .highlight-weight {
+    color: #047857;
+    font-weight: 700;
   }
 
   .soche-dashboard .card-desc {
@@ -518,80 +532,14 @@
     color: #1d4ed8;
     padding: 4px 10px;
     border-radius: 6px;
-    font-size: 11.5px;
+    font-size: 12px;
     font-weight: 600;
-    margin: 6px 0 12px 0;
+    margin: 6px 0 10px 0;
   }
 
   .soche-dashboard .arrival-banner svg {
-    width: 13px;
-    height: 13px;
-  }
-
-  /* ================= TIMELINE VẬN CHUYỂN ================= */
-  .soche-dashboard .shipping-timeline {
-    display: flex;
-    align-items: center;
-    margin-top: 10px;
-    padding: 10px 14px;
-    background: #f8fafc;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    overflow-x: auto;
-  }
-
-  .soche-dashboard .timeline-step {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #94a3b8;
-    white-space: nowrap;
-  }
-
-  .soche-dashboard .timeline-step.completed {
-    color: #059669;
-    font-weight: 600;
-  }
-
-  .soche-dashboard .timeline-step.active {
-    color: #2563eb;
-    font-weight: 700;
-  }
-
-  .soche-dashboard .timeline-dot {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background-color: #e2e8f0;
-    color: #64748b;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: bold;
-  }
-
-  .soche-dashboard .timeline-step.completed .timeline-dot {
-    background-color: #10b981;
-    color: white;
-  }
-
-  .soche-dashboard .timeline-step.active .timeline-dot {
-    background-color: #3b82f6;
-    color: white;
-  }
-
-  .soche-dashboard .timeline-connector {
-    flex: 1;
-    height: 2px;
-    background-color: #cbd5e1;
-    min-width: 24px;
-    margin: 0 10px;
-  }
-
-  .soche-dashboard .timeline-connector.filled {
-    background-color: #10b981;
+    width: 14px;
+    height: 14px;
   }
 
   /* Badge trạng thái */
@@ -599,7 +547,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 12px;
+    padding: 4px 12px;
     border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
@@ -616,8 +564,9 @@
   }
 
   .soche-dashboard .badge-status-line.purple {
-    background-color: #e0e7ff;
-    color: #4338ca;
+    background-color: #f5f3ff;
+    border: 1px solid #ddd6fe;
+    color: #6d28d9;
   }
 
   .soche-dashboard .badge-status-line.danger {
@@ -627,7 +576,8 @@
 
   .soche-dashboard .badge-status-line.success {
     background-color: #dcfce7;
-    color: #166534;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
   }
 
   /* ================= NÚT THAO TÁC TIẾP NHẬN ================= */
@@ -638,10 +588,56 @@
     flex-shrink: 0;
   }
 
+  .soche-dashboard .btn-receive {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: 1px solid #278d49;
+    background-color: #278d49;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(39, 141, 73, 0.2);
+  }
+
+  .soche-dashboard .btn-receive:hover {
+    background-color: #20733b;
+    border-color: #20733b;
+  }
+
+  .soche-dashboard .btn-reject {
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 8px;
+    border: 1px solid #fecaca;
+    background-color: #fef2f2;
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .soche-dashboard .btn-reject:hover {
+    background-color: #fee2e2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+  }
+
   .soche-dashboard .btn-action-outline {
-    height: 36px;
+    height: 38px;
     padding: 0 14px;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 1px solid #a7f3d0;
     background-color: #ecfdf5;
     color: #065f46;
@@ -936,7 +932,7 @@
   }
 
   .soche-dashboard .btn-save {
-    background-color: #2e8b57;
+    background-color: #278d49;
     color: #ffffff;
     border: none;
     padding: 8px 18px;
@@ -946,8 +942,16 @@
     cursor: pointer;
   }
 
+  .soche-dashboard .btn-save:hover {
+    background-color: #20733b;
+  }
+
   .soche-dashboard .btn-save.danger {
     background-color: #dc2626;
+  }
+
+  .soche-dashboard .btn-save.danger:hover {
+    background-color: #b91c1c;
   }
 
   /* Subtab box & Logs */

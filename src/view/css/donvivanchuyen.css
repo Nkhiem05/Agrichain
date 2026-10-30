@@ -3,8 +3,8 @@
   --bg-app: #f8faf9;
   --bg-sidebar: #f0f2f1;
   --header-green: #278d49;
-  --primary-green: #2e8b57;
-  --primary-hover: #257247;
+  --primary-green: #278d49;
+  --primary-hover: #20733b;
   --active-tab-bg: #67ac7d;
   --card-metric-bg: #f1f6fd;
   --border-color: #e5e7eb;
@@ -22,7 +22,7 @@
   user-select: none;
 }
 
-/* Reset phải đặt TRƯỚC các rule khác (cùng độ ưu tiên, rule sau thắng) */
+/* Reset phải đặt TRƯỚC các rule khác */
 .vanchuyen *,
 .vanchuyen *::before,
 .vanchuyen *::after {
@@ -293,7 +293,7 @@
 }
 .vanchuyen .btn-primary-action {
   height: 42px;
-  background-color: #2e8b57;
+  background-color: #278d49;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -307,7 +307,7 @@
   transition: background 0.2s;
 }
 .vanchuyen .btn-primary-action:hover {
-  background-color: #257247;
+  background-color: #20733b;
 }
 
 /* ========== LIST ========== */
@@ -345,14 +345,22 @@
   justify-content: space-between;
   transition: border-color 0.2s;
   flex-shrink: 0;
+  position: relative;
 }
 .vanchuyen .trip-card:hover {
   border-color: #cbd5e1;
 }
+
+/* Thẻ đang mở menu dropdown sẽ nổi lên trên để không bị che */
+.vanchuyen .trip-card.has-open-menu {
+  z-index: 50;
+}
+
 .vanchuyen .trip-card-left {
   display: flex;
   align-items: flex-start;
   gap: 20px;
+  flex: 1;
 }
 .vanchuyen .icon-avatar {
   width: 60px;
@@ -372,11 +380,6 @@
   background-color: #fffbeb;
   border: 1px solid #fde68a;
   color: #d97706;
-}
-.vanchuyen .icon-avatar.purple {
-  background-color: #f5f3ff;
-  border: 1px solid #ddd6fe;
-  color: #7c3aed;
 }
 .vanchuyen .icon-avatar.emerald {
   background-color: #ecfdf5;
@@ -433,27 +436,9 @@
   font-weight: 600;
   color: #047857;
 }
-.vanchuyen .trip-meta-row .highlight-temp {
-  font-weight: 600;
-  color: #2563eb;
-  font-family: monospace;
-}
-
-.vanchuyen .trip-location-note {
-  font-size: 12.5px;
-  color: #4b5563;
-}
-.vanchuyen .trip-location-note p:first-child {
-  font-weight: 600;
-  color: #374151;
-}
-.vanchuyen .trip-location-note p:last-child {
-  color: #6b7280;
-}
 
 .vanchuyen .status-badge-blue,
 .vanchuyen .status-badge-amber,
-.vanchuyen .status-badge-purple,
 .vanchuyen .status-badge-emerald,
 .vanchuyen .status-badge-success,
 .vanchuyen .status-badge-danger {
@@ -471,10 +456,6 @@
   background-color: #fef3c7;
   color: #92400e;
 }
-.vanchuyen .status-badge-purple {
-  background-color: #ede9fe;
-  color: #5b21b6;
-}
 .vanchuyen .status-badge-emerald {
   background-color: #d1fae5;
   color: #065f46;
@@ -488,14 +469,125 @@
   color: #b91c1c;
 }
 
-/* ========== BUTTONS ========== */
-.vanchuyen .actions-vertical {
+/* ========== NÚT 3 CHẤM & DROPDOWN MENU THEO STYLE NÔNG DÂN ========== */
+.vanchuyen .trip-card-actions {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  margin-left: 16px;
   flex-shrink: 0;
-  min-width: 170px;
 }
+
+.vanchuyen .btn-more-dots {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.vanchuyen .btn-more-dots:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+.vanchuyen .btn-more-dots:active {
+  transform: scale(0.94);
+}
+
+.vanchuyen .dropdown-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vanchuyen .dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 9999 !important;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.15),
+    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  min-width: 195px;
+  padding: 6px 0;
+  animation: vc-fadeInDropdown 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top right;
+}
+
+.vanchuyen .dropdown-menu::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  background-color: #ffffff;
+  transform: rotate(45deg);
+  border-top: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
+}
+
+.vanchuyen .dropdown-item {
+  padding: 9px 16px;
+  font-size: 13.5px;
+  color: #334155;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+  text-align: left;
+  font-weight: 500;
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  white-space: nowrap;
+}
+
+.vanchuyen .dropdown-item:hover {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+.vanchuyen .dropdown-item.danger {
+  color: #dc2626;
+}
+
+.vanchuyen .dropdown-item.danger:hover {
+  background-color: #fef2f2;
+  color: #b91c1c;
+}
+
+.vanchuyen .dropdown-divider {
+  height: 1px;
+  background-color: #f1f5f9;
+  margin: 4px 0;
+}
+
+@keyframes vc-fadeInDropdown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ========== BUTTONS TIÊU CHUẨN ========== */
 .vanchuyen .btn-primary {
   background-color: var(--primary-green);
   color: #fff;
@@ -509,11 +601,15 @@
   gap: 6px;
   border: none;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition:
+    background-color 0.2s,
+    box-shadow 0.2s;
 }
 .vanchuyen .btn-primary:hover {
   background-color: var(--primary-hover);
+  box-shadow: 0 2px 6px rgba(39, 141, 73, 0.25);
 }
+
 .vanchuyen .btn-secondary {
   background-color: #edf5f0;
   color: #1c693a;
@@ -531,6 +627,7 @@
 .vanchuyen .btn-secondary:hover {
   background-color: #d8f2e2;
 }
+
 .vanchuyen .btn-action-detail {
   display: inline-flex;
   align-items: center;
@@ -582,79 +679,6 @@
 .vanchuyen .section-header-box p {
   font-size: 12.5px;
   color: var(--text-muted);
-}
-
-/* ========== TIMELINE ========== */
-.vanchuyen .timeline-track {
-  position: relative;
-  border-left: 2px solid #10b981;
-  margin-left: 16px;
-  padding-left: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  font-size: 13px;
-}
-.vanchuyen .timeline-item {
-  position: relative;
-}
-.vanchuyen .timeline-dot {
-  position: absolute;
-  left: -31px;
-  top: 0;
-  width: 16px;
-  height: 16px;
-  background-color: #059669;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 2px #a7f3d0;
-}
-.vanchuyen .timeline-dot.current {
-  background-color: #2563eb;
-  box-shadow: 0 0 0 2px #bfdbfe;
-}
-.vanchuyen .timeline-dot-ping {
-  position: absolute;
-  left: -31px;
-  top: 0;
-  width: 16px;
-  height: 16px;
-  background-color: #2563eb;
-  border-radius: 50%;
-  border: 2px solid #fff;
-  animation: vc-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-.vanchuyen .timeline-title {
-  font-weight: 700;
-  font-size: 14px;
-  color: #1f2937;
-}
-.vanchuyen .timeline-title.current {
-  color: #1d4ed8;
-}
-.vanchuyen .timeline-desc {
-  color: #6b7280;
-  margin-top: 3px;
-}
-
-/* ========== SUMMARY GRID ========== */
-.vanchuyen .data-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  font-size: 13px;
-  background-color: #f9fafb;
-  padding: 16px;
-  border-radius: 8px;
-  border: 1px solid #f3f4f6;
-}
-.vanchuyen .data-summary-grid span.label {
-  display: block;
-  color: #6b7280;
-}
-.vanchuyen .data-summary-grid span.value {
-  font-weight: 700;
-  color: #1f2937;
 }
 
 /* ========== MODALS ========== */
@@ -741,10 +765,7 @@
 .vanchuyen .form-input:focus,
 .vanchuyen .form-select:focus,
 .vanchuyen .form-textarea:focus {
-  border-color: #2e8b57;
-}
-.vanchuyen .form-input.font-mono {
-  font-family: monospace;
+  border-color: #278d49;
 }
 .vanchuyen .form-row-2 {
   display: grid;
@@ -794,7 +815,7 @@
   background-color: #f3f4f6;
 }
 
-/* ========== KEYFRAMES (global, nên có tiền tố riêng) ========== */
+/* ========== KEYFRAMES ========== */
 @keyframes vc-pulse {
   0%,
   100% {
@@ -806,15 +827,8 @@
     transform: scale(1.1);
   }
 }
-@keyframes vc-ping {
-  75%,
-  100% {
-    transform: scale(2);
-    opacity: 0;
-  }
-}
 
-/* ========== TAB KÝ BLOCKCHAIN (FULL WIDTH, CUỘN ĐƯỢC) ========== */
+/* ========== TAB KÝ BLOCKCHAIN ========== */
 .vanchuyen .blockchain-tab-wrapper {
   width: 100%;
   height: 100%;
@@ -837,7 +851,6 @@
   margin-left: 0 !important;
   margin-right: 0 !important;
 }
-/* Cột cuối (nút "Ký lên blockchain") căn sang bên phải, thẳng hàng với nút "Ký tất cả" */
 .vanchuyen .blockchain-panel-full .bc-table th:last-child,
 .vanchuyen .blockchain-panel-full .bc-table td:last-child {
   text-align: right;

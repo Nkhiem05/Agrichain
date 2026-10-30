@@ -594,12 +594,12 @@ const createProcessingBatch = async (req, res) => {
     const maCoSo = getProcessorId(req);
 
     const ma_lo = cleanText(req.body?.ma_lo_nguon);
-    const tieu_de = cleanText(req.body?.tieu_de);
+    // Không còn nhập tên lô mới: mặc định lấy tên lô hiện tại ("Tên sản phẩm (mã lô)"); vẫn nhận tieu_de nếu client gửi
+    let tieu_de = cleanText(req.body?.tieu_de);
     const khu_vuc_so_che = cleanText(req.body?.khu_vuc_so_che);
     const quy_cach_tieu_chuan = cleanText(req.body?.quy_cach_tieu_chuan);
 
     if (!ma_lo) throw new ApiError(400, "Vui lòng chọn lô đã tiếp nhận");
-    if (!tieu_de) throw new ApiError(400, "Vui lòng nhập tên gọi lô sơ chế");
 
     let maSoChe;
 
@@ -608,9 +608,10 @@ const createProcessingBatch = async (req, res) => {
         maSoChe = await withTransaction(async (connection) => {
           const [lots] = await connection.execute(
             `
-            SELECT tinh_trang_su_dung, giai_doan_hien_tai
-            FROM lo_nong_san
-            WHERE ma_lo_nong_san = ? AND ma_nguoi_quan_ly = ?
+            SELECT lo.tinh_trang_su_dung, lo.giai_doan_hien_tai, sp.ten_san_pham
+            FROM lo_nong_san lo
+            JOIN san_pham_nong_san sp ON sp.ma_san_pham = lo.ma_san_pham
+            WHERE lo.ma_lo_nong_san = ? AND lo.ma_nguoi_quan_ly = ?
             LIMIT 1
             FOR UPDATE
             `,
@@ -620,6 +621,7 @@ const createProcessingBatch = async (req, res) => {
           if (lots.length === 0) {
             throw new ApiError(404, "Không tìm thấy lô thuộc cơ sở của bạn");
           }
+          const tenHoSo = tieu_de || `${lots[0].ten_san_pham} (${ma_lo})`;
           if (lots[0].tinh_trang_su_dung !== "ACTIVE") {
             throw new ApiError(409, "Lô này đã được sử dụng hết");
           }
@@ -669,7 +671,7 @@ const createProcessingBatch = async (req, res) => {
               newMaSoChe,
               maCoSo,
               ma_lo,
-              tieu_de,
+              tenHoSo,
               khu_vuc_so_che,
               quy_cach_tieu_chuan,
             ],
@@ -1710,9 +1712,9 @@ const createShipment = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      cho_ky: canKy,
+      cho_ky: false,
       message: canKy
-        ? `Đã tạo lệnh bàn giao vận chuyển. Hãy ký lệnh ở tab "Ký blockchain": đơn vị vận chuyển chỉ thực hiện được sau khi bạn ký${canhBaoVi}`
+        ? `Đã tạo lệnh bàn giao vận chuyển. Không cần ký lúc này: sau khi đơn vị vận chuyển chấp nhận, bạn ký xác nhận lấy hàng đi (nút "Ký xác nhận lấy hàng đi" ở lệnh đó hoặc tab Ký blockchain) rồi xe mới lấy hàng được${canhBaoVi}`
         : `Đã tạo lệnh bàn giao vận chuyển${canhBaoVi}`,
       data: { ma_van_don: maVanDon },
     });

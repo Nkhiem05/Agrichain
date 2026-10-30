@@ -181,3 +181,37 @@
   color: #bbf7d0;
   text-decoration: underline;
 }
+
+/* ===== Căn chỉnh dùng chung cho mọi trang có tab / khung "Ký blockchain" ===== */
+/* Bảng sự kiện chờ ký: cột cuối (nút "Ký lên blockchain") căn sang phải, thẳng hàng với nút "Ký tất cả" phía trên.
+   Đặt ở đây (không riêng từng trang) nên trang nào dùng khung ký cũng đúng, kể cả sơ chế, nhà phân phối, đại lý, trang cá nhân. */
+:root:root .bc-panel .bc-table th:last-child,
+:root:root .bc-panel .bc-table td:last-child {
+  text-align: right;
+  padding-right: 0;
+}
+:root:root .bc-panel .bc-table td:last-child .bc-btn {
+  margin-left: auto;
+}
+
+/* Bố cục tab "Ký blockchain" dùng chung (sơ chế, nhà phân phối, đại lý): full chiều ngang, mô tả ngay trên khung,
+   khung ví thẳng lề với mô tả (giống tab của nông dân / vận chuyển / kiểm định) */
+:root:root .bc-tab {
+  width: 100%;
+  max-width: 100%;
+  padding-top: 24px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+:root:root .bc-tab-desc {
+  font-size: 14px;
+  color: #4b5563;
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+:root:root .bc-tab > .bc-panel {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
