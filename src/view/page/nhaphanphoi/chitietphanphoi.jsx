@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import "../../css/chitietphanphoi.css";
-import { kyNgay } from "../kyNgay";
+import { baoKetQua } from "../kyNgay";
 import {
   fetchDispatchDetail,
   markDispatchShipped,
@@ -72,7 +72,7 @@ const ChiTietPhanPhoiPage = () => {
     try {
       const res = await markDispatchShipped(orderDetail.ma_phieu);
       await loadDetail();
-      if (orderDetail.ma_van_don) await kyNgay(res?.message || "Đã xuất kho.", { taiLai: loadDetail });
+      await baoKetQua(res, { thanhCong: "Đã xuất kho, đang trên đường giao.", taiLai: loadDetail });
     } catch (err) {
       alert(err.message || "Không thể xác nhận xuất kho");
     } finally {
@@ -93,7 +93,7 @@ const ChiTietPhanPhoiPage = () => {
     try {
       const res = await markDispatchDelivered(orderDetail.ma_phieu);
       await loadDetail();
-      if (orderDetail.ma_van_don) await kyNgay(res?.message || "Đã tới nơi.", { taiLai: loadDetail });
+      await baoKetQua(res, { thanhCong: orderDetail.ma_van_don ? "Đã giao tới nơi, chờ đại lý xác nhận nhận hàng." : undefined, taiLai: loadDetail });
     } catch (err) {
       alert(err.message || "Không thể xác nhận giao hàng");
     } finally {
@@ -232,6 +232,12 @@ const ChiTietPhanPhoiPage = () => {
               <CheckCircle2 size={13} />
               {statusInfo.text}
             </div>
+            {orderDetail.cho_ky && (
+              <div className="ctpp-status-pill warning" style={{ marginBottom: 10 }}>
+                {({ XUAT_KHO: "Đang chờ bạn ký xuất kho", TOI_NOI: "Đang chờ bạn ký đã tới nơi", TAO_PHIEU: "Đang chờ bạn ký xác nhận lấy hàng đi" })[orderDetail.cho_ky] || "Đang chờ ký"}
+                : bấm lại nút bên phải để ký tiếp
+              </div>
+            )}
             <h2 className="ctpp-hero-title">
               Phiếu Phân Phối: {orderDetail.ma_phieu}
             </h2>

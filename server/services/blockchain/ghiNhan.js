@@ -87,22 +87,49 @@ const apDungKetQuaVanDon = async (executor, maVanDon, ap) => {
       [ap.khoi_luong_nhan, maVanDon],
     );
     if (kq.affectedRows > 0) {
+      // giai_doan: mặc định "đã nhận vào kho"; đại lý nhận hàng thì "đã tới điểm bán"
       await executor.query(
         `
         UPDATE lo_nong_san lo
         JOIN lenh_van_chuyen v ON v.ma_lo_nong_san = lo.ma_lo_nong_san
-        SET lo.ma_nguoi_quan_ly = v.ma_ben_nhan, lo.so_luong_hien_tai = ?, lo.giai_doan_hien_tai = 'RECEIVED'
+        SET lo.ma_nguoi_quan_ly = v.ma_ben_nhan, lo.so_luong_hien_tai = ?, lo.giai_doan_hien_tai = ?
         WHERE v.ma_van_don = ?
         `,
-        [ap.khoi_luong_nhan, maVanDon],
+        [ap.khoi_luong_nhan, ap.giai_doan || "RECEIVED", maVanDon],
       );
+      // Nhà phân phối nhập kho: ghi kho và hạn lưu kho đã chọn lúc bấm nhập
+      if (ap.nhap_kho) {
+        await executor.query(
+          `
+          UPDATE lo_nong_san lo
+          JOIN lenh_van_chuyen v ON v.ma_lo_nong_san = lo.ma_lo_nong_san
+          SET lo.vi_tri_luu_kho = ?, lo.han_luu_kho = ?
+          WHERE v.ma_van_don = ?
+          `,
+          [ap.nhap_kho.vi_tri_luu_kho ?? null, ap.nhap_kho.han_luu_kho ?? null, maVanDon],
+        );
+      }
+      // Phiếu xuất kho cho đại lý (nếu có) hoàn tất khi đại lý đã ký nhận
+      if (ap.phieu_da_giao) {
+        await executor.query(
+          `UPDATE phieu_xuat_kho SET trang_thai = 'DA_GIAO', thoi_gian_giao = NOW() WHERE ma_van_don = ?`,
+          [maVanDon],
+        );
+      }
     }
   } else if (ap.hanh_dong === "BEN_NHAN_TU_CHOI") {
     // Bên nhận đã ký từ chối khi hàng đến nơi
-    await executor.query(
+    const [kq] = await executor.query(
       `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_TIEP_NHAN'`,
       [ap.ghi_chu ?? null, maVanDon],
     );
+    // Phiếu xuất kho cho đại lý (nếu có) bị hủy theo khi đại lý từ chối
+    if (kq.affectedRows > 0) {
+      await executor.query(
+        `UPDATE phieu_xuat_kho SET trang_thai = 'DA_HUY' WHERE ma_van_don = ? AND trang_thai IN ('CHO_XUAT', 'DANG_GIAO')`,
+        [maVanDon],
+      );
+    }
   } else if (ap.hanh_dong === "TU_CHOI") {
     await executor.query(
       `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_CHAP_NHAN'`,
@@ -150,6 +177,17 @@ const apDungGiaiDoanSoChe = async (executor, ap) => {
   }
 };
 
+// Đại lý bán hết lô: lô chỉ kết thúc vòng đời (hết hàng, "đã bán hết") sau khi đại lý ký sự kiện hoàn tất lên blockchain.
+// Có điều kiện theo trạng thái nên gọi lại vẫn an toàn.
+const apDungBanHet = async (executor, ap) => {
+  if (!ap?.ma_lo) return;
+  await executor.query(
+    `UPDATE lo_nong_san SET giai_doan_hien_tai = 'COMPLETED', so_luong_hien_tai = 0
+     WHERE ma_lo_nong_san = ? AND giai_doan_hien_tai <> 'COMPLETED'`,
+    [ap.ma_lo],
+  );
+};
+
 // Sự kiện vừa lên chain mang kết quả kiểm định chờ áp dụng thì áp dụng ngay (trong cùng transaction xác nhận)
 const apDungKetQuaKhiXacNhan = async (executor, maLichSu) => {
   const [rows] = await executor.query(
@@ -164,6 +202,8 @@ const apDungKetQuaKhiXacNhan = async (executor, maLichSu) => {
   const ts = payload?.tham_so || {};
   if (ts.ap_dung?.hanh_dong === "SO_CHE_GIAI_DOAN") {
     await apDungGiaiDoanSoChe(executor, ts.ap_dung);
+  } else if (ts.ap_dung?.hanh_dong === "BAN_HET") {
+    await apDungBanHet(executor, ts.ap_dung);
   } else if (ts.ap_dung?.hanh_dong) {
     await apDungKetQuaVanDon(executor, ts.ma_van_don, ts.ap_dung);
   } else {
@@ -252,6 +292,7 @@ module.exports = {
   apDungKetQuaKiemDinh,
   apDungKetQuaVanDon,
   apDungGiaiDoanSoChe,
+  apDungBanHet,
   capNhatTrangThaiLo,
   ghiNhanDaXacNhan,
   ghiNhanDaGui,

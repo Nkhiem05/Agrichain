@@ -66,6 +66,14 @@ export const fetchDispatchDetail = async (maPhieu) => {
   return parseJson(res);
 };
 
+// Tài khoản đơn vị vận chuyển để thuê giao hàng cho đại lý
+export const fetchDispatchTransporters = async () => {
+  const res = await fetch(`${API_URL}/don-vi-van-chuyen`, {
+    headers: authHeaders(),
+  });
+  return parseJson(res);
+};
+
 export const createDispatch = async (payload) => {
   const res = await fetch(`${API_URL}/xuat-kho`, {
     method: "POST",

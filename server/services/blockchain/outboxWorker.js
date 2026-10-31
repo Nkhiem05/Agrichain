@@ -1,6 +1,6 @@
 const db = require("../../config/db");
 const chain = require("./chainClient");
-const { ghiNhanDaXacNhan, traVeHangCho } = require("./ghiNhan");
+const { ghiNhanDaXacNhan, traVeHangCho, apDungKetQuaVanDon } = require("./ghiNhan");
 
 // OUTBOX WORKER: chạy nền trong server, KHÔNG giữ khóa bí mật và KHÔNG tự ký.
 // Người dùng vẫn ký bằng MetaMask; worker chỉ làm phần việc sau khi ký:
@@ -195,6 +195,48 @@ const doiSoatHangCho = async (kq) => {
   }
 };
 
+// 3. Tự phục hồi: bước vận chuyển / nhận hàng ĐÃ ký và xác nhận trên chain nhưng lệnh vận chuyển vẫn ở trạng thái cũ
+// (ví dụ xác nhận xong mà việc áp dụng bị bỏ sót, hoặc sự kiện tạo từ phiên bản cũ không mang sẵn kết quả chờ áp dụng).
+// Áp dụng lại đúng kết quả của bước đó. Có điều kiện theo trạng thái lệnh nên chạy lại nhiều lần vẫn an toàn.
+
+const apDungLaiBuocDaKy = async (kq) => {
+  const [rows] = await db.query(
+    `
+    SELECT ls.ma_lich_su, ls.loai_hoat_dong AS loai, o.payload, v.ma_van_don, v.trang_thai
+    FROM lich_su_truy_xuat_lo ls
+    JOIN blockchain_outbox o ON o.event_id = ls.ma_lich_su
+    JOIN lenh_van_chuyen v ON v.ma_van_don = JSON_UNQUOTE(JSON_EXTRACT(o.payload, '$.tham_so.ma_van_don'))
+    WHERE ls.blockchain_sync_status = 'CONFIRMED'
+      AND o.confirmed_at > DATE_SUB(NOW(), INTERVAL 7 DAY)
+      AND ls.loai_hoat_dong IN ('PICKUP_CONFIRMED', 'DELIVERY_CONFIRMED', 'STOCK_IN_CONFIRMED', 'HANDOVER_REJECTED')
+      AND (
+        (ls.loai_hoat_dong = 'PICKUP_CONFIRMED' AND v.trang_thai = 'CHO_LAY_HANG') OR
+        (ls.loai_hoat_dong = 'DELIVERY_CONFIRMED' AND v.trang_thai = 'DANG_VAN_CHUYEN') OR
+        (ls.loai_hoat_dong = 'STOCK_IN_CONFIRMED' AND v.trang_thai = 'CHO_TIEP_NHAN') OR
+        (ls.loai_hoat_dong = 'HANDOVER_REJECTED' AND v.trang_thai = 'CHO_TIEP_NHAN')
+      )
+    ORDER BY o.confirmed_at
+    LIMIT 30
+    `,
+  );
+  for (const r of rows) {
+    const payload = typeof r.payload === "string" ? JSON.parse(r.payload) : r.payload;
+    const ts = payload?.tham_so || {};
+    let ap = ts.ap_dung;
+    if (!ap?.hanh_dong) {
+      // Sự kiện không mang kết quả chờ áp dụng: suy ra từ loại sự kiện
+      if (r.loai === "PICKUP_CONFIRMED") ap = { hanh_dong: "LAY_HANG" };
+      else if (r.loai === "DELIVERY_CONFIRMED") ap = { hanh_dong: "DEN_NOI" };
+      else if (r.loai === "STOCK_IN_CONFIRMED" && Number(ts.khoi_luong_nhan_gram) > 0)
+        ap = { hanh_dong: "NHAN_HANG", khoi_luong_nhan: Number(ts.khoi_luong_nhan_gram) / 1000 };
+      else continue; // từ chối cần biết ai từ chối: không đoán
+    }
+    await trongGiaoDich((conn) => apDungKetQuaVanDon(conn, r.ma_van_don, ap));
+    console.log(`[Outbox worker] áp dụng lại bước ${r.loai} cho lệnh ${r.ma_van_don} (đã ký nhưng lệnh còn ở "${r.trang_thai}")`);
+    kq.apDungLai = (kq.apDungLai || 0) + 1;
+  }
+};
+
 const chayMotLan = async () => {
   if (trangThai.dangChay) return trangThai.ketQuaCuoi;
   if (!chain.layCauHinh().daCauHinh) return null;
@@ -203,10 +245,11 @@ const chayMotLan = async () => {
   try {
     await xuLyDaGui(kq);
     await doiSoatHangCho(kq);
+    await apDungLaiBuocDaKy(kq);
     trangThai.loiCuoi = null;
-    if (kq.xacNhan || kq.traVe || kq.doiSoat) {
+    if (kq.xacNhan || kq.traVe || kq.doiSoat || kq.apDungLai) {
       console.log(
-        `[Outbox worker] xác nhận ${kq.xacNhan}, đối soát ${kq.doiSoat}, trả về hàng chờ ${kq.traVe}, chờ vào khối ${kq.choKhoi}`,
+        `[Outbox worker] xác nhận ${kq.xacNhan}, đối soát ${kq.doiSoat}, trả về hàng chờ ${kq.traVe}, chờ vào khối ${kq.choKhoi}, áp dụng lại ${kq.apDungLai || 0}`,
       );
     }
   } catch (err) {

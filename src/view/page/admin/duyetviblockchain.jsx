@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Contract } from "ethers";
 import { Wallet, RefreshCw, CheckCheck, ExternalLink, Scale, ListChecks } from "lucide-react";
 import { TEN_SU_KIEN } from "../xacthucblockchain";
+import QuanTriLoKet from "./quantriloket";
 import {
   fetchCauHinh,
   fetchViCuaToi,
@@ -15,6 +16,7 @@ import {
   xacNhanNguong,
   fetchOutbox,
   chayOutboxNgay,
+  dongBoVaiTro,
 } from "../../../api/blockchainApi";
 
 // Mục "Ví blockchain" của trang quản trị: liên kết ví admin, duyệt / từ chối ví của người dùng.
@@ -105,6 +107,7 @@ const DuyetViBlockchain = () => {
     () => viNguoiDung.filter((w) => !boLoc || w.trang_thai_duyet === boLoc),
     [viNguoiDung, boLoc],
   );
+  const viLech = useMemo(() => viNguoiDung.filter((w) => w.lech_vai_tro), [viNguoiDung]);
   const dem = (tt) => viNguoiDung.filter((w) => w.trang_thai_duyet === tt).length;
   const coTheChon = (w) => w.trang_thai_duyet === "CHO_DUYET" && Boolean(w.vai_tro_on_chain);
   const dsChoChon = hienThi.filter(coTheChon);
@@ -190,6 +193,25 @@ const DuyetViBlockchain = () => {
       await taiDuLieu();
     });
 
+  // Hợp đồng mới chưa có vai trò nào: gán lại cho mọi ví đã duyệt trong 1 lần ký (setRoles), rồi server kiểm tra trên chain
+  const dongBoVaiTroLai = () =>
+    chayTacVu("dong-bo-vai-tro", async () => {
+      const ds = viLech;
+      if (ds.length === 0) throw new Error("Không có ví nào cần gán lại vai trò");
+      const contract = await layHopDongAdmin();
+      const tx = await contract.setRoles(
+        ds.map((w) => w.dia_chi_vi),
+        ds.map((w) => w.vai_tro_on_chain),
+      );
+      await tx.wait();
+      const kq = await dongBoVaiTro(
+        ds.map((w) => w.dia_chi_vi),
+        tx.hash,
+      );
+      setThongBao({ loai: kq.data.con_lech.length === 0 ? "ok" : "loi", text: kq.message });
+      await taiDuLieu();
+    });
+
   // Ghi bộ ngưỡng đang áp dụng lên hợp đồng, rồi báo backend đọc lại trên chain và lưu phiên bản
   const ghiNguong = () =>
     chayTacVu("nguong", async () => {
@@ -207,7 +229,7 @@ const DuyetViBlockchain = () => {
       setThongBao({
         loai: "ok",
         text: kq
-          ? `Đối soát xong: xác nhận ${kq.xacNhan}, đối soát từ chain ${kq.doiSoat}, trả về hàng chờ ${kq.traVe}, chờ vào khối ${kq.choKhoi}`
+          ? `Đối soát xong: xác nhận ${kq.xacNhan}, đối soát từ chain ${kq.doiSoat}, trả về hàng chờ ${kq.traVe}, chờ vào khối ${kq.choKhoi}, áp dụng lại bước đã ký ${kq.apDungLai || 0}`
           : "Chưa cấu hình hợp đồng, không có gì để đối soát",
       });
       await taiDuLieu();
@@ -333,6 +355,34 @@ const DuyetViBlockchain = () => {
         </div>
       </div>
 
+      {/* Ví đã duyệt trong CSDL nhưng hợp đồng đang dùng chưa gán vai trò (vd vừa deploy hợp đồng mới) */}
+      {viLech.length > 0 && (
+        <div className="table-container" style={{ padding: 16, marginBottom: 16, borderLeft: "4px solid #f59e0b" }} data-testid="vi-lech">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+            <div>
+              <div style={{ fontWeight: 700 }}>
+                {viLech.length} ví đã duyệt nhưng hợp đồng đang dùng chưa gán vai trò
+              </div>
+              <div style={{ fontSize: 13, marginTop: 4, color: "#6b7280" }}>
+                Thường gặp sau khi deploy hợp đồng mới: các ví vẫn "Đã duyệt" trong hệ thống nhưng hợp đồng mới chưa biết họ, nên họ không ký được
+                (báo "chưa có vai trò trên hợp đồng blockchain hiện tại"). Bấm nút bên cạnh để gán lại vai trò cho tất cả trong 1 lần ký MetaMask:{" "}
+                {viLech.map((w) => w.ho_ten).join(", ")}.
+              </div>
+            </div>
+            <button
+              type="button"
+              className="btn-primary-action"
+              style={{ whiteSpace: "nowrap" }}
+              onClick={dongBoVaiTroLai}
+              disabled={!sanSangDuyet || Boolean(dangXuLy)}
+              title="Admin ký setRoles cho các ví này trên hợp đồng đang dùng"
+            >
+              <CheckCheck size={16} /> {dangXuLy === "dong-bo-vai-tro" ? "Đang gán..." : `Gán lại vai trò (${viLech.length})`}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Bộ ngưỡng kiểm định */}
       {nguong && (
         <div className="table-container" style={{ padding: 16, marginBottom: 16 }}>
@@ -377,7 +427,8 @@ const DuyetViBlockchain = () => {
                 </div>
               )}
             </div>
-            {!nguong.phien_ban?.ma_giao_dich_blockchain && (
+            {/* Hiện nút khi chưa có trên hợp đồng đang dùng (kể cả khi CSDL còn giữ tx của hợp đồng cũ) hoặc server chưa lưu phiên bản */}
+            {(nguong.tren_chain !== true || !nguong.phien_ban?.ma_giao_dich_blockchain) && (
               <button
                 type="button"
                 className="btn-primary-action"
@@ -386,7 +437,11 @@ const DuyetViBlockchain = () => {
                 disabled={!sanSangDuyet || Boolean(dangXuLy)}
                 title="Admin ký setThreshold(mã băm) trên hợp đồng"
               >
-                <Scale size={16} /> {dangXuLy === "nguong" ? "Đang ghi..." : "Ghi bộ ngưỡng lên blockchain"}
+                <Scale size={16} /> {dangXuLy === "nguong"
+                  ? "Đang ghi..."
+                  : nguong.phien_ban?.ma_giao_dich_blockchain
+                    ? "Ghi lại bộ ngưỡng lên hợp đồng này"
+                    : "Ghi bộ ngưỡng lên blockchain"}
               </button>
             )}
           </div>
@@ -467,6 +522,15 @@ const DuyetViBlockchain = () => {
           )}
         </div>
       )}
+
+      {/* Gỡ lô kẹt và đổi ví người dùng */}
+      <QuanTriLoKet
+        layHopDongAdmin={layHopDongAdmin}
+        sanSangKy={sanSangDuyet}
+        onThongBao={setThongBao}
+        onXong={taiDuLieu}
+        linkExplorer={(h) => linkExplorer("tx", h)}
+      />
 
       {thongBao.text && (
         <div
@@ -562,6 +626,9 @@ const DuyetViBlockchain = () => {
                       <span className={`status-pill ${tt.cls}`}>{tt.text}</span>
                       {w.trang_thai !== 1 && (
                         <div style={{ fontSize: 11, color: "#dc2626", marginTop: 2 }}>Ví bị tắt</div>
+                      )}
+                      {w.lech_vai_tro && (
+                        <div style={{ fontSize: 11, color: "#b45309", marginTop: 2 }}>Chưa có vai trò trên hợp đồng này</div>
                       )}
                     </td>
                     <td style={{ fontSize: 12 }}>

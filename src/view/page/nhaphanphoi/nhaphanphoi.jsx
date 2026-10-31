@@ -27,7 +27,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import "../../css/nhaphanphoi.css";
 import BlockchainPanel from "../blockchainpannel";
-import { kyNgay } from "../kyNgay";
+import { baoKetQua } from "../kyNgay";
 import {
   fetchIncomingShipments,
   confirmReceiveShipment,
@@ -36,6 +36,7 @@ import {
   fetchDispatchOrders,
   createDispatch,
   fetchDealers,
+  fetchDispatchTransporters,
   createDealer,
   updateDealer,
   toggleDealerStatus,
@@ -206,11 +207,13 @@ const NhaPhanPhoiPage = () => {
   // ==========================================
   const [dispatchOrders, setDispatchOrders] = useState([]);
   const [showCreateDispatchModal, setShowCreateDispatchModal] = useState(false);
-  // Giao hàng cho đại lý dùng đơn vị vận chuyển nội bộ của nhà phân phối nên phiếu chỉ cần đại lý, lô và số lượng
+  // Giao hàng cho đại lý luôn THUÊ đơn vị vận chuyển (tài khoản vận chuyển): họ chấp nhận lệnh, tự ký lấy hàng và đến nơi
+  const [transporters, setTransporters] = useState([]);
   const [dispatchForm, setDispatchForm] = useState({
     daiLyId: "",
     maLo: "",
     soLuongXuat: "",
+    maDonViVanChuyen: "",
   });
 
   // ==========================================
@@ -378,17 +381,17 @@ const NhaPhanPhoiPage = () => {
     }
 
     try {
-      await confirmReceiveShipment(selectedOrder.ma_van_don, {
+      const res = await confirmReceiveShipment(selectedOrder.ma_van_don, {
         khoi_luong_thuc_te: Number(receiveForm.thucNhan),
         ma_kho: receiveForm.maKho,
         han_luu_kho: receiveForm.hanLuuKho || undefined,
       });
       setShowReceiveModal(false);
       await loadAll();
-      await kyNgay(
-        `Đã nhập kho ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}.`,
-        { taiLai: loadAll },
-      );
+      await baoKetQua(res, {
+        thanhCong: `Đã nhập kho ${receiveForm.thucNhan} kg cho lô ${selectedOrder.ma_lo_nong_san}.`,
+        taiLai: loadAll,
+      });
     } catch (err) {
       alert(err.message || "Không thể xác nhận nhập kho");
     }
@@ -407,13 +410,14 @@ const NhaPhanPhoiPage = () => {
       return;
     }
     try {
-      await rejectReceiveShipment(
+      const res = await rejectReceiveShipment(
         selectedOrder.ma_van_don,
         rejectReason.trim(),
       );
       setShowRejectModal(false);
       await loadAll();
-      await kyNgay(`Đã từ chối tiếp nhận chuyến ${selectedOrder.ma_van_don}.`, {
+      await baoKetQua(res, {
+        thanhCong: `Đã từ chối tiếp nhận chuyến ${selectedOrder.ma_van_don}.`,
         taiLai: loadAll,
       });
     } catch (err) {
@@ -432,6 +436,18 @@ const NhaPhanPhoiPage = () => {
       setDealers(dsDaiLy);
     } catch {
       /* dùng danh sách đã có */
+    }
+    // Đơn vị vận chuyển để thuê (tài khoản vận chuyển)
+    let dsVanChuyen = transporters;
+    try {
+      dsVanChuyen = (await fetchDispatchTransporters())?.data || [];
+      setTransporters(dsVanChuyen);
+    } catch {
+      /* dùng danh sách đã có */
+    }
+    if (dsVanChuyen.length === 0) {
+      alert("Chưa có tài khoản đơn vị vận chuyển nào để thuê giao hàng. Hãy tạo tài khoản vận chuyển trước.");
+      return;
     }
     if (!dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG")) {
       alert(
@@ -461,8 +477,9 @@ const NhaPhanPhoiPage = () => {
             (d) => d.trang_thai === "HOAT_DONG" && d.ma_nguoi_dung,
           ) || dsDaiLy.find((d) => d.trang_thai === "HOAT_DONG")
         )?.ma_dai_ly || "",
-      maLo: validLots[0]?.ma_lo_nong_san || "",
+      maLo: validLots.find((lot) => !lot.cho_ky)?.ma_lo_nong_san || "",
       soLuongXuat: "",
+      maDonViVanChuyen: dsVanChuyen[0]?.ma_nguoi_dung || "",
     });
     setShowCreateDispatchModal(true);
   };
@@ -470,21 +487,25 @@ const NhaPhanPhoiPage = () => {
   const handleSaveDispatch = async () => {
     if (!dispatchForm.daiLyId) return alert("Vui lòng chọn đại lý nhận hàng!");
     if (!dispatchForm.maLo) return alert("Vui lòng chọn lô xuất hàng!");
-    const xuatKg = Number(dispatchForm.soLuongXuat);
-    if (!xuatKg || xuatKg <= 0) return alert("Số lượng xuất phải lớn hơn 0!");
+    if (!dispatchForm.maDonViVanChuyen) return alert("Vui lòng chọn đơn vị vận chuyển!");
+    // Giao nguyên lô: khối lượng lấy theo tồn của lô, không tách lô
+    const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
+    const xuatKg = Number(lotChon?.so_luong_hien_tai);
+    if (!xuatKg || xuatKg <= 0) return alert("Lô được chọn không còn hàng để giao!");
 
     try {
       const res = await createDispatch({
         ma_dai_ly: dispatchForm.daiLyId,
         ma_lo_nong_san: dispatchForm.maLo,
         so_luong_xuat: xuatKg,
-        hinh_thuc: "TU_GIAO", // đơn vị vận chuyển nội bộ của nhà phân phối
+        hinh_thuc: "DV_VAN_CHUYEN", // luôn thuê đơn vị vận chuyển: họ chấp nhận lệnh rồi tự ký lấy hàng / đến nơi
+        ma_don_vi_van_chuyen: dispatchForm.maDonViVanChuyen,
       });
       setShowCreateDispatchModal(false);
       await loadAll();
-      await kyNgay(
-        `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.`,
-        { taiLai: loadAll },
+      await baoKetQua(
+        { ...res, message: `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.` },
+        { thanhCong: `Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""}.`, taiLai: loadAll },
       );
     } catch (err) {
       alert(err.message || "Không thể lập phiếu xuất kho");
@@ -909,6 +930,15 @@ const NhaPhanPhoiPage = () => {
                                   >
                                     <StatusIcon size={13} /> {statusInfo.text}
                                   </span>
+                                  {order.cho_ky && (
+                                    <span
+                                      className="status-pill warning"
+                                      style={{ marginLeft: 6 }}
+                                      title="Bạn đã bấm nhưng chưa ký: bước này chỉ có hiệu lực sau khi ký"
+                                    >
+                                      {({ NHAP_KHO: "Chờ ký nhập kho", TU_CHOI: "Chờ ký từ chối" })[order.cho_ky] || "Chờ ký"}
+                                    </span>
+                                  )}
                                 </td>
                                 <td>
                                   <div className="status-icon-cell">
@@ -1417,6 +1447,15 @@ const NhaPhanPhoiPage = () => {
                                     : DISPATCH_STATUS_LABEL[order.trang_thai] ||
                                       order.trang_thai}
                                 </span>
+                                  {order.cho_ky && (
+                                    <span
+                                      className="status-pill warning"
+                                      style={{ marginLeft: 6 }}
+                                      title="Bạn đã bấm nhưng chưa ký: bước này chỉ có hiệu lực sau khi ký"
+                                    >
+                                      {({ XUAT_KHO: "Chờ ký xuất kho", TOI_NOI: "Chờ ký tới nơi", TAO_PHIEU: "Chờ ký xác nhận lấy hàng đi" })[order.cho_ky] || "Chờ ký"}
+                                    </span>
+                                  )}
                               </td>
                               <td>
                                 <div
@@ -1453,8 +1492,8 @@ const NhaPhanPhoiPage = () => {
                 <div className="bc-tab">
                   <p className="bc-tab-desc">
                     Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận)
-                    hoặc từ chối nhận, khi lập phiếu xuất cho đại lý (tách lô
-                    xuất + lệnh giao) và khi tự giao (lấy hàng, tới nơi). Các
+                    hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác nhận
+                    giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký lấy hàng và tới nơi. Các
                     bước của một lô ký theo thứ tự.
                   </p>
                   <BlockchainPanel />
@@ -1935,16 +1974,19 @@ const NhaPhanPhoiPage = () => {
                     <option value="">-- Chọn lô --</option>
                     {inventoryList.map((lot) => {
                       const isRevoked = lot.trang_thai_chung_thu === "REVOKED";
+                      // Lô còn bước chưa ký blockchain (vd nhập kho chưa ký): chưa lập phiếu phân phối được
+                      const choKy = Boolean(lot.cho_ky);
                       return (
                         <option
                           key={lot.ma_lo_nong_san}
                           value={lot.ma_lo_nong_san}
-                          disabled={isRevoked}
+                          disabled={isRevoked || choKy}
                         >
                           {lot.ma_lo_nong_san} - {lot.ten_san_pham} (Tồn:{" "}
                           {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
                           {lot.han_luu_kho ? ` - Hạn: ${lot.han_luu_kho}` : ""})
                           {isRevoked ? " [BỊ THU HỒI - KHÓA]" : ""}
+                          {choKy && !isRevoked ? " [CHỜ KÝ - ký ở tab Ký blockchain]" : ""}
                         </option>
                       );
                     })}
@@ -1952,19 +1994,45 @@ const NhaPhanPhoiPage = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Số Lượng Xuất (*)</label>
-                  <input
-                    type="number"
-                    placeholder="VD: 300"
-                    value={dispatchForm.soLuongXuat}
-                    onChange={(e) =>
-                      setDispatchForm({
-                        ...dispatchForm,
-                        soLuongXuat: e.target.value,
-                      })
-                    }
-                  />
+                  <label>Khối Lượng Giao</label>
+                  <div
+                    style={{
+                      padding: "10px 12px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 8,
+                      background: "#f9fafb",
+                      fontSize: 14,
+                    }}
+                  >
+                    {(() => {
+                      const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
+                      return lotChon
+                        ? `Giao nguyên lô: ${formatWeight(lotChon.so_luong_hien_tai, lotChon.don_vi_tinh)}`
+                        : "Chọn lô để xem khối lượng";
+                    })()}
+                  </div>
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label>Đơn Vị Vận Chuyển (*)</label>
+                <select
+                  value={dispatchForm.maDonViVanChuyen}
+                  onChange={(e) =>
+                    setDispatchForm({
+                      ...dispatchForm,
+                      maDonViVanChuyen: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">-- Chọn đơn vị vận chuyển --</option>
+                  {transporters.map((t) => (
+                    <option key={t.ma_nguoi_dung} value={t.ma_nguoi_dung}>
+                      {t.ho_ten}
+                      {t.so_dien_thoai ? ` (${t.so_dien_thoai})` : ""}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <p
@@ -1975,8 +2043,9 @@ const NhaPhanPhoiPage = () => {
                   lineHeight: 1.5,
                 }}
               >
-                Hàng được giao bằng đơn vị vận chuyển nội bộ của nhà phân phối,
-                không cần chọn đơn vị vận chuyển, tài xế hay biển số.
+                Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận. Sau đó bạn ký
+                "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị vận chuyển tự ký lấy hàng và
+                đến nơi trên trang của họ, rồi đại lý ký nhận.
               </p>
             </div>
             <div className="modal-footer">

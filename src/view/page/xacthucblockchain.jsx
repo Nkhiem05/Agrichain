@@ -164,6 +164,61 @@ export const ChuoiKhoiChip = ({ maLo }) => {
   );
 };
 
+// Danh sách sự kiện đã ký của một lô (dùng cho lô đang xem và các lô nguồn trong dòng dõi)
+const DanhSachSuKien = ({ suKien, lienKetTx }) => (
+  <ol className="bc-events">
+    {suKien.map((e) => {
+      const link = lienKetTx(e.tx_hash);
+      return (
+        <li key={e.stt} className={e.trang_thai === "CONFIRMED" ? "" : "bc-pending"}>
+          <div className="bc-event-title">
+            <ShieldCheck size={14} />
+            <span>{TEN_SU_KIEN[e.loai] || e.loai}</span>
+          </div>
+          <div className="bc-event-meta">
+            {new Date(e.thoi_diem).toLocaleString("vi-VN")} • {e.nguoi_ky}
+            {TEN_VAI_TRO_KY[e.vai_tro] ? ` (${TEN_VAI_TRO_KY[e.vai_tro]})` : ""}
+          </div>
+          <div className="bc-event-meta">
+            {e.trang_thai === "CONFIRMED" ? (
+              <>
+                Ví ký {rutGon(e.dia_chi_vi_ky)} •{" "}
+                {link ? (
+                  <a href={link} target="_blank" rel="noopener noreferrer">
+                    Giao dịch {rutGon(e.tx_hash, 8, 6)}
+                  </a>
+                ) : (
+                  <span>Giao dịch {rutGon(e.tx_hash, 8, 6)}</span>
+                )}
+              </>
+            ) : (
+              <>{e.trang_thai === "SUBMITTED" ? "Đã gửi, đang chờ blockchain xác nhận" : "Chưa ký lên blockchain"}</>
+            )}
+          </div>
+        </li>
+      );
+    })}
+  </ol>
+);
+
+const NHAN_QUAN_HE = {
+  SPLIT: "tách ra",
+  MERGE: "gộp vào",
+  TRANSFORM: "sơ chế / chế biến thành",
+};
+
+const giaiDoanLo = {
+  RECEIVED: "đã nhập kho",
+  DISTRIBUTED: "đã tới điểm bán",
+  PACKAGED: "đã đóng gói",
+  COMPLETED: "đã bán hết",
+};
+
+const kgLo = (v, dv) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? `${n.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${dv || ""}`.trim() : "";
+};
+
 // Thẻ chi tiết: kết quả đối chiếu + các sự kiện đã ký
 export const XacThucBlockchainCard = ({ maLo }) => {
   const { loading, data, error } = useXacThuc(maLo);
@@ -196,6 +251,9 @@ export const XacThucBlockchainCard = ({ maLo }) => {
   const lienKetHopDong =
     goc && data.contract_address ? `${goc}/address/${data.contract_address}` : null;
   const tren = data.tren_chain;
+  const nguon = data.dong_doi?.lo_nguon || [];
+  const con = data.dong_doi?.lo_con || [];
+  const nguonTuXa = [...nguon].reverse(); // nông trại trước, lô gần nhất sau
 
   return (
     <div className="blockchain-card">
@@ -236,47 +294,80 @@ export const XacThucBlockchainCard = ({ maLo }) => {
       <p className="tx-hash-label">Mã băm sự kiện mới nhất:</p>
       <p className="tx-hash-value">{data.hash_moi_nhat || "Chưa có"}</p>
 
-      {data.su_kien.length > 0 && (
-        <ol className="bc-events">
-          {data.su_kien.map((e) => {
-            const link = lienKetTx(e.tx_hash);
+      {/* Hành trình trước đó: các lô nguồn, từ nơi xa nhất (nông trại) tới gần nhất, mỗi lô có chuỗi ký riêng đã được xác thực */}
+      {nguon.length > 0 && (
+        <div className="bc-lineage" data-testid="bc-lo-nguon">
+          <div className="bc-lineage-title">
+            Hành trình trước đó ({nguon.length} lô nguồn)
+          </div>
+          <p className="bc-muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+            Lô này được tạo ra từ các lô dưới đây. Mỗi lô có chuỗi chữ ký riêng, được đối chiếu độc lập với blockchain.
+          </p>
+          {nguonTuXa.map((n) => {
+            const xt = n.xac_thuc;
+            const tt2 = xt ? TRANG_THAI_XAC_THUC[xt.trang_thai] : null;
             return (
-              <li
-                key={e.stt}
-                className={e.trang_thai === "CONFIRMED" ? "" : "bc-pending"}
-              >
-                <div className="bc-event-title">
-                  <ShieldCheck size={14} />
-                  <span>{TEN_SU_KIEN[e.loai] || e.loai}</span>
-                </div>
-                <div className="bc-event-meta">
-                  {new Date(e.thoi_diem).toLocaleString("vi-VN")} • {e.nguoi_ky}
-                  {TEN_VAI_TRO_KY[e.vai_tro] ? ` (${TEN_VAI_TRO_KY[e.vai_tro]})` : ""}
-                </div>
-                <div className="bc-event-meta">
-                  {e.trang_thai === "CONFIRMED" ? (
-                    <>
-                      Ví ký {rutGon(e.dia_chi_vi_ky)} •{" "}
-                      {link ? (
-                        <a
-                          href={link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Giao dịch {rutGon(e.tx_hash, 8, 6)}
-                        </a>
-                      ) : (
-                        <span>Giao dịch {rutGon(e.tx_hash, 8, 6)}</span>
-                      )}
-                    </>
-                  ) : (
-                    <>{e.trang_thai === "SUBMITTED" ? "Đã gửi, đang chờ blockchain xác nhận" : "Chưa ký lên blockchain"}</>
-                  )}
-                </div>
-              </li>
+              <details key={n.ma_lo} className="bc-lineage-item" data-lo={n.ma_lo}>
+                <summary>
+                  <b>Lô {n.ma_lo}</b>
+                  <span className="bc-lineage-note">
+                    {NHAN_QUAN_HE[n.loai_lien_ket] || "tạo"} {kgLo(n.so_luong, n.don_vi_tinh)} → lô {n.tao_ra_lo}
+                  </span>
+                  <span className="bc-lineage-state" style={{ color: tt2 ? tt2.mauNen : "#d1d5db" }}>
+                    {xt
+                      ? xt.so_su_kien > 0
+                        ? `${xt.da_xac_nhan}/${xt.so_su_kien} sự kiện • ${tt2.nhan}`
+                        : "Lô cũ, chưa theo dõi trên blockchain"
+                      : "Không kiểm tra được"}
+                  </span>
+                </summary>
+                {xt?.ly_do?.length > 0 && (
+                  <ul className="bc-reasons" style={{ color: tt2 ? tt2.mauNen : undefined }}>
+                    {xt.ly_do.map((l) => (
+                      <li key={l}>{l}</li>
+                    ))}
+                  </ul>
+                )}
+                {xt?.su_kien?.length > 0 && <DanhSachSuKien suKien={xt.su_kien} lienKetTx={lienKetTx} />}
+              </details>
             );
           })}
-        </ol>
+        </div>
+      )}
+
+      {nguon.length > 0 && data.su_kien.length > 0 && (
+        <div className="bc-lineage-title" style={{ marginTop: 14 }}>
+          Các bước của chính lô {maLo}
+        </div>
+      )}
+
+      {data.su_kien.length > 0 && <DanhSachSuKien suKien={data.su_kien} lienKetTx={lienKetTx} />}
+
+      {/* Hành trình tiếp theo: các lô con đã tách / gộp / chế biến ra từ lô này */}
+      {con.length > 0 && (
+        <div className="bc-lineage" data-testid="bc-lo-con">
+          <div className="bc-lineage-title">Hành trình tiếp theo ({con.length} lô con)</div>
+          <p className="bc-muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+            Hàng của lô này đã được chia / chuyển thành các lô dưới đây. Xem mã lô con để biết hàng đi tiếp tới đâu.
+          </p>
+          <ul className="bc-lineage-list">
+            {con.map((c) => (
+              <li key={c.ma_lo} data-lo={c.ma_lo}>
+                <b>Lô {c.ma_lo}</b>
+                <span className="bc-lineage-note">
+                  {NHAN_QUAN_HE[c.loai_lien_ket] || "tạo"} {kgLo(c.so_luong, c.don_vi_tinh)}
+                  {c.tao_tu_lo !== maLo ? ` (từ lô ${c.tao_tu_lo})` : ""}
+                </span>
+                <span className="bc-lineage-note">
+                  {c.nguoi_giu}
+                  {TEN_VAI_TRO_KY[c.vai_tro_nguoi_giu] ? ` (${TEN_VAI_TRO_KY[c.vai_tro_nguoi_giu]})` : ""}
+                  {giaiDoanLo[c.giai_doan] ? ` • ${giaiDoanLo[c.giai_doan]}` : ""}
+                  {c.so_su_kien > 0 ? ` • ${c.da_ky}/${c.so_su_kien} sự kiện đã ký` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       <div className="blockchain-card-footer">

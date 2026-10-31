@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import "../../css/nhaphanphoi.css";
 import BlockchainPanel from "../blockchainpannel";
-import { kyNgay } from "../kyNgay";
+import { baoKetQua } from "../kyNgay";
 import {
   fetchHangDangToi,
   xacNhanNhanHang,
@@ -95,12 +95,12 @@ const DaiLyPage = () => {
     navigate("/dang-nhap");
   };
 
-  const chay = async (khoa, fn) => {
+  const chay = async (khoa, fn, thanhCong) => {
     setDangXuLy(khoa);
     try {
       const kq = await fn();
       await loadAll();
-      await kyNgay(kq?.message || "Đã thực hiện.", { taiLai: loadAll });
+      await baoKetQua(kq, { thanhCong, taiLai: loadAll });
     } catch (err) {
       alert(err.message || "Có lỗi xảy ra");
     } finally {
@@ -116,13 +116,21 @@ const DaiLyPage = () => {
     if (nhap === null) return;
     const kl = Number(String(nhap).replace(",", "."));
     if (!kl || kl <= 0) return alert("Khối lượng không hợp lệ");
-    chay(item.ma_van_don, () => xacNhanNhanHang(item.ma_van_don, kl));
+    chay(
+      item.ma_van_don,
+      () => xacNhanNhanHang(item.ma_van_don, kl),
+      `Đã nhận lô ${item.ma_lo_nong_san} (${kl} ${item.don_vi_tinh || "kg"}).`,
+    );
   };
 
   const tuChoi = (item) => {
     const lyDo = window.prompt(`Lý do từ chối nhận lô ${item.ma_lo_nong_san}:`);
     if (!lyDo || !lyDo.trim()) return;
-    chay(item.ma_van_don, () => tuChoiNhanHang(item.ma_van_don, lyDo.trim()));
+    chay(
+      item.ma_van_don,
+      () => tuChoiNhanHang(item.ma_van_don, lyDo.trim()),
+      `Đã từ chối nhận lô ${item.ma_lo_nong_san}.`,
+    );
   };
 
   const banHet = (lo) => {
@@ -132,7 +140,11 @@ const DaiLyPage = () => {
       )
     )
       return;
-    chay(lo.ma_lo_nong_san, () => xacNhanBanHet(lo.ma_lo_nong_san));
+    chay(
+      lo.ma_lo_nong_san,
+      () => xacNhanBanHet(lo.ma_lo_nong_san),
+      `Đã xác nhận bán hết lô ${lo.ma_lo_nong_san}.`,
+    );
   };
 
   if (!user) return null;
@@ -349,6 +361,15 @@ const DaiLyPage = () => {
                               <span className={`status-pill ${tt.tone}`}>
                                 {tt.text}
                               </span>
+                              {h.cho_ky && (
+                                <span
+                                  className="status-pill warning"
+                                  style={{ marginLeft: 6 }}
+                                  title="Bạn đã bấm nhưng chưa ký: bước này chỉ có hiệu lực sau khi ký"
+                                >
+                                  Chờ ký
+                                </span>
+                              )}
                             </td>
                             <td
                               style={{
@@ -444,6 +465,15 @@ const DaiLyPage = () => {
                               <span className={`status-pill ${xt.tone}`}>
                                 {xt.text}
                               </span>
+                              {l.cho_ky && (
+                                <span
+                                  className="status-pill warning"
+                                  style={{ marginLeft: 6 }}
+                                  title="Đã bấm bán hết nhưng chưa ký: lô chỉ kết thúc sau khi ký"
+                                >
+                                  Chờ ký bán hết
+                                </span>
+                              )}
                             </td>
                             <td
                               style={{

@@ -215,3 +215,237 @@
   margin: 0;
   box-sizing: border-box;
 }
+
+/* ===== Khung ký blockchain: kiểm tra ví, thẻ sự kiện gom theo lô, lịch sử ===== */
+:root:root .bc-checks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+:root:root .bc-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  line-height: 1.4;
+}
+:root:root .bc-check.ok {
+  color: #166534;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+:root:root .bc-check.warn {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+:root:root .bc-check svg {
+  flex: none;
+  margin-top: 2px;
+}
+:root:root .bc-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 12px;
+}
+:root:root .bc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+:root:root .bc-chip.ok {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #bbf7d0;
+}
+:root:root .bc-chip.wait {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+:root:root .bc-chip.sent {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+:root:root .bc-chip.err {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+:root:root .bc-lot {
+  margin-top: 14px;
+}
+:root:root .bc-lot-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+:root:root .bc-ev {
+  border: 1px solid #e5e7eb;
+  border-left-width: 4px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+:root:root .bc-ev-ok {
+  border-left-color: #22c55e;
+}
+:root:root .bc-ev-wait {
+  border-left-color: #f59e0b;
+  background: #fffdf5;
+}
+:root:root .bc-ev-sent {
+  border-left-color: #3b82f6;
+}
+:root:root .bc-ev-err {
+  border-left-color: #ef4444;
+}
+:root:root .bc-ev-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+:root:root .bc-step-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+:root:root .bc-ev-name {
+  font-size: 14px;
+}
+:root:root .bc-ev-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: #6b7280;
+}
+:root:root .bc-ev-result {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.5;
+}
+:root:root .bc-ev-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 8px 0 0;
+}
+:root:root .bc-ev-detail div {
+  display: flex;
+  gap: 6px;
+  font-size: 12.5px;
+}
+:root:root .bc-ev-detail dt {
+  color: #6b7280;
+  margin: 0;
+}
+:root:root .bc-ev-detail dd {
+  margin: 0;
+  font-weight: 600;
+}
+:root:root .bc-ev-why {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 6px 10px;
+  white-space: pre-line;
+}
+:root:root .bc-ev-err {
+  white-space: pre-line;
+}
+:root:root .bc-ev > .bc-ev-err {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-left-width: 1px;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+:root:root .bc-ev-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+:root:root .bc-link {
+  font-size: 12.5px;
+  color: #1d4ed8;
+}
+:root:root .bc-history {
+  margin-top: 10px;
+}
+
+/* ===== Dòng dõi lô: lô nguồn (hành trình trước đó) và lô con (hành trình tiếp theo) ===== */
+:root:root .bc-lineage {
+  margin: 14px 0 4px;
+}
+:root:root .bc-lineage-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  margin-bottom: 4px;
+}
+:root:root .bc-lineage-item {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+}
+:root:root .bc-lineage-item > summary {
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+:root:root .bc-lineage-note {
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+:root:root .bc-lineage-state {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-left: auto;
+}
+:root:root .bc-lineage-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+:root:root .bc-lineage-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  align-items: baseline;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 12.5px;
+}

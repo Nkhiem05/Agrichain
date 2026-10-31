@@ -25,6 +25,7 @@ const {
   ghiNhanDaGui,
 } = require("../services/blockchain/ghiNhan");
 const outboxWorker = require("../services/blockchain/outboxWorker");
+const { moTaSuKien } = require("../services/blockchain/moTaKy");
 
 class ApiError extends Error {
   constructor(status, message) {
@@ -297,11 +298,27 @@ const danhSachVi = async (req, res) => {
           dia_chi: chain.layCauHinh().contractAddress,
           loi: loiHopDong,
         },
-        vi: rows.map((r) => ({
-          ...r,
-          dia_chi_vi: getAddress(r.dia_chi_vi),
-          vai_tro_on_chain: VAI_TRO_ON_CHAIN[r.vai_tro] || null,
-        })),
+        vi: await Promise.all(
+          rows.map(async (r) => {
+            const mongDoi = VAI_TRO_ON_CHAIN[r.vai_tro] || null;
+            // Ví đã duyệt trong CSDL nhưng hợp đồng đang dùng chưa gán đúng vai trò (thường do deploy hợp đồng mới)
+            let lech = false;
+            if (!loiHopDong && mongDoi && r.trang_thai_duyet === "DA_DUYET") {
+              try {
+                const thucTe = await chain.vaiTroTrenChain(r.dia_chi_vi);
+                lech = thucTe !== null && thucTe !== mongDoi;
+              } catch {
+                lech = false;
+              }
+            }
+            return {
+              ...r,
+              dia_chi_vi: getAddress(r.dia_chi_vi),
+              vai_tro_on_chain: mongDoi,
+              lech_vai_tro: lech,
+            };
+          }),
+        ),
       },
     });
   } catch (err) {
@@ -358,6 +375,62 @@ const duyetVi = async (req, res) => {
     return res.json({ success: true, message: "Đã duyệt ví" });
   } catch (err) {
     return sendError(res, err, "Không thể duyệt ví");
+  }
+};
+
+// Sau khi admin ký setRoles để gán lại vai trò cho các ví đã duyệt (hợp đồng mới chưa có vai trò nào), server kiểm tra từng ví
+// trên chain rồi ghi lại mã giao dịch gán vai trò. Không đổi trạng thái duyệt: các ví này vốn đã được duyệt.
+const dongBoVaiTro = async (req, res) => {
+  try {
+    const txHash = txHashHopLe(req.body?.txHash);
+    if (!txHash) throw new ApiError(400, "Thiếu mã giao dịch hợp lệ");
+    const ds = Array.isArray(req.body?.dia_chi) ? req.body.dia_chi.map(chuanHoaDiaChi) : [];
+    if (ds.length === 0) throw new ApiError(400, "Thiếu danh sách ví");
+
+    let gd;
+    try {
+      gd = await chain.kiemTraGiaoDichHopDong(txHash);
+    } catch (err) {
+      console.error("Lỗi đọc giao dịch:", err);
+      throw new ApiError(502, "Không đọc được blockchain, thử lại sau");
+    }
+    if (!gd.ok) throw new ApiError(409, gd.lyDo);
+
+    const [rows] = await db.query(
+      `
+      SELECT v.dia_chi_vi, nd.vai_tro
+      FROM vi_blockchain v JOIN nguoi_dung nd ON nd.ma_nguoi_dung = v.ma_nguoi_dung
+      WHERE v.dia_chi_vi IN (?) AND v.trang_thai_duyet = 'DA_DUYET'
+      `,
+      [ds],
+    );
+    const daDongBo = [];
+    const conLech = [];
+    for (const r of rows) {
+      const mongDoi = VAI_TRO_ON_CHAIN[r.vai_tro];
+      let thucTe = null;
+      try {
+        thucTe = await chain.vaiTroTrenChain(r.dia_chi_vi);
+      } catch (err) {
+        throw new ApiError(502, "Không đọc được blockchain, thử lại sau");
+      }
+      if (mongDoi && thucTe === mongDoi) {
+        await db.query(`UPDATE vi_blockchain SET tx_gan_vai_tro = ? WHERE dia_chi_vi = ?`, [txHash, r.dia_chi_vi]);
+        daDongBo.push(getAddress(r.dia_chi_vi));
+      } else {
+        conLech.push(getAddress(r.dia_chi_vi));
+      }
+    }
+    return res.json({
+      success: true,
+      message:
+        conLech.length === 0
+          ? `Đã gán lại vai trò cho ${daDongBo.length} ví trên hợp đồng đang dùng`
+          : `Đã đồng bộ ${daDongBo.length} ví, còn ${conLech.length} ví chưa đúng vai trò trên chain`,
+      data: { da_dong_bo: daDongBo, con_lech: conLech },
+    });
+  } catch (err) {
+    return sendError(res, err, "Không thể đồng bộ vai trò");
   }
 };
 
@@ -807,9 +880,13 @@ const choKy = async (req, res) => {
           lyDo = `Ví của ${lech.map(nhanDien).join(", ")} đã duyệt trong hệ thống nhưng chưa có vai trò trên hợp đồng blockchain hiện tại. Quản trị viên cần duyệt lại ví (Quản trị → Ví blockchain)`;
       }
 
+      const mo = moTaSuKien(it.loai_hoat_dong, ts, nhanDien);
       return {
         ma_lich_su: it.ma_lich_su,
         ma_lo: it.ma_lo_nong_san,
+        ket_qua: mo.ket_qua,
+        chi_tiet: mo.chi_tiet,
+        dau_hang_lo: minChuaXacNhan.get(it.ma_lo_nong_san) === stt,
         stt,
         loai: it.loai_hoat_dong,
         thoi_diem: it.thoi_diem_xay_ra,
@@ -837,6 +914,27 @@ const choKy = async (req, res) => {
     });
   } catch (err) {
     return sendError(res, err, "Không thể lấy danh sách sự kiện chờ ký");
+  }
+};
+
+// Các sự kiện người dùng đã ký và đã xác nhận trên blockchain (mới nhất trước), để tra lại giao dịch
+const lichSuDaKy = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT ma_lich_su, ma_lo_nong_san AS ma_lo, so_thu_tu_su_kien AS stt, loai_hoat_dong AS loai,
+             thoi_diem_xay_ra AS thoi_diem, ma_giao_dich_blockchain AS tx_hash, so_block, dia_chi_vi_ky,
+             ma_bam_su_kien_hien_tai AS event_hash
+      FROM lich_su_truy_xuat_lo
+      WHERE ma_nguoi_dung = ? AND blockchain_sync_status = 'CONFIRMED'
+      ORDER BY created_at DESC, so_thu_tu_su_kien DESC
+      LIMIT 20
+      `,
+      [req.user.ma_nguoi_dung],
+    );
+    return res.json({ success: true, data: { su_kien: rows } });
+  } catch (err) {
+    return sendError(res, err, "Không thể lấy lịch sử đã ký");
   }
 };
 
@@ -1275,9 +1373,109 @@ const chayDoiSoat = async (req, res) => {
   }
 };
 
+// Dòng dõi của lô: lô nguồn (đi ngược về nông trại, mỗi lô được xác thực chuỗi riêng) và lô con (tách / gộp / sơ chế ra từ lô này).
+// Khi một lô tách thành nhiều lô, mỗi lô con vẫn lần ngược được tới lô gốc qua các liên kết này.
+const TOI_DA_LO_DONG_DOI = 15;
+const MUC_NGHIEM_TRONG = { VERIFIED: 0, NOT_CHECKED: 0, INCOMPLETE: 1, MISMATCH: 2, BROKEN_CHAIN: 3 };
+
+const layDongDoi = async (maLo) => {
+  const nguon = [];
+  const daThay = new Set([maLo]);
+  let bac = [{ ma: maLo, tang: 0 }];
+  while (bac.length > 0 && nguon.length < TOI_DA_LO_DONG_DOI) {
+    const ke = [];
+    for (const { ma, tang } of bac) {
+      const [rows] = await db.query(
+        `
+        SELECT ma_lo_nguon, loai_lien_ket, CAST(so_luong_tham_gia AS CHAR) AS so_luong, don_vi_tinh
+        FROM lien_ket_nguon_goc_lo WHERE ma_lo_duoc_tao_ra = ? ORDER BY ma_lo_nguon
+        `,
+        [ma],
+      );
+      for (const r of rows) {
+        if (daThay.has(r.ma_lo_nguon) || nguon.length >= TOI_DA_LO_DONG_DOI) continue;
+        daThay.add(r.ma_lo_nguon);
+        let xacThuc = null;
+        try {
+          xacThuc = await xacThucMotLo(r.ma_lo_nguon);
+        } catch {
+          xacThuc = null;
+        }
+        nguon.push({
+          ma_lo: r.ma_lo_nguon,
+          tang: tang + 1,
+          tao_ra_lo: ma,
+          loai_lien_ket: r.loai_lien_ket,
+          so_luong: r.so_luong,
+          don_vi_tinh: r.don_vi_tinh,
+          xac_thuc: xacThuc,
+        });
+        ke.push({ ma: r.ma_lo_nguon, tang: tang + 1 });
+      }
+    }
+    bac = ke;
+  }
+
+  const con = [];
+  const daThayCon = new Set([maLo]);
+  bac = [{ ma: maLo, tang: 0 }];
+  while (bac.length > 0 && con.length < TOI_DA_LO_DONG_DOI) {
+    const ke = [];
+    for (const { ma, tang } of bac) {
+      const [rows] = await db.query(
+        `
+        SELECT k.ma_lo_duoc_tao_ra AS ma_lo, k.loai_lien_ket, CAST(k.so_luong_tham_gia AS CHAR) AS so_luong, k.don_vi_tinh,
+               lo.giai_doan_hien_tai, lo.latest_event_sequence AS so_su_kien, nd.ho_ten AS nguoi_giu, nd.vai_tro AS vai_tro_nguoi_giu,
+               (SELECT COUNT(*) FROM lich_su_truy_xuat_lo ls WHERE ls.ma_lo_nong_san = lo.ma_lo_nong_san AND ls.blockchain_sync_status = 'CONFIRMED') AS da_ky
+        FROM lien_ket_nguon_goc_lo k
+        JOIN lo_nong_san lo ON lo.ma_lo_nong_san = k.ma_lo_duoc_tao_ra
+        JOIN nguoi_dung nd ON nd.ma_nguoi_dung = lo.ma_nguoi_quan_ly
+        WHERE k.ma_lo_nguon = ? ORDER BY k.ma_lo_duoc_tao_ra
+        `,
+        [ma],
+      );
+      for (const r of rows) {
+        if (daThayCon.has(r.ma_lo) || con.length >= TOI_DA_LO_DONG_DOI) continue;
+        daThayCon.add(r.ma_lo);
+        con.push({
+          ma_lo: r.ma_lo,
+          tang: tang + 1,
+          tao_tu_lo: ma,
+          loai_lien_ket: r.loai_lien_ket,
+          so_luong: r.so_luong,
+          don_vi_tinh: r.don_vi_tinh,
+          giai_doan: r.giai_doan_hien_tai,
+          nguoi_giu: r.nguoi_giu,
+          vai_tro_nguoi_giu: r.vai_tro_nguoi_giu,
+          so_su_kien: Number(r.so_su_kien),
+          da_ky: Number(r.da_ky),
+        });
+        ke.push({ ma: r.ma_lo, tang: tang + 1 });
+      }
+    }
+    bac = ke;
+  }
+  return { lo_nguon: nguon, lo_con: con };
+};
+
 const xacThucLo = async (req, res) => {
   try {
     const data = await xacThucMotLo(req.params.maLo);
+    // Dòng dõi là phần thêm: lỗi ở đây không được làm hỏng kết quả xác thực của chính lô này
+    try {
+      const maLo = String(req.params.maLo || "").replace(/^#/, "").trim();
+      data.dong_doi = await layDongDoi(maLo);
+      let toanChuoi = data.trang_thai;
+      for (const n of data.dong_doi.lo_nguon) {
+        const tt = n.xac_thuc?.trang_thai;
+        if (tt && MUC_NGHIEM_TRONG[tt] > MUC_NGHIEM_TRONG[toanChuoi]) toanChuoi = tt;
+      }
+      data.trang_thai_toan_chuoi = toanChuoi;
+    } catch (err) {
+      console.error("Không lấy được dòng dõi của lô:", err);
+      data.dong_doi = { lo_nguon: [], lo_con: [] };
+      data.trang_thai_toan_chuoi = data.trang_thai;
+    }
     return res.json({ success: true, data });
   } catch (err) {
     return sendError(res, err, "Không thể xác thực lô hàng");
@@ -1293,6 +1491,7 @@ module.exports = {
   danhSachVi,
   duyetVi,
   tuChoiVi,
+  dongBoVaiTro,
   thongTinNguong,
   xacNhanNguong,
   thongTinOutbox,
@@ -1300,6 +1499,7 @@ module.exports = {
   thongTinDoiSoat,
   chayDoiSoat,
   choKy,
+  lichSuDaKy,
   daGuiSuKien,
   xacNhanSuKien,
   xacThucLo,

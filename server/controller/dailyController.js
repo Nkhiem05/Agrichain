@@ -1,9 +1,17 @@
 const db = require("../config/db");
 const { ghiSuKien } = require("../services/blockchain/traceEvent");
 const {
-  ghiSuKienVanDon,
   ghiSuKienTuChoiNhanHang,
 } = require("../services/blockchain/hook");
+const {
+  daCoBuocChoKy,
+  thucHienBuocCoKy,
+} = require("../services/blockchain/buocCoKy");
+const {
+  apDungKetQuaVanDon,
+  apDungBanHet,
+} = require("../services/blockchain/ghiNhan");
+const { layCauHinh } = require("../services/blockchain/chainClient");
 
 /*
 ==================================================
@@ -87,6 +95,27 @@ const getIncoming = async (req, res) => {
       `,
       [maDaiLy],
     );
+    // cho_ky = bước đại lý đã bấm và đang chờ ký (NHAN_HANG | TU_CHOI_NHAN): hàng chỉ đổi trạng thái sau khi ký xong
+    rows.forEach((r) => {
+      r.cho_ky = null;
+    });
+    if (rows.length > 0 && layCauHinh().daCauHinh) {
+      const [ev] = await db.query(
+        `
+        SELECT ls.loai_hoat_dong AS loai,
+               JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) AS ma_van_don
+        FROM lich_su_truy_xuat_lo ls
+        WHERE ls.blockchain_sync_status <> 'CONFIRMED'
+          AND ls.loai_hoat_dong IN ('STOCK_IN_CONFIRMED', 'HANDOVER_REJECTED')
+          AND JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) IN (?)
+        `,
+        [rows.map((r) => r.ma_van_don)],
+      );
+      rows.forEach((r) => {
+        const e = ev.find((x) => x.ma_van_don === r.ma_van_don);
+        if (e) r.cho_ky = e.loai === "STOCK_IN_CONFIRMED" ? "NHAN_HANG" : "TU_CHOI_NHAN";
+      });
+    }
     return res.json({ success: true, data: rows });
   } catch (err) {
     return sendError(res, err, "Lỗi lấy hàng đang tới:", "Không thể lấy danh sách hàng đang tới");
@@ -101,7 +130,7 @@ const confirmReceive = async (req, res) => {
     const khoiLuong = toPositiveNumber(req.body?.khoi_luong_thuc_te);
     if (!khoiLuong) throw new ApiError(400, "Vui lòng nhập khối lượng nhận thực tế hợp lệ");
 
-    await withTransaction(async (connection) => {
+    const choKy = await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `
         SELECT v.trang_thai, v.ma_lo_nong_san, lo.so_luong_hien_tai, lo.don_vi_tinh
@@ -125,22 +154,37 @@ const confirmReceive = async (req, res) => {
         );
       }
 
-      await connection.execute(
-        `UPDATE lenh_van_chuyen SET trang_thai = 'HOAN_THANH', khoi_luong_nhan = ? WHERE ma_van_don = ?`,
-        [khoiLuong, maVanDon],
+      // Blockchain: đại lý ký nhận hàng kèm khối lượng thực nhận; lô đổi chủ sang đại lý trên chain.
+      // Lệnh / phiếu chỉ hoàn tất và lô chỉ vào cửa hàng sau khi đại lý ký xong (ghiNhan.js áp dụng ap_dung).
+      if (await daCoBuocChoKy(connection, maVanDon, "HANDOVER_REJECTED")) {
+        throw new ApiError(
+          409,
+          'Bạn đã gửi yêu cầu từ chối lô này và đang chờ ký ở tab "Ký blockchain", không nhận hàng được nữa',
+        );
+      }
+      return thucHienBuocCoKy(
+        connection,
+        maVanDon,
+        "STOCK_IN_CONFIRMED",
+        maDaiLy,
+        { khoi_luong_nhan: String(khoiLuong) },
+        {
+          hanh_dong: "NHAN_HANG",
+          khoi_luong_nhan: khoiLuong,
+          giai_doan: "DISTRIBUTED",
+          phieu_da_giao: true,
+        },
       );
-      await connection.execute(
-        `UPDATE lo_nong_san SET ma_nguoi_quan_ly = ?, so_luong_hien_tai = ?, giai_doan_hien_tai = 'DISTRIBUTED' WHERE ma_lo_nong_san = ?`,
-        [maDaiLy, khoiLuong, v.ma_lo_nong_san],
-      );
-      await connection.execute(
-        `UPDATE phieu_xuat_kho SET trang_thai = 'DA_GIAO', thoi_gian_giao = NOW() WHERE ma_van_don = ?`,
-        [maVanDon],
-      );
-      // Blockchain: đại lý ký nhận hàng kèm khối lượng thực nhận; lô đổi chủ sang đại lý
-      await ghiSuKienVanDon(connection, maVanDon, "STOCK_IN_CONFIRMED", maDaiLy);
     });
 
+    if (choKy) {
+      return res.json({
+        success: true,
+        cho_ky: true,
+        message:
+          'Đã gửi yêu cầu xác nhận nhận hàng. Lô chỉ vào cửa hàng của bạn sau khi bạn ký ở tab "Ký blockchain".',
+      });
+    }
     return res.json({ success: true, message: "Đã nhận hàng." });
   } catch (err) {
     return sendError(res, err, "Lỗi đại lý nhận hàng:", "Không thể xác nhận nhận hàng");
@@ -156,7 +200,7 @@ const rejectReceive = async (req, res) => {
     if (!lyDo) throw new ApiError(400, "Vui lòng nhập lý do từ chối");
     if (lyDo.length > MAX_GHI_CHU) throw new ApiError(400, `Lý do tối đa ${MAX_GHI_CHU} ký tự`);
 
-    await withTransaction(async (connection) => {
+    const choKy = await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `SELECT trang_thai FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_ben_nhan = ? LIMIT 1 FOR UPDATE`,
         [maVanDon, maDaiLy],
@@ -165,18 +209,36 @@ const rejectReceive = async (req, res) => {
       if (rows[0].trang_thai !== "CHO_TIEP_NHAN") {
         throw new ApiError(409, "Chỉ từ chối được khi hàng đã tới nơi");
       }
-      await connection.execute(
-        `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ?`,
-        [`Đại lý từ chối nhận: ${lyDo}`, maVanDon],
-      );
-      await connection.execute(
-        `UPDATE phieu_xuat_kho SET trang_thai = 'DA_HUY' WHERE ma_van_don = ?`,
-        [maVanDon],
-      );
-      // Blockchain: đại lý ký từ chối; bên giao ký chở trả về, nhà phân phối ký đã nhận lại
-      await ghiSuKienTuChoiNhanHang(connection, maVanDon);
+      // Blockchain: đại lý ký từ chối; bên giao ký chở trả về, nhà phân phối ký đã nhận lại.
+      // Lệnh / phiếu chỉ chuyển sang "từ chối / hủy" sau khi đại lý ký xong bước từ chối của mình.
+      if (await daCoBuocChoKy(connection, maVanDon, "STOCK_IN_CONFIRMED")) {
+        throw new ApiError(
+          409,
+          'Bạn đã gửi yêu cầu nhận lô này và đang chờ ký ở tab "Ký blockchain", không từ chối được nữa',
+        );
+      }
+      if (await daCoBuocChoKy(connection, maVanDon, "HANDOVER_REJECTED"))
+        return true;
+      const apDung = {
+        hanh_dong: "BEN_NHAN_TU_CHOI",
+        ghi_chu: `Đại lý từ chối nhận: ${lyDo}`,
+      };
+      const suKien = await ghiSuKienTuChoiNhanHang(connection, maVanDon, apDung);
+      if (!layCauHinh().daCauHinh || !suKien) {
+        await apDungKetQuaVanDon(connection, maVanDon, apDung);
+        return false;
+      }
+      return true;
     });
 
+    if (choKy) {
+      return res.json({
+        success: true,
+        cho_ky: true,
+        message:
+          'Đã gửi yêu cầu từ chối nhận hàng. Hàng chỉ được ghi là bị từ chối sau khi bạn ký ở tab "Ký blockchain".',
+      });
+    }
     return res.json({ success: true, message: "Đã từ chối nhận hàng" });
   } catch (err) {
     return sendError(res, err, "Lỗi đại lý từ chối nhận hàng:", "Không thể từ chối nhận hàng");
@@ -202,6 +264,24 @@ const getStock = async (req, res) => {
       `,
       [maDaiLy],
     );
+    // cho_ky = "BAN_HET": đã bấm bán hết và đang chờ đại lý ký (lô chỉ kết thúc sau khi ký xong)
+    rows.forEach((r) => {
+      r.cho_ky = null;
+    });
+    if (rows.length > 0 && layCauHinh().daCauHinh) {
+      const [ev] = await db.query(
+        `
+        SELECT ma_lo_nong_san FROM lich_su_truy_xuat_lo
+        WHERE loai_hoat_dong = 'COMPLETE_CONFIRMED' AND blockchain_sync_status <> 'CONFIRMED'
+          AND ma_lo_nong_san IN (?)
+        `,
+        [rows.map((r) => r.ma_lo_nong_san)],
+      );
+      const cho = new Set(ev.map((e) => e.ma_lo_nong_san));
+      rows.forEach((r) => {
+        if (cho.has(r.ma_lo_nong_san)) r.cho_ky = "BAN_HET";
+      });
+    }
     return res.json({ success: true, data: rows });
   } catch (err) {
     return sendError(res, err, "Lỗi lấy kho đại lý:", "Không thể lấy danh sách hàng trong cửa hàng");
@@ -215,7 +295,7 @@ const completeLot = async (req, res) => {
     const maDaiLy = getRetailerId(req);
     const ghiChu = cleanText(req.body?.ghi_chu);
 
-    await withTransaction(async (connection) => {
+    const choKy = await withTransaction(async (connection) => {
       const [rows] = await connection.execute(
         `
         SELECT so_luong_hien_tai, don_vi_tinh, giai_doan_hien_tai, tinh_trang_su_dung
@@ -228,12 +308,17 @@ const completeLot = async (req, res) => {
       if (lo.giai_doan_hien_tai === "COMPLETED") throw new ApiError(409, "Lô đã được xác nhận bán hết");
       if (lo.tinh_trang_su_dung !== "ACTIVE") throw new ApiError(409, "Lô không còn khả dụng");
 
-      await connection.execute(
-        `UPDATE lo_nong_san SET giai_doan_hien_tai = 'COMPLETED', so_luong_hien_tai = 0 WHERE ma_lo_nong_san = ?`,
+      // Blockchain: đại lý ký "Hoàn tất" (hàm step, COMPLETE_CONFIRMED). Lô chỉ kết thúc vòng đời (hết hàng,
+      // "đã bán hết") sau khi đại lý ký xong (ghiNhan.js áp dụng ap_dung).
+      const [dangCho] = await connection.query(
+        `SELECT ma_lich_su FROM lich_su_truy_xuat_lo
+         WHERE ma_lo_nong_san = ? AND loai_hoat_dong = 'COMPLETE_CONFIRMED' AND blockchain_sync_status <> 'CONFIRMED' LIMIT 1`,
         [maLo],
       );
-      // Blockchain: đại lý ký "Hoàn tất" (hàm step, COMPLETE_CONFIRMED)
-      await ghiSuKien(connection, {
+      if (dangCho.length > 0) return true; // đã gửi yêu cầu trước đó, đang chờ ký
+
+      const apDung = { hanh_dong: "BAN_HET", ma_lo: maLo };
+      const suKien = await ghiSuKien(connection, {
         maLo,
         loai: "COMPLETE_CONFIRMED",
         maNguoiKy: maDaiLy,
@@ -242,10 +327,24 @@ const completeLot = async (req, res) => {
           don_vi_tinh: lo.don_vi_tinh,
           ghi_chu: ghiChu,
         },
-        thamSo: {},
+        thamSo: { ap_dung: apDung },
       });
+      if (!layCauHinh().daCauHinh || !suKien) {
+        // Không có blockchain hoặc lô cũ không được theo dõi: kết thúc lô ngay
+        await apDungBanHet(connection, apDung);
+        return false;
+      }
+      return true;
     });
 
+    if (choKy) {
+      return res.json({
+        success: true,
+        cho_ky: true,
+        message:
+          'Đã gửi yêu cầu xác nhận bán hết. Lô chỉ kết thúc sau khi bạn ký ở tab "Ký blockchain".',
+      });
+    }
     return res.json({ success: true, message: "Đã xác nhận bán hết lô." });
   } catch (err) {
     return sendError(res, err, "Lỗi xác nhận bán hết:", "Không thể xác nhận bán hết lô");

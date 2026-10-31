@@ -1274,6 +1274,17 @@ const ProcessingPage = () => {
                                         <Eye size={15} /> Xem chi tiết
                                       </button>
 
+                                      <button
+                                        type="button"
+                                        className="dropdown-item-btn"
+                                        onClick={() => {
+                                          setOpenDropdownId(null);
+                                          navigate(`/lo-hang/${encodeURIComponent(b.ma_lo_moi)}`);
+                                        }}
+                                      >
+                                        <Eye size={15} /> Chi tiết lô &amp; mã QR
+                                      </button>
+
                                       {(!isPackaged ||
                                         readyToShip.some(
                                           (r) => r.ma_so_che === b.ma_so_che,
