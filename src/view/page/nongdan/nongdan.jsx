@@ -1288,7 +1288,7 @@ const DashboardPage = () => {
         return;
       }
 
-      alert(`${data.message}. Mã hồ sơ: #${data.data.ma_ho_so}`);
+      alert(`${data.message}`);
       handleCloseInspectionModal();
       setActiveTab("inspection");
       // Đang ở sẵn tab này (gửi lại đơn) thì không có gì tự tải lại danh sách
@@ -2267,7 +2267,9 @@ const DashboardPage = () => {
                                     <div
                                       className="dropdown-item"
                                       onClick={() =>
-                                        navigate(`/lo-hang/${encodeURIComponent(batch.ma_lo_nong_san)}`)
+                                        navigate(
+                                          `/lo-hang/${encodeURIComponent(batch.ma_lo_nong_san)}`,
+                                        )
                                       }
                                     >
                                       <Eye size={15} />

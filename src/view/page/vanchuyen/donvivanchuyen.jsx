@@ -243,22 +243,16 @@ export default function AgriChainLogistics() {
       const kq = await kyCacSuKienDangCho();
       if (kq.soDaKy > 0) {
         await loadTrips();
-        alert(
-          `${loiBao}\nĐã ký ${kq.soDaKy} sự kiện lên blockchain, chuyến đã chuyển sang bước tiếp theo.`,
-        );
+        alert("Đã ký và cập nhật trạng thái vận chuyển.");
       } else {
-        alert(
-          `${loiBao}\nChưa ký được: ${kq.lyDo}.\nChuyến giữ nguyên bước hiện tại; bấm lại nút để ký.`,
-        );
+        alert(`${loiBao}\nChưa ký: ${kq.lyDo}. Bấm lại nút để ký.`);
       }
     } catch (loi) {
       const lyDo =
         loi?.code === "ACTION_REJECTED" || loi?.code === 4001
           ? "bạn đã từ chối trong MetaMask"
           : loi?.reason || loi?.shortMessage || loi?.message;
-      alert(
-        `${loiBao}\nChưa ký được (${lyDo}).\nChuyến giữ nguyên bước hiện tại; bấm lại nút để ký.`,
-      );
+      alert(`${loiBao}\nChưa ký (${lyDo}). Bấm lại nút để ký.`);
     }
     await loadTrips();
   };
@@ -266,8 +260,8 @@ export default function AgriChainLogistics() {
   const chanNeuBenGuiChuaKy = (trip) => {
     if (!trip.chua_ky_lenh) return false;
     alert(
-      `Bên gửi (${trip.ten_nguoi_gui || "—"}) chưa ký xác nhận lấy hàng đi cho chuyến ${trip.ma_van_don} lên blockchain.\nHãy chờ bên gửi ký xong rồi mới bấm lấy hàng đi.${
-        trip.ly_do_chua_ky_lenh ? `\n\n${trip.ly_do_chua_ky_lenh}` : ""
+      `Chờ bên gửi (${trip.ten_nguoi_gui || "—"}) ký xác nhận lấy hàng đi cho chuyến ${trip.ma_van_don}.${
+        trip.ly_do_chua_ky_lenh ? `\n${trip.ly_do_chua_ky_lenh}` : ""
       }`,
     );
     return true;
@@ -407,7 +401,7 @@ export default function AgriChainLogistics() {
             ? "tài xế"
             : "phương tiện";
       alert(
-        `Bạn chưa có ${thieu} nào trong danh sách.\nHãy thêm ở mục "Tài xế & phương tiện" rồi quay lại chấp nhận chuyến.`,
+        `Bạn chưa có ${thieu}. Hãy thêm ở mục "Tài xế & phương tiện" rồi chấp nhận lại.`,
       );
       setCurrentTab("fleet");
       return;

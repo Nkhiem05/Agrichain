@@ -99,7 +99,7 @@ const getTransporterId = (req) => {
 };
 
 const CHUA_KY_LENH =
-  "Bên gửi chưa ký xác nhận lấy hàng đi lên blockchain. Hãy chờ bên gửi ký xong rồi mới thực hiện bước này.";
+  "Chờ bên gửi ký xác nhận lấy hàng đi rồi mới thực hiện bước này.";
 
 // Trạng thái ký của sự kiện tạo lệnh (bên gửi ký): null = lệnh chưa có sự kiện (lệnh cũ), hoặc trạng thái đồng bộ của nó
 const trangThaiKyLenh = async (executor, maVanDon) => {
@@ -207,7 +207,7 @@ const ganCoKy = async (executor, rows, maDonVi) => {
         ds.push(`bên gửi ${ten(r.ma_nguoi_gui, r.ten_nguoi_gui)}`);
       if (thieu.has(maDonVi)) ds.push("đơn vị vận chuyển (bạn)");
       if (ds.length > 0) {
-        r.ly_do_chua_ky_lenh = `Lệnh chưa ký được vì ${ds.join(", ")} chưa liên kết ví hoặc chưa được quản trị viên duyệt ví blockchain.`;
+        r.ly_do_chua_ky_lenh = `Lệnh chưa ký được: ${ds.join(", ")} chưa có ví được duyệt.`;
       }
     });
   }
@@ -529,13 +529,11 @@ const createDriver = async (req, res) => {
         throw err;
       }
     }
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Đã thêm tài xế",
-        data: { ma_tai_xe: ma },
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Đã thêm tài xế",
+      data: { ma_tai_xe: ma },
+    });
   } catch (err) {
     return sendError(res, err, "Lỗi thêm tài xế:", "Không thể thêm tài xế");
   }
@@ -640,13 +638,11 @@ const createVehicle = async (req, res) => {
         throw err;
       }
     }
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: "Đã thêm phương tiện",
-        data: { ma_phuong_tien: ma },
-      });
+    return res.status(201).json({
+      success: true,
+      message: "Đã thêm phương tiện",
+      data: { ma_phuong_tien: ma },
+    });
   } catch (err) {
     return sendError(
       res,
@@ -735,7 +731,7 @@ const acceptTrip = async (req, res) => {
     if (!maTaiXe || !maPhuongTien) {
       throw new ApiError(
         400,
-        'Hãy chọn tài xế và phương tiện từ danh sách. Nếu chưa có, thêm ở mục "Tài xế & phương tiện"',
+        'Hãy chọn tài xế và phương tiện từ danh sách (thêm ở mục "Tài xế & phương tiện").',
       );
     }
 
@@ -824,13 +820,13 @@ const rejectTrip = async (req, res) => {
         if (trangThaiKy === "SUBMITTED") {
           throw new ApiError(
             409,
-            "Bên gửi vừa ký lệnh, đang chờ blockchain xác nhận. Hãy thử lại sau ít phút",
+            "Lệnh đang chờ blockchain xác nhận, hãy thử lại sau ít phút",
           );
         }
         if (trangThaiKy && !(await goSuKienLenhChuaKy(connection, maVanDon))) {
           throw new ApiError(
             409,
-            "Không gỡ được lệnh đang chờ ký vì lô còn sự kiện khác chờ ký phía sau",
+            "Không gỡ được lệnh chờ ký vì lô còn sự kiện khác chờ ký phía sau",
           );
         }
         await apDungKetQuaVanDon(connection, maVanDon, {
@@ -856,7 +852,7 @@ const rejectTrip = async (req, res) => {
       success: true,
       cho_ky: choKy,
       message: choKy
-        ? "Đã tạo yêu cầu từ chối chuyến. Hãy ký bằng MetaMask; chuyến chỉ bị từ chối sau khi ký xong."
+        ? "Đã tạo yêu cầu từ chối chuyến. Hãy ký bằng MetaMask để hoàn tất."
         : "Đã từ chối chuyến vận chuyển",
     });
   } catch (err) {
@@ -906,7 +902,7 @@ const confirmPickup = async (req, res) => {
       success: true,
       cho_ky: choKy,
       message: choKy
-        ? "Đã tạo yêu cầu xác nhận lấy hàng. Hãy ký bằng MetaMask; chuyến chỉ bắt đầu vận chuyển sau khi ký xong."
+        ? "Đã tạo yêu cầu xác nhận lấy hàng. Hãy ký bằng MetaMask để bắt đầu vận chuyển."
         : "Đã xác nhận lấy hàng, chuyến bắt đầu vận chuyển",
     });
   } catch (err) {
@@ -952,7 +948,7 @@ const confirmArrival = async (req, res) => {
       success: true,
       cho_ky: choKy,
       message: choKy
-        ? "Đã tạo yêu cầu xác nhận đến nơi. Hãy ký bằng MetaMask; bên nhận chỉ xác nhận được sau khi ký xong."
+        ? "Đã tạo yêu cầu xác nhận đến nơi. Hãy ký bằng MetaMask để bên nhận xác nhận."
         : "Đã xác nhận đến nơi, chờ bên nhận xác nhận bàn giao",
     });
   } catch (err) {

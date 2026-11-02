@@ -2,6 +2,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import AppRoutes from "../src/app"; // đường dẫn tới file route vừa tạo
+import { caiDatThayAlert } from "../server/utils/thongbao";
+
+// Mọi alert("...") trong dự án sẽ hiện bằng thông báo toast dùng chung
+caiDatThayAlert();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>

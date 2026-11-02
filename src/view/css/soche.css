@@ -553,6 +553,14 @@
     font-weight: 600;
   }
 
+  /* Badge trạng thái ở bảng bàn giao vận chuyển: mọi dòng cùng độ rộng */
+  .soche-dashboard .badge-status-line.badge-fixed {
+    box-sizing: border-box;
+    width: 230px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+
   .soche-dashboard .badge-status-line.warning {
     background-color: #fef3c7;
     color: #92400e;
@@ -767,6 +775,7 @@
 
   /* Nút xem chi tiết bảng vận chuyển */
   .soche-dashboard .btn-detail-table {
+    white-space: nowrap;
     background-color: #eff6ff;
     color: #2563eb;
     border: 1px solid #bfdbfe;
@@ -797,6 +806,7 @@
 
   .soche-dashboard .shipping-table {
     width: 100%;
+    min-width: 1000px;
     border-collapse: collapse;
     text-align: left;
     font-size: 13px;
@@ -814,6 +824,12 @@
     padding: 14px 18px;
     border-bottom: 1px solid #f3f4f6;
     color: #1f2937;
+  }
+
+  /* Mã vận đơn và cột thao tác không bị bẻ dòng; bảng hẹp thì cuộn ngang */
+  .soche-dashboard .shipping-table td:first-child,
+  .soche-dashboard .shipping-table td:last-child {
+    white-space: nowrap;
   }
 
   .soche-dashboard .shipping-table tbody tr:last-child td {

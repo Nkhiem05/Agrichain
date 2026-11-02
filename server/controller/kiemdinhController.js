@@ -33,16 +33,14 @@ class LoiNghiepVu extends Error {
 }
 
 const CHUA_KY_LAY_MAU =
-  'Biên bản lấy mẫu chưa được ký lên blockchain. Hãy vào mục "Ký blockchain" ký biên bản lấy mẫu trước, rồi mới nhập chỉ số xét nghiệm.';
-const CHU_LO_CHUA_KY_XAC_NHAN =
-  'Nông dân (chủ lô) chưa ký xác nhận biên bản lấy mẫu. Nông dân cần vào trang Nông dân → "Ký blockchain" để ký, sau đó bạn mới công bố được kết quả.';
+  "Biên bản lấy mẫu chưa được ký. Hãy ký rồi nhập chỉ số.";
+const CHU_LO_CHUA_KY_XAC_NHAN = "Chờ nông dân ký biên bản xác nhận lấy mẫu";
 const CHUA_KY_LAY_MAU_CONG_BO =
-  'Biên bản lấy mẫu của cơ quan chưa được ký lên blockchain. Hãy vào mục "Ký blockchain" ký trước, rồi mới công bố được kết quả.';
+  "Biên bản lấy mẫu chưa được ký. Hãy ký rồi thử lại.";
 const DA_GUI_CONG_BO =
-  'Đã gửi yêu cầu công bố cho hồ sơ này, đang chờ cơ quan ký. Hãy vào mục "Ký blockchain" để ký; hồ sơ chỉ chuyển sang công bố sau khi ký xong.';
+  'Hồ sơ đang chờ ký công bố. Hãy vào mục "Ký blockchain" để ký.';
 const DA_GUI_THU_HOI =
-  'Đã gửi yêu cầu thu hồi cho hồ sơ này, đang chờ cơ quan ký. Hãy vào mục "Ký blockchain" để ký; hồ sơ chỉ bị thu hồi sau khi ký xong.';
-
+  'Hồ sơ đang chờ ký thu hồi. Hãy vào mục "Ký blockchain" để ký.';
 // Trạng thái ký blockchain của hồ sơ: Map mã hồ sơ -> { theoDoi, daKyLayMau, daKyXacNhan, choKyCongBo }.
 //  - daKyLayMau : SAMPLING_SEALED (cơ quan ký) đã lên chain -> mới được nhập chỉ số xét nghiệm
 //  - daKyXacNhan: SAMPLING_CONFIRMED (chủ lô ký xác nhận biên bản lấy mẫu) đã lên chain -> mới được công bố

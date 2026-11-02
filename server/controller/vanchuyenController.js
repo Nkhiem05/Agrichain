@@ -593,7 +593,7 @@ const createOrder = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Tạo lệnh vận chuyển & bàn giao thành công. Không cần ký lúc này: sau khi đơn vị vận chuyển chấp nhận, bạn ký xác nhận lấy hàng đi (nút "Ký xác nhận lấy hàng đi" ở lệnh đó, hoặc tab Ký blockchain) rồi xe mới lấy hàng được${canhBaoVi}`,
+      message: `Tạo lệnh vận chuyển thành công, vui lòng ký khi đơn vị vận chuyển đến lấy hàng.`,
       data: { ma_van_don },
     });
   } catch (err) {

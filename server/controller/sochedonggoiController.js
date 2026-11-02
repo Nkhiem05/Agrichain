@@ -1714,8 +1714,8 @@ const createShipment = async (req, res) => {
       success: true,
       cho_ky: false,
       message: canKy
-        ? `Đã tạo lệnh bàn giao vận chuyển. Không cần ký lúc này: sau khi đơn vị vận chuyển chấp nhận, bạn ký xác nhận lấy hàng đi (nút "Ký xác nhận lấy hàng đi" ở lệnh đó hoặc tab Ký blockchain) rồi xe mới lấy hàng được${canhBaoVi}`
-        : `Đã tạo lệnh bàn giao vận chuyển${canhBaoVi}`,
+        ? `Đã tạo lệnh vận chuyển, vui lòng ký khi bên vận chuyển đến lấy hàng.`
+        : `Đã tạo lệnh vận chuyển`,
       data: { ma_van_don: maVanDon },
     });
   } catch (err) {

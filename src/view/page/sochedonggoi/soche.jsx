@@ -1279,10 +1279,13 @@ const ProcessingPage = () => {
                                         className="dropdown-item-btn"
                                         onClick={() => {
                                           setOpenDropdownId(null);
-                                          navigate(`/lo-hang/${encodeURIComponent(b.ma_lo_moi)}`);
+                                          navigate(
+                                            `/lo-hang/${encodeURIComponent(b.ma_lo_moi)}`,
+                                          );
                                         }}
                                       >
-                                        <Eye size={15} /> Chi tiết lô &amp; mã QR
+                                        <Eye size={15} /> Chi tiết lô &amp; mã
+                                        QR
                                       </button>
 
                                       {(!isPackaged ||
@@ -1767,21 +1770,11 @@ const ProcessingPage = () => {
                                     <td>{row.thoi_gian_xuat}</td>
                                     <td>
                                       <span
-                                        className={`badge-status-line ${statusInfo.tone}`}
+                                        className={`badge-status-line badge-fixed ${statusInfo.tone}`}
                                       >
                                         <StatusIcon size={12} />{" "}
                                         {statusInfo.text}
                                       </span>
-                                      {row.cho_ky_lenh && (
-                                        <div style={{ marginTop: 6 }}>
-                                          <span className="badge-status-line warning">
-                                            <Clock size={12} />{" "}
-                                            {row.trang_thai === "CHO_CHAP_NHAN"
-                                              ? "Chờ đơn vị vận chuyển chấp nhận (chưa cần ký)"
-                                              : "Chờ bạn ký xác nhận lấy hàng đi"}
-                                          </span>
-                                        </div>
-                                      )}
                                     </td>
                                     <td>
                                       {row.cho_ky_lenh &&

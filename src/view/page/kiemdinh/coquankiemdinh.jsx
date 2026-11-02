@@ -92,14 +92,13 @@ const BadgeChuLoXacNhan = ({ item }) =>
 
 // Nút công bố vẫn bấm được khi chủ lô chưa ký xác nhận biên bản lấy mẫu: bấm thì báo bằng alert
 const CANH_BAO_CHU_LO_CHUA_XAC_NHAN =
-  'Nông dân (chủ lô) chưa ký xác nhận biên bản lấy mẫu.\nNông dân cần vào trang Nông dân → "Ký blockchain" để ký, sau đó bạn mới công bố được kết quả.';
+  "Chờ nông dân ký xác nhận biên bản lấy mẫu bạn mới có thể công bố.";
 
 // Chưa ký blockchain thì không nhập chỉ số / không công bố: nút vẫn bấm được nhưng chỉ hiện alert
 const CANH_BAO_CHUA_KY_LAY_MAU =
-  'Biên bản lấy mẫu chưa được ký lên blockchain.\nHãy vào mục "Ký blockchain" ký biên bản lấy mẫu trước, rồi mới nhập chỉ số xét nghiệm.';
+  'Biên bản lấy mẫu chưa được ký. Hãy ký ở mục "Ký blockchain" và thử lại.';
 const CANH_BAO_CHUA_KY_LAY_MAU_CONG_BO =
-  'Biên bản lấy mẫu của cơ quan chưa được ký lên blockchain.\nHãy vào mục "Ký blockchain" ký trước, rồi mới công bố được kết quả.';
-
+  'Biên bản lấy mẫu chưa được ký. Hãy ký ở mục "Ký blockchain" và thử lại.';
 // Lý do chưa công bố được (null = được công bố). da_ky_lay_mau do server trả về, thiếu thì coi như không chặn.
 const canhBaoTruocCongBo = (item) => {
   if (item.cho_ky_cong_bo) return CANH_BAO_DA_GUI_CONG_BO;
@@ -110,10 +109,9 @@ const canhBaoTruocCongBo = (item) => {
 
 // Công bố / thu hồi chỉ có hiệu lực sau khi cơ quan ký lên blockchain: lúc bấm chỉ tạo yêu cầu chờ ký
 const CANH_BAO_DA_GUI_CONG_BO =
-  'Đã gửi yêu cầu công bố cho hồ sơ này, đang chờ cơ quan ký.\nHãy vào mục "Ký blockchain" để ký; hồ sơ chỉ chuyển sang "Công bố chứng nhận" sau khi ký xong.';
+  'Hồ sơ đang chờ ký công bố. Hãy vào mục "Ký blockchain" để ký.';
 const CANH_BAO_DA_GUI_THU_HOI =
-  'Đã gửi yêu cầu thu hồi cho chứng nhận này, đang chờ cơ quan ký.\nHãy vào mục "Ký blockchain" để ký; chứng nhận chỉ bị thu hồi sau khi ký xong.';
-
+  'Chứng nhận đang chờ ký thu hồi. Hãy vào mục "Ký blockchain" để ký.';
 const BadgeChoKy = ({ text }) => (
   <span
     style={{

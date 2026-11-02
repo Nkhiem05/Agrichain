@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import "../css/dangky.css";
 
 const ACTOR_DATA = {
@@ -149,12 +149,133 @@ const ACTOR_DATA = {
   },
 };
 
+// ================= THÔNG BÁO (TOAST) =================
+const TOAST_MS = 4000;
+
+const TOAST_ICON = {
+  success: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.5"
+      d="M5 13l4 4L19 7"
+    />
+  ),
+  error: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.5"
+      d="M6 18L18 6M6 6l12 12"
+    />
+  ),
+  warning: (
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.5"
+      d="M12 8v5m0 4h.01"
+    />
+  ),
+};
+
+const ToastItem = ({ toast, onClose }) => {
+  const [closing, setClosing] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const timer = useRef(null);
+
+  const dong = () => {
+    setClosing(true);
+    setTimeout(() => onClose(toast.id), 300);
+  };
+
+  // Tự đóng sau 4 giây; rê chuột vào thì dừng đếm giờ, rời chuột 1,2 giây sau thì đóng
+  useEffect(() => {
+    timer.current = setTimeout(dong, TOAST_MS);
+    return () => clearTimeout(timer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const roiChuot = () => {
+    setPaused(false);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(dong, 1200);
+  };
+
+  return (
+    <div
+      className={`req-toast req-toast-${toast.type} ${closing ? "is-closing" : ""}`}
+      role={toast.type === "success" ? "status" : "alert"}
+      onMouseEnter={() => {
+        setPaused(true);
+        clearTimeout(timer.current);
+      }}
+      onMouseLeave={roiChuot}
+    >
+      <div className="req-toast-icon">
+        <svg
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          {TOAST_ICON[toast.type]}
+        </svg>
+      </div>
+      <div className="req-toast-body">
+        <h4 className="req-toast-title">{toast.title}</h4>
+        {toast.desc && <p className="req-toast-desc">{toast.desc}</p>}
+      </div>
+      <button
+        type="button"
+        className="req-toast-close"
+        onClick={dong}
+        aria-label="Đóng thông báo"
+      >
+        <svg
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      </button>
+      <div className="req-toast-progress">
+        <div
+          className="req-toast-progress-bar"
+          style={{
+            animationDuration: `${TOAST_MS}ms`,
+            animationPlayState: paused ? "paused" : "running",
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
 export const DangKy = () => {
   const [selectedRole, setSelectedRole] = useState("FARMER");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = (type, title, desc) =>
+    setToasts((prev) => [
+      ...prev,
+      { id: Date.now() + Math.random(), type, title, desc },
+    ]);
+  const closeToast = (id) =>
+    setToasts((prev) => prev.filter((t) => t.id !== id));
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -181,12 +302,20 @@ export const DangKy = () => {
       !formData.facilityName ||
       !formData.address
     ) {
-      alert("Vui lòng điền đầy đủ các trường thông tin bắt buộc!");
+      showToast(
+        "warning",
+        "Thiếu thông tin",
+        "Vui lòng điền đầy đủ các trường thông tin bắt buộc!",
+      );
       return;
     }
 
     if (!agreedTerms) {
-      alert("Bạn cần đồng ý với các điều khoản trước khi gửi yêu cầu!");
+      showToast(
+        "warning",
+        "Chưa đồng ý điều khoản",
+        "Bạn cần đồng ý với các điều khoản trước khi gửi yêu cầu!",
+      );
       return;
     }
 
@@ -207,13 +336,26 @@ export const DangKy = () => {
       if (!res.ok) {
         console.log(res);
 
-        alert("Có lỗi xảy ra, vui lòng thử lại!");
+        showToast(
+          "error",
+          "Gửi yêu cầu thất bại",
+          "Có lỗi xảy ra, vui lòng thử lại!",
+        );
         return;
       }
+      showToast(
+        "success",
+        "Gửi yêu cầu thành công!",
+        "Hệ thống đã ghi nhận yêu cầu cấp tài khoản của bạn.",
+      );
       setSubmitted(true);
     } catch (error) {
       console.error(error);
-      alert("Có lỗi kết nối đến máy chủ, vui lòng thử lại!");
+      showToast(
+        "error",
+        "Không kết nối được máy chủ",
+        "Có lỗi kết nối đến máy chủ, vui lòng thử lại!",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -221,6 +363,13 @@ export const DangKy = () => {
 
   return (
     <div className="req-container">
+      {/* Thông báo nổi góc trên bên phải */}
+      <div className="req-toast-container">
+        {toasts.map((t) => (
+          <ToastItem key={t.id} toast={t} onClose={closeToast} />
+        ))}
+      </div>
+
       <div className="req-card">
         {/* Header với Logo Badge nâng cấp */}
         <div className="req-header">
