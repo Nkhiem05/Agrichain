@@ -33,7 +33,10 @@ import {
 } from "lucide-react";
 import "../../css/soche.css";
 import BlockchainPanel from "../blockchainpannel";
-import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
+import {
+  kyCacSuKienDangCho,
+  nhanLaiHangTra,
+} from "../../../api/blockchainApi";
 import { useNavigate } from "react-router-dom";
 import {
   fetchIncomingShipments,
@@ -83,6 +86,16 @@ const SHIPMENT_STATUS_LABEL = {
     icon: CheckCircle2,
   },
   TU_CHOI: { text: "Đã từ chối tiếp nhận", tone: "danger", icon: XCircle },
+  DANG_TRA_HANG: {
+    text: "Bị từ chối - đang chở hàng trả về",
+    tone: "warning",
+    icon: Truck,
+  },
+  DA_TRA_LAI: {
+    text: "Hàng đã trả về nơi gửi",
+    tone: "purple",
+    icon: Clock,
+  },
   DA_HUY: { text: "Đã hủy", tone: "danger", icon: XCircle },
 };
 
@@ -559,6 +572,17 @@ const ProcessingPage = () => {
 
   // Ký xác nhận lấy hàng đi (sau khi đơn vị vận chuyển đã chấp nhận): mở MetaMask ký sự kiện tạo lệnh.
   // Hủy hoặc lỗi thì sự kiện vẫn nằm ở tab "Ký blockchain" để ký sau.
+  // Hàng bị bên nhận từ chối đã được chở về: bấm "đã nhận lại hàng" rồi ký (RETURN_RECEIVED); lô dùng lại được sau khi ký xong
+  const handleNhanLaiHang = async (row) => {
+    try {
+      const res = await nhanLaiHangTra(row.ma_van_don);
+      baoChoKy(res, `Đã nhận lại hàng của lệnh ${row.ma_van_don}.`);
+      if (!res?.cho_ky) await loadAll(true);
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận nhận lại hàng");
+    }
+  };
+
   const handleKyLenhBanGiao = async (row) => {
     try {
       const kq = await kyCacSuKienDangCho({ maLo: row.ma_lo_nong_san });
@@ -821,9 +845,12 @@ const ProcessingPage = () => {
                             {
                               incomingShipments.filter(
                                 (b) =>
-                                  !["HOAN_THANH", "TU_CHOI"].includes(
-                                    b.trang_thai,
-                                  ),
+                                  ![
+                                    "HOAN_THANH",
+                                    "TU_CHOI",
+                                    "DANG_TRA_HANG",
+                                    "DA_TRA_LAI",
+                                  ].includes(b.trang_thai),
                               ).length
                             }
                             <span className="metric-unit">LÔ HÀNG</span>
@@ -901,7 +928,9 @@ const ProcessingPage = () => {
                                 className={`card-icon-box ${
                                   shipment.trang_thai === "HOAN_THANH"
                                     ? "green"
-                                    : shipment.trang_thai === "TU_CHOI"
+                                    : ["TU_CHOI", "DANG_TRA_HANG", "DA_TRA_LAI"].includes(
+                                          shipment.trang_thai,
+                                        )
                                       ? "amber"
                                       : "blue"
                                 }`}
@@ -1741,12 +1770,24 @@ const ProcessingPage = () => {
                                     </td>
                                     <td>{row.thoi_gian_xuat}</td>
                                     <td>
-                                      <span
-                                        className={`badge-status-line ${statusInfo.tone}`}
-                                      >
-                                        <StatusIcon size={12} />{" "}
-                                        {statusInfo.text}
-                                      </span>
+                                      {row.cho_ky === "NHAN_LAI" ? (
+                                        <span className="badge-status-line warning">
+                                          <Clock size={12} /> Chờ ký nhận lại
+                                          hàng
+                                        </span>
+                                      ) : row.trang_thai === "DA_TRA_LAI" ? (
+                                        <span className="badge-status-line purple">
+                                          <Clock size={12} /> Hàng đã trả về -
+                                          chờ bạn nhận lại
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className={`badge-status-line ${statusInfo.tone}`}
+                                        >
+                                          <StatusIcon size={12} />{" "}
+                                          {statusInfo.text}
+                                        </span>
+                                      )}
                                       {row.cho_ky_lenh && (
                                         <div style={{ marginTop: 6 }}>
                                           <span className="badge-status-line warning">
@@ -1759,6 +1800,17 @@ const ProcessingPage = () => {
                                       )}
                                     </td>
                                     <td>
+                                      {row.trang_thai === "DA_TRA_LAI" && (
+                                        <button
+                                          className="btn-detail-table"
+                                          style={{ marginRight: 6 }}
+                                          onClick={() => handleNhanLaiHang(row)}
+                                        >
+                                          {row.cho_ky === "NHAN_LAI"
+                                            ? "Ký nhận lại hàng"
+                                            : "Đã nhận lại hàng"}
+                                        </button>
+                                      )}
                                       {row.cho_ky_lenh &&
                                         row.trang_thai === "CHO_LAY_HANG" && (
                                           <button
@@ -1886,8 +1938,9 @@ const ProcessingPage = () => {
               <div className="modal-body">
                 <p style={{ color: "#4b5563", marginBottom: "12px" }}>
                   Bạn đang từ chối lô hàng{" "}
-                  <strong>{rejectingShipment.ma_lo_nong_san}</strong>. Lệnh vận
-                  chuyển sẽ bị đóng và nông dân có thể tạo lại lệnh mới.
+                  <strong>{rejectingShipment.ma_lo_nong_san}</strong>. Sau khi bạn
+                  ký từ chối, đơn vị vận chuyển sẽ chở hàng trả về nơi gửi và
+                  bên gửi ký xác nhận nhận lại hàng.
                 </p>
 
                 <div className="form-group">
@@ -2632,7 +2685,10 @@ const ProcessingPage = () => {
                   ) : (
                     <div className="merge-lot-list">
                       {splitMergeLots.map((l) => (
-                        <label key={l.ma_lo_nong_san} className="merge-lot-row">
+                        <label
+                          key={l.ma_lo_nong_san}
+                          className="merge-lot-row"
+                        >
                           <input
                             type="checkbox"
                             checked={mergeSelected.includes(l.ma_lo_nong_san)}

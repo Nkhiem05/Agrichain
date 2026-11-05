@@ -328,7 +328,7 @@ const viecDangDo = async (maNguoiDung, diaChiCu) => {
     `
     SELECT ma_van_don, ma_lo_nong_san AS ma_lo, trang_thai FROM lenh_van_chuyen
     WHERE (ma_don_vi_van_chuyen = ? OR ma_ben_nhan = ?)
-      AND trang_thai IN ('CHO_LAY_HANG','DANG_VAN_CHUYEN','CHO_TIEP_NHAN','DANG_TRA_HANG')
+      AND trang_thai IN ('CHO_LAY_HANG','DANG_VAN_CHUYEN','CHO_TIEP_NHAN','DANG_TRA_HANG','DA_TRA_LAI')
     `,
     [maNguoiDung, maNguoiDung],
   );

@@ -10,6 +10,9 @@ router.get("/xac-thuc/:maLo", blockchainController.xacThucLo);
 
 router.use(checkAuth);
 
+// Bên gửi ký nhận lại hàng bị bên nhận từ chối (sau khi vận chuyển đã chở về)
+router.put("/van-don/:maVanDon/nhan-lai", blockchainController.nhanLaiHangTra);
+
 // Ví của người dùng đang đăng nhập
 router.get("/vi", blockchainController.viCuaToi);
 router.post("/vi/nonce", blockchainController.taoNonce);

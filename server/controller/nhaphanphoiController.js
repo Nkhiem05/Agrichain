@@ -146,7 +146,8 @@ const INCOMING_SELECT = `
 const TRANG_THAI_CO_THE_XU_LY = ["CHO_TIEP_NHAN"];
 
 // Gắn cờ cho từng dòng có ma_van_don: cho_ky = bước nhà phân phối đã bấm và đang chờ ký (hồ sơ chỉ đổi sau khi ký xong).
-//   NHAP_KHO | TU_CHOI (nhận hàng từ sơ chế), XUAT_KHO | TOI_NOI (giao cho đại lý), TAO_PHIEU (lệnh giao chưa ký xong)
+//   NHAP_KHO | TU_CHOI (nhận hàng từ sơ chế), XUAT_KHO | TOI_NOI (giao cho đại lý), TAO_PHIEU (lệnh giao chưa ký xong),
+//   NHAN_LAI (nhận lại hàng bị đại lý từ chối)
 const gioChoKy = async (rows) => {
   rows.forEach((r) => {
     r.cho_ky = null;
@@ -159,7 +160,7 @@ const gioChoKy = async (rows) => {
            JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) AS ma_van_don
     FROM lich_su_truy_xuat_lo ls
     WHERE ls.blockchain_sync_status <> 'CONFIRMED'
-      AND ls.loai_hoat_dong IN ('STOCK_IN_CONFIRMED', 'HANDOVER_REJECTED', 'PICKUP_CONFIRMED', 'DELIVERY_CONFIRMED', 'TRANSPORT_ORDERED')
+      AND ls.loai_hoat_dong IN ('STOCK_IN_CONFIRMED', 'HANDOVER_REJECTED', 'PICKUP_CONFIRMED', 'DELIVERY_CONFIRMED', 'TRANSPORT_ORDERED', 'RETURN_RECEIVED')
       AND JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) IN (?)
     `,
     [dsVanDon],
@@ -170,14 +171,13 @@ const gioChoKy = async (rows) => {
     PICKUP_CONFIRMED: "XUAT_KHO",
     DELIVERY_CONFIRMED: "TOI_NOI",
     TRANSPORT_ORDERED: "TAO_PHIEU",
+    RETURN_RECEIVED: "NHAN_LAI",
   };
   rows.forEach((r) => {
     const cua = ev.filter((e) => e.ma_van_don === r.ma_van_don);
     // ưu tiên bước muộn nhất đang chờ
-    const thuTu = ["TOI_NOI", "XUAT_KHO", "NHAP_KHO", "TU_CHOI", "TAO_PHIEU"];
-    const co = cua
-      .map((e) => TEN[e.loai])
-      .sort((x, y) => thuTu.indexOf(x) - thuTu.indexOf(y))[0];
+    const thuTu = ["NHAN_LAI", "TOI_NOI", "XUAT_KHO", "NHAP_KHO", "TU_CHOI", "TAO_PHIEU"];
+    const co = cua.map((e) => TEN[e.loai]).sort((x, y) => thuTu.indexOf(x) - thuTu.indexOf(y))[0];
     if (co) r.cho_ky = co;
   });
 };
@@ -503,10 +503,7 @@ const confirmReceive = async (req, res) => {
         {
           hanh_dong: "NHAN_HANG",
           khoi_luong_nhan: khoiLuongThucTe,
-          nhap_kho: {
-            vi_tri_luu_kho: viTriKho,
-            han_luu_kho: hanLuuKho || null,
-          },
+          nhap_kho: { vi_tri_luu_kho: viTriKho, han_luu_kho: hanLuuKho || null },
         },
       );
     });
@@ -811,8 +808,7 @@ const createDispatch = async (req, res) => {
     if (!ma_lo_nong_san)
       throw new ApiError(400, "Vui lòng chọn lô hàng cần xuất");
     // Có blockchain: giao nguyên lô nên số lượng lấy theo tồn của lô, không cần nhập
-    if (!coChuoi && !so_luong_xuat)
-      throw new ApiError(400, "Số lượng xuất phải lớn hơn 0");
+    if (!coChuoi && !so_luong_xuat) throw new ApiError(400, "Số lượng xuất phải lớn hơn 0");
     if (!["TU_GIAO", "DV_VAN_CHUYEN"].includes(hinh_thuc)) {
       throw new ApiError(400, "Hình thức giao hàng không hợp lệ");
     }
@@ -845,9 +841,7 @@ const createDispatch = async (req, res) => {
           // Đại lý phải liên kết ví MetaMask (đã được admin duyệt) thì mới lập phiếu và vận chuyển được,
           // vì họ phải ký nhận hàng bằng ví của mình
           if (coChuoi) {
-            const thieuVi = await chuaCoViDuyet(connection, [
-              dealer.ma_nguoi_dung,
-            ]);
+            const thieuVi = await chuaCoViDuyet(connection, [dealer.ma_nguoi_dung]);
             if (thieuVi.length > 0) {
               throw new ApiError(
                 409,
@@ -1020,9 +1014,8 @@ const createDispatch = async (req, res) => {
           // Không có blockchain: trừ tồn kho như cách cũ. Có blockchain: lô được giao nguyên, đổi chủ khi đại lý ký nhận
           if (!coChuoi) {
             const conLai =
-              Math.round(
-                (Number(lot.so_luong_hien_tai) - so_luong_xuat) * 1000,
-              ) / 1000;
+              Math.round((Number(lot.so_luong_hien_tai) - so_luong_xuat) * 1000) /
+              1000;
             await connection.execute(
               `UPDATE lo_nong_san SET so_luong_hien_tai = ? WHERE ma_lo_nong_san = ?`,
               [conLai, ma_lo_nong_san],

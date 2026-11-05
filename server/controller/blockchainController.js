@@ -25,6 +25,7 @@ const {
   ghiNhanDaGui,
 } = require("../services/blockchain/ghiNhan");
 const outboxWorker = require("../services/blockchain/outboxWorker");
+const { thucHienBuocCoKy } = require("../services/blockchain/buocCoKy");
 const { moTaSuKien } = require("../services/blockchain/moTaKy");
 
 class ApiError extends Error {
@@ -384,9 +385,7 @@ const dongBoVaiTro = async (req, res) => {
   try {
     const txHash = txHashHopLe(req.body?.txHash);
     if (!txHash) throw new ApiError(400, "Thiếu mã giao dịch hợp lệ");
-    const ds = Array.isArray(req.body?.dia_chi)
-      ? req.body.dia_chi.map(chuanHoaDiaChi)
-      : [];
+    const ds = Array.isArray(req.body?.dia_chi) ? req.body.dia_chi.map(chuanHoaDiaChi) : [];
     if (ds.length === 0) throw new ApiError(400, "Thiếu danh sách ví");
 
     let gd;
@@ -417,10 +416,7 @@ const dongBoVaiTro = async (req, res) => {
         throw new ApiError(502, "Không đọc được blockchain, thử lại sau");
       }
       if (mongDoi && thucTe === mongDoi) {
-        await db.query(
-          `UPDATE vi_blockchain SET tx_gan_vai_tro = ? WHERE dia_chi_vi = ?`,
-          [txHash, r.dia_chi_vi],
-        );
+        await db.query(`UPDATE vi_blockchain SET tx_gan_vai_tro = ? WHERE dia_chi_vi = ?`, [txHash, r.dia_chi_vi]);
         daDongBo.push(getAddress(r.dia_chi_vi));
       } else {
         conLech.push(getAddress(r.dia_chi_vi));
@@ -1033,16 +1029,74 @@ const xacNhanSuKien = async (req, res) => {
   }
 };
 
+/* ======================= Nhận lại hàng bị từ chối (bên gửi) ======================= */
+
+// Hàng bị bên nhận từ chối đã được vận chuyển chở trả về tới bên gửi: bên gửi (nông dân / sơ chế / nhà phân phối)
+// bấm "đã nhận lại hàng" rồi ký (RETURN_RECEIVED). Lệnh chỉ đóng và lô chỉ dùng lại được sau khi ký xong.
+const nhanLaiHangTra = async (req, res) => {
+  const { maVanDon } = req.params;
+  try {
+    const maNguoiDung = req.user.ma_nguoi_dung;
+    const choKy = await withTransaction(async (connection) => {
+      const [rows] = await connection.query(
+        `SELECT trang_thai FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_nguoi_gui = ? LIMIT 1 FOR UPDATE`,
+        [maVanDon, maNguoiDung],
+      );
+      if (rows.length === 0)
+        throw new ApiError(404, "Không tìm thấy lệnh vận chuyển của bạn");
+      if (rows[0].trang_thai !== "DA_TRA_LAI") {
+        throw new ApiError(
+          409,
+          rows[0].trang_thai === "DANG_TRA_HANG"
+            ? "Hàng chưa được đơn vị vận chuyển chở về tới bạn"
+            : "Lệnh này không có hàng bị trả về cần nhận lại",
+        );
+      }
+      return thucHienBuocCoKy(
+        connection,
+        maVanDon,
+        "RETURN_RECEIVED",
+        maNguoiDung,
+        {},
+        { hanh_dong: "BEN_GUI_NHAN_LAI" },
+      );
+    });
+    return res.json({
+      success: true,
+      cho_ky: choKy,
+      message: choKy
+        ? "Đã tạo yêu cầu xác nhận nhận lại hàng. Hãy ký bằng MetaMask: lô chỉ dùng lại được sau khi ký xong."
+        : "Đã xác nhận nhận lại hàng, lô dùng lại được",
+    });
+  } catch (err) {
+    return sendError(res, err, "Không thể xác nhận nhận lại hàng");
+  }
+};
+
 /* ======================= Xác thực (công khai cho người tiêu dùng) ======================= */
 
 // Đối chiếu một lô: chuỗi hash trong MySQL, dữ liệu gốc (mùa vụ, chỉ số kiểm định, lô nguồn) và hash trên chain.
 // Dùng cho trang xác thực công khai và cho đối soát toàn bộ của admin.
+// Chẩn đoán lỗi đọc chain, nhớ kết quả 30 giây để đối soát hàng loạt không gọi lại cho từng lô
+let chanDoanNho = { luc: 0, kq: null };
+const chanDoanDocChain = async () => {
+  if (Date.now() - chanDoanNho.luc < 30000) return chanDoanNho.kq;
+  let kq = null;
+  try {
+    kq = await chain.chanDoanHopDong();
+  } catch (err) {
+    kq = err.shortMessage || err.message;
+  }
+  chanDoanNho = { luc: Date.now(), kq };
+  return kq;
+};
+
 const xacThucMotLo = async (maLoVao) => {
   const maLo = String(maLoVao || "")
     .replace(/^#/, "")
     .trim();
   const [loRows] = await db.query(
-    `SELECT ma_lo_nong_san, latest_event_sequence, latest_event_hash FROM lo_nong_san WHERE ma_lo_nong_san = ?`,
+    `SELECT ma_lo_nong_san, latest_event_sequence, latest_event_hash, integrity_status FROM lo_nong_san WHERE ma_lo_nong_san = ?`,
     [maLo],
   );
   if (loRows.length === 0) throw new ApiError(404, "Không tìm thấy lô hàng");
@@ -1171,6 +1225,8 @@ const xacThucMotLo = async (maLoVao) => {
 
   // 2. Đối chiếu với blockchain
   let tren = null;
+  let khongDocDuocChain = false;
+  let loiMangDocChain = false; // lỗi tạm thời khi gọi RPC (khác với việc hợp đồng không có lô)
   if (
     events.length > 0 &&
     trangThai !== "BROKEN_CHAIN" &&
@@ -1179,21 +1235,46 @@ const xacThucMotLo = async (maLoVao) => {
     if (!cfg.daCauHinh) {
       danger("INCOMPLETE", "Server chưa cấu hình contract blockchain");
     } else {
-      try {
-        tren = await chain.layTrangThaiLoTrenChain(maLo);
-      } catch (err) {
-        console.error("Lỗi đọc blockchain:", err);
-        danger(
-          "INCOMPLETE",
-          "Không đọc được blockchain lúc này, hãy thử lại sau",
+      // Thử tối đa 3 lần: nút RPC công cộng thỉnh thoảng giới hạn tốc độ hoặc ngắt kết nối tạm thời
+      let loiDoc = null;
+      for (let lan = 1; lan <= 3; lan++) {
+        try {
+          tren = await chain.layTrangThaiLoTrenChain(maLo);
+          loiDoc = null;
+          break;
+        } catch (err) {
+          loiDoc = err;
+          if (lan < 3) await new Promise((r) => setTimeout(r, 600 * lan));
+        }
+      }
+      if (loiDoc) {
+        // Đọc chain lỗi KHÔNG có nghĩa là thiếu chữ ký: báo "chưa đối soát được" kèm nguyên nhân thật
+        console.error("Lỗi đọc blockchain:", loiDoc);
+        khongDocDuocChain = true;
+        loiMangDocChain = true;
+        lyDo.push(
+          `Không đọc được blockchain qua ${cfg.rpcUrl}: ${loiDoc.shortMessage || loiDoc.message}`,
         );
+        // Chẩn đoán luôn nguyên nhân (sai RPC / sai mạng / không có hợp đồng ở địa chỉ này...) để khỏi phải tìm log
+        const chanDoan = await chanDoanDocChain();
+        if (chanDoan) lyDo.push(`Chẩn đoán: ${chanDoan}`);
       }
       if (tren) {
         if (!tren.tonTai) {
-          danger(
-            "INCOMPLETE",
-            "Chưa có sự kiện nào của lô được ký lên blockchain",
-          );
+          const daKy = events.filter((e) => e.blockchain_sync_status === "CONFIRMED").length;
+          if (daKy === events.length) {
+            // Đã ký đủ theo hệ thống nhưng hợp đồng đang dùng không có lô: không phải thiếu chữ ký,
+            // mà do các chữ ký nằm trên hợp đồng cũ (đã triển khai lại hợp đồng) nên không đối soát được
+            khongDocDuocChain = true;
+            lyDo.push(
+              `Hệ thống ghi nhận ${daKy}/${events.length} sự kiện đã ký nhưng hợp đồng đang dùng (${cfg.contractAddress}) không có lô này. Có thể các chữ ký được ký trên hợp đồng cũ (hợp đồng đã được triển khai lại): lô này không đối soát được với hợp đồng mới`,
+            );
+          } else {
+            danger(
+              "INCOMPLETE",
+              "Chưa có sự kiện nào của lô được ký lên blockchain",
+            );
+          }
         } else {
           const idx = events.findIndex(
             (e) => e.ma_bam_su_kien_hien_tai === tren.lastHash,
@@ -1214,10 +1295,25 @@ const xacThucMotLo = async (maLoVao) => {
     }
   }
 
-  await db.query(
-    `UPDATE lo_nong_san SET integrity_status = ? WHERE ma_lo_nong_san = ?`,
-    [trangThai, maLo],
-  );
+  // Chuỗi trong MySQL không có vấn đề nhưng chưa đọc được chain: giữ ở "chưa đối soát", không kết luận thiếu chữ ký
+  // Lỗi RPC tạm thời (giới hạn tốc độ, rớt mạng) KHÔNG được làm mất kết quả "khớp" của lần đối soát trước: mọi sự kiện mới
+  // đều đặt lô về "chưa đối soát", nên lô còn VERIFIED nghĩa là chưa có gì thay đổi kể từ lần khớp đó.
+  let giuKetQuaCu = false;
+  if (khongDocDuocChain && trangThai === "VERIFIED") {
+    if (loiMangDocChain && lo.integrity_status === "VERIFIED") {
+      giuKetQuaCu = true;
+      lyDo.push("Lúc này không đọc được blockchain nên giữ kết quả khớp của lần đối soát trước (chưa có sự kiện mới)");
+    } else {
+      trangThai = "NOT_CHECKED";
+    }
+  }
+
+  if (!giuKetQuaCu) {
+    await db.query(
+      `UPDATE lo_nong_san SET integrity_status = ? WHERE ma_lo_nong_san = ?`,
+      [trangThai, maLo],
+    );
+  }
 
   return {
     trang_thai: trangThai,
@@ -1369,7 +1465,7 @@ const chayDoiSoat = async (req, res) => {
     const t = data.thong_ke;
     return res.json({
       success: true,
-      message: `Đã đối soát ${los.length} lô: ${t.VERIFIED} khớp, ${t.INCOMPLETE} chờ đủ chữ ký, ${t.MISMATCH + t.BROKEN_CHAIN} có sai lệch`,
+      message: `Đã đối soát ${los.length} lô: ${t.VERIFIED} khớp, ${t.INCOMPLETE} chờ đủ chữ ký, ${t.MISMATCH + t.BROKEN_CHAIN} có sai lệch${t.NOT_CHECKED > 0 ? `, ${t.NOT_CHECKED} chưa đối soát được (xem cột Chi tiết)` : ""}`,
       data,
     });
   } catch (err) {
@@ -1381,13 +1477,7 @@ const chayDoiSoat = async (req, res) => {
 // Dòng dõi của lô: lô nguồn (đi ngược về nông trại, mỗi lô được xác thực chuỗi riêng) và lô con (tách / gộp / sơ chế ra từ lô này).
 // Khi một lô tách thành nhiều lô, mỗi lô con vẫn lần ngược được tới lô gốc qua các liên kết này.
 const TOI_DA_LO_DONG_DOI = 15;
-const MUC_NGHIEM_TRONG = {
-  VERIFIED: 0,
-  NOT_CHECKED: 0,
-  INCOMPLETE: 1,
-  MISMATCH: 2,
-  BROKEN_CHAIN: 3,
-};
+const MUC_NGHIEM_TRONG = { VERIFIED: 0, NOT_CHECKED: 0, INCOMPLETE: 1, MISMATCH: 2, BROKEN_CHAIN: 3 };
 
 const layDongDoi = async (maLo) => {
   const nguon = [];
@@ -1404,8 +1494,7 @@ const layDongDoi = async (maLo) => {
         [ma],
       );
       for (const r of rows) {
-        if (daThay.has(r.ma_lo_nguon) || nguon.length >= TOI_DA_LO_DONG_DOI)
-          continue;
+        if (daThay.has(r.ma_lo_nguon) || nguon.length >= TOI_DA_LO_DONG_DOI) continue;
         daThay.add(r.ma_lo_nguon);
         let xacThuc = null;
         try {
@@ -1447,8 +1536,7 @@ const layDongDoi = async (maLo) => {
         [ma],
       );
       for (const r of rows) {
-        if (daThayCon.has(r.ma_lo) || con.length >= TOI_DA_LO_DONG_DOI)
-          continue;
+        if (daThayCon.has(r.ma_lo) || con.length >= TOI_DA_LO_DONG_DOI) continue;
         daThayCon.add(r.ma_lo);
         con.push({
           ma_lo: r.ma_lo,
@@ -1476,15 +1564,12 @@ const xacThucLo = async (req, res) => {
     const data = await xacThucMotLo(req.params.maLo);
     // Dòng dõi là phần thêm: lỗi ở đây không được làm hỏng kết quả xác thực của chính lô này
     try {
-      const maLo = String(req.params.maLo || "")
-        .replace(/^#/, "")
-        .trim();
+      const maLo = String(req.params.maLo || "").replace(/^#/, "").trim();
       data.dong_doi = await layDongDoi(maLo);
       let toanChuoi = data.trang_thai;
       for (const n of data.dong_doi.lo_nguon) {
         const tt = n.xac_thuc?.trang_thai;
-        if (tt && MUC_NGHIEM_TRONG[tt] > MUC_NGHIEM_TRONG[toanChuoi])
-          toanChuoi = tt;
+        if (tt && MUC_NGHIEM_TRONG[tt] > MUC_NGHIEM_TRONG[toanChuoi]) toanChuoi = tt;
       }
       data.trang_thai_toan_chuoi = toanChuoi;
     } catch (err) {
@@ -1520,4 +1605,5 @@ module.exports = {
   xacNhanSuKien,
   xacThucLo,
   xacThucMotLo,
+  nhanLaiHangTra,
 };

@@ -253,7 +253,7 @@ const ganTrangThaiKy = async (executor, rows, truong, maCoSo) => {
   });
 };
 
-// Lệnh vận chuyển có đang chờ cơ sở ký bước nào không (cho_ky = NHAN_HANG | TU_CHOI_NHAN; cho_ky_lenh = lệnh bàn giao chưa ký)
+// Lệnh vận chuyển có đang chờ cơ sở ký bước nào không (cho_ky = NHAN_HANG | TU_CHOI_NHAN | NHAN_LAI; cho_ky_lenh = lệnh bàn giao chưa ký)
 const ganChoKyVanDon = async (executor, rows) => {
   rows.forEach((r) => {
     r.cho_ky = null;
@@ -266,7 +266,7 @@ const ganChoKyVanDon = async (executor, rows) => {
            JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) AS ma_van_don
     FROM lich_su_truy_xuat_lo ls
     WHERE ls.blockchain_sync_status <> 'CONFIRMED'
-      AND ls.loai_hoat_dong IN ('TRANSPORT_ORDERED', 'STOCK_IN_CONFIRMED', 'HANDOVER_REJECTED')
+      AND ls.loai_hoat_dong IN ('TRANSPORT_ORDERED', 'STOCK_IN_CONFIRMED', 'HANDOVER_REJECTED', 'RETURN_RECEIVED')
       AND JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) IN (?)
     `,
     [rows.map((r) => r.ma_van_don)],
@@ -275,6 +275,7 @@ const ganChoKyVanDon = async (executor, rows) => {
     ev.filter((e) => e.ma_van_don === r.ma_van_don).forEach((e) => {
       if (e.loai === "STOCK_IN_CONFIRMED") r.cho_ky = "NHAN_HANG";
       else if (e.loai === "HANDOVER_REJECTED") r.cho_ky = "TU_CHOI_NHAN";
+      else if (e.loai === "RETURN_RECEIVED") r.cho_ky = "NHAN_LAI";
       else if (e.loai === "TRANSPORT_ORDERED") r.cho_ky_lenh = true;
     });
   });

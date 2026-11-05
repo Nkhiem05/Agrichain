@@ -180,9 +180,7 @@ const KD1 = id("KD-001");
   const e = next(L1);
   // cơ quan chưa niêm phong được khi chủ lô chưa ký; chưa niêm phong thì cũng chưa công bố được
   await rejects(
-    c
-      .connect(certA)
-      .certify(L1, KD1, T.SAMPLING, 0, ZeroHash, e.prev, e.eventHash),
+    c.connect(certA).certify(L1, KD1, T.SAMPLING, 0, ZeroHash, e.prev, e.eventHash),
     "chu lo chua ky bien ban lay mau",
   );
   await rejects(
@@ -407,9 +405,7 @@ check(
     "khong phai nguoi giu lo",
   );
 }
-await sign(L1, (p, e) =>
-  c.connect(factory).step(L1, T.PROCESSING_STARTED, p, e),
-);
+await sign(L1, (p, e) => c.connect(factory).step(L1, T.PROCESSING_STARTED, p, e));
 await sign(L1, (p, e) => c.connect(factory).step(L1, T.WASHING_DONE, p, e));
 await sign(L1, (p, e) => c.connect(factory).step(L1, T.PROCESSING_DONE, p, e));
 const P1 = id("LO-P1");

@@ -618,6 +618,7 @@ const ganCoKyLenh = async (executor, rows) => {
   rows.forEach((r) => {
     r.cho_ky_lenh = false;
     r.can_ky_lenh = false;
+    r.cho_ky_nhan_lai = false; // đã bấm nhận lại hàng bị từ chối, đang chờ ký
   });
   if (rows.length === 0 || !layCauHinh().daCauHinh) return;
   const [ev] = await executor.query(
@@ -633,6 +634,21 @@ const ganCoKyLenh = async (executor, rows) => {
   rows.forEach((r) => {
     r.cho_ky_lenh = chuaKy.has(r.ma_van_don);
     r.can_ky_lenh = r.cho_ky_lenh && ["CHO_LAY_HANG"].includes(r.trang_thai);
+  });
+
+  // Nhận lại hàng bị bên nhận từ chối: sự kiện RETURN_RECEIVED của bên gửi đang chờ ký
+  const [nl] = await executor.query(
+    `
+    SELECT JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) AS ma_van_don
+    FROM lich_su_truy_xuat_lo
+    WHERE loai_hoat_dong = 'RETURN_RECEIVED' AND blockchain_sync_status <> 'CONFIRMED'
+      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) IN (?)
+    `,
+    [rows.map((r) => r.ma_van_don)],
+  );
+  const choNhanLai = new Set(nl.map((e) => e.ma_van_don));
+  rows.forEach((r) => {
+    r.cho_ky_nhan_lai = choNhanLai.has(r.ma_van_don);
   });
 };
 

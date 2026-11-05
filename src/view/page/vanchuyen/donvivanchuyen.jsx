@@ -35,6 +35,7 @@ import {
   rejectTrip,
   confirmPickup,
   confirmArrival,
+  confirmReturn,
   fetchDrivers,
   createDriver,
   updateDriver,
@@ -59,6 +60,16 @@ const STATUS_LABEL = {
   },
   HOAN_THANH: { text: "Đã hoàn thành", tone: "success", icon: CheckCircle2 },
   TU_CHOI: { text: "Đã từ chối", tone: "danger", icon: XCircle },
+  DANG_TRA_HANG: {
+    text: "Bị từ chối - chở hàng trả về",
+    tone: "amber",
+    icon: AlertCircle,
+  },
+  DA_TRA_LAI: {
+    text: "Đã trả hàng về - chờ bên gửi nhận lại",
+    tone: "emerald",
+    icon: ClipboardCheck,
+  },
   DA_HUY: { text: "Đã hủy", tone: "danger", icon: XCircle },
 };
 
@@ -81,6 +92,7 @@ const TEN_CHO_KY = {
   LAY_HANG: "Chờ ký lấy hàng",
   DEN_NOI: "Chờ ký đến nơi",
   TU_CHOI: "Chờ ký từ chối",
+  TRA_HANG_TOI_NOI: "Chờ ký trả hàng về",
 };
 
 const BadgeChoKy = ({ text }) => (
@@ -535,6 +547,33 @@ export default function AgriChainLogistics() {
     }
   };
 
+  // ==================== TRẢ HÀNG VỀ (bên nhận đã từ chối) ====================
+
+  const handleConfirmReturn = async (trip) => {
+    setOpenDropdown(null);
+    if (trip.cho_ky === "TRA_HANG_TOI_NOI") {
+      await kySauThaoTac(
+        `Chuyến ${trip.ma_van_don} đang chờ ký xác nhận trả hàng về.`,
+      );
+      return;
+    }
+    if (
+      !window.confirm(
+        `Xác nhận đã chở hàng bị từ chối của chuyến ${trip.ma_van_don} về tới ${trip.ten_nguoi_gui || "bên gửi"}?`,
+      )
+    )
+      return;
+    try {
+      const kq = await confirmReturn(trip.ma_van_don);
+      await loadTrips();
+      if (kq?.cho_ky)
+        await kySauThaoTac(`Chuyến ${trip.ma_van_don}: ${kq.message}`);
+      else alert("Đã xác nhận trả hàng về. Chờ bên gửi xác nhận nhận lại.");
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận trả hàng về");
+    }
+  };
+
   // ==================== XUẤT FILE ====================
 
   const exportToJson = (data, filename = "agrichain_logistics_data.json") => {
@@ -608,9 +647,12 @@ export default function AgriChainLogistics() {
   const pickupHistory = trips.filter((t) =>
     ["DANG_VAN_CHUYEN", "CHO_TIEP_NHAN", "HOAN_THANH"].includes(t.trang_thai),
   );
-  const deliveryTrips = trips.filter((t) => t.trang_thai === "DANG_VAN_CHUYEN");
+  // Tab "giao hàng đến" gồm cả chuyến đang chở hàng bị từ chối trả về
+  const deliveryTrips = trips.filter((t) =>
+    ["DANG_VAN_CHUYEN", "DANG_TRA_HANG"].includes(t.trang_thai),
+  );
   const deliveryHistory = trips.filter((t) =>
-    ["CHO_TIEP_NHAN", "HOAN_THANH"].includes(t.trang_thai),
+    ["CHO_TIEP_NHAN", "HOAN_THANH", "DA_TRA_LAI"].includes(t.trang_thai),
   );
 
   if (!user) return null;
@@ -1152,8 +1194,10 @@ export default function AgriChainLogistics() {
                         <div className="metric-title">Chuyến xe đang chạy</div>
                         <div className="metric-number">
                           {
-                            trips.filter(
-                              (t) => t.trang_thai === "DANG_VAN_CHUYEN",
+                            trips.filter((t) =>
+                              ["DANG_VAN_CHUYEN", "DANG_TRA_HANG"].includes(
+                                t.trang_thai,
+                              ),
                             ).length
                           }
                           <span className="metric-unit">
@@ -1177,6 +1221,10 @@ export default function AgriChainLogistics() {
                           <option value="CHO_TIEP_NHAN">
                             Chờ bên nhận xác nhận
                           </option>
+                          <option value="DANG_TRA_HANG">
+                            Đang trả hàng về
+                          </option>
+                          <option value="DA_TRA_LAI">Đã trả hàng về</option>
                           <option value="HOAN_THANH">Đã hoàn thành</option>
                           <option value="TU_CHOI">Đã từ chối</option>
                         </select>
@@ -1356,6 +1404,21 @@ export default function AgriChainLogistics() {
                                         </>
                                       )}
 
+                                      {trip.trang_thai === "DANG_TRA_HANG" && (
+                                        <>
+                                          <div className="dropdown-divider"></div>
+                                          <div
+                                            className="dropdown-item"
+                                            onClick={() =>
+                                              handleConfirmReturn(trip)
+                                            }
+                                          >
+                                            <CheckCircle size={15} />
+                                            <span>Xác nhận đã trả hàng về</span>
+                                          </div>
+                                        </>
+                                      )}
+
                                       {trip.trang_thai ===
                                         "DANG_VAN_CHUYEN" && (
                                         <>
@@ -1523,7 +1586,7 @@ export default function AgriChainLogistics() {
                           color: "#6b7280",
                         }}
                       >
-                        Không có chuyến nào đang trên đường.
+                        Không có chuyến nào đang trên đường (kể cả chuyến chở hàng bị từ chối trả về).
                       </div>
                     ) : (
                       deliveryTrips.map((trip) => (
@@ -1553,10 +1616,14 @@ export default function AgriChainLogistics() {
                               <p
                                 style={{ fontSize: "12.5px", color: "#6b7280" }}
                               >
-                                Điểm giao:{" "}
-                                {trip.ten_ben_nhan ||
-                                  trip.dia_chi_giao_hang ||
-                                  "—"}
+                                {trip.trang_thai === "DANG_TRA_HANG"
+                                  ? "Trả hàng về: "
+                                  : "Điểm giao: "}
+                                {trip.trang_thai === "DANG_TRA_HANG"
+                                  ? trip.ten_nguoi_gui || "—"
+                                  : trip.ten_ben_nhan ||
+                                    trip.dia_chi_giao_hang ||
+                                    "—"}
                                 {trip.cho_ky && (
                                   <BadgeChoKy text={TEN_CHO_KY[trip.cho_ky]} />
                                 )}
@@ -1571,11 +1638,19 @@ export default function AgriChainLogistics() {
                                 <span>Xem chi tiết</span>
                               </button>
                               <button
-                                onClick={() => handleConfirmArrival(trip)}
+                                onClick={() =>
+                                  trip.trang_thai === "DANG_TRA_HANG"
+                                    ? handleConfirmReturn(trip)
+                                    : handleConfirmArrival(trip)
+                                }
                                 className="btn-primary"
                               >
                                 <Check size={16} />
-                                <span>Xác nhận đã đến nơi</span>
+                                <span>
+                                  {trip.trang_thai === "DANG_TRA_HANG"
+                                    ? "Xác nhận đã trả hàng về"
+                                    : "Xác nhận đã đến nơi"}
+                                </span>
                               </button>
                             </div>
                           </div>

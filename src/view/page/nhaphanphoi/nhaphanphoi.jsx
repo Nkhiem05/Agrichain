@@ -28,6 +28,7 @@ import { useNavigate } from "react-router-dom";
 import "../../css/nhaphanphoi.css";
 import BlockchainPanel from "../blockchainpannel";
 import { baoKetQua } from "../kyNgay";
+import { nhanLaiHangTra } from "../../../api/blockchainApi";
 import {
   fetchIncomingShipments,
   confirmReceiveShipment,
@@ -72,6 +73,16 @@ const INCOMING_STATUS = {
   },
   HOAN_THANH: { text: "Đã nhập kho", tone: "success", icon: CheckCircle2 },
   TU_CHOI: { text: "Đã từ chối", tone: "danger", icon: XCircle },
+  DANG_TRA_HANG: {
+    text: "Đã từ chối - hàng đang chở trả về",
+    tone: "warning",
+    icon: Truck,
+  },
+  DA_TRA_LAI: {
+    text: "Đã từ chối - hàng đã trả về nơi gửi",
+    tone: "gray",
+    icon: CheckCircle2,
+  },
 };
 
 // Bước nhà phân phối đã bấm nhưng chưa ký (cờ cho_ky do server trả về)
@@ -83,6 +94,7 @@ const NHAN_CHO_KY_XUAT = {
   XUAT_KHO: "Chờ ký xuất kho",
   TOI_NOI: "Chờ ký tới nơi",
   TAO_PHIEU: "Chờ ký xác nhận lấy hàng đi",
+  NHAN_LAI: "Chờ ký nhận lại hàng",
 };
 
 // Nhãn tiếng Việt cho trạng thái phiếu xuất kho (phieu_xuat_kho.trang_thai)
@@ -457,9 +469,7 @@ const NhaPhanPhoiPage = () => {
       /* dùng danh sách đã có */
     }
     if (dsVanChuyen.length === 0) {
-      alert(
-        "Chưa có tài khoản đơn vị vận chuyển nào để thuê giao hàng. Hãy tạo tài khoản vận chuyển trước.",
-      );
+      alert("Chưa có tài khoản đơn vị vận chuyển nào để thuê giao hàng. Hãy tạo tài khoản vận chuyển trước.");
       return;
     }
     if (!dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG")) {
@@ -470,9 +480,7 @@ const NhaPhanPhoiPage = () => {
       return;
     }
     // Đại lý phải liên kết ví MetaMask (đã duyệt) mới nhận được phiếu phân phối và vận chuyển
-    if (
-      !dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi)
-    ) {
+    if (!dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi)) {
       alert(
         "Chưa có đại lý nào liên kết ví MetaMask. Đại lý cần liên kết ví ở trang của họ thì bạn mới lập phiếu phân phối và vận chuyển được.",
       );
@@ -503,6 +511,19 @@ const NhaPhanPhoiPage = () => {
     setShowCreateDispatchModal(true);
   };
 
+  // Hàng đại lý từ chối đã được chở về kho: bấm "đã nhận lại hàng" rồi ký (RETURN_RECEIVED); lô dùng lại được sau khi ký xong
+  const handleNhanLaiHang = async (order) => {
+    try {
+      const res = await nhanLaiHangTra(order.ma_van_don);
+      await baoKetQua(res, {
+        thanhCong: `Đã nhận lại hàng đại lý từ chối (lệnh ${order.ma_van_don}). Lô đã dùng lại được.`,
+        taiLai: loadAll,
+      });
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận nhận lại hàng");
+    }
+  };
+
   const handleSaveDispatch = async () => {
     if (!dispatchForm.daiLyId) return alert("Vui lòng chọn đại lý nhận hàng!");
     const daiLyChon = dealers.find((d) => d.ma_dai_ly === dispatchForm.daiLyId);
@@ -512,15 +533,11 @@ const NhaPhanPhoiPage = () => {
       );
     }
     if (!dispatchForm.maLo) return alert("Vui lòng chọn lô xuất hàng!");
-    if (!dispatchForm.maDonViVanChuyen)
-      return alert("Vui lòng chọn đơn vị vận chuyển!");
+    if (!dispatchForm.maDonViVanChuyen) return alert("Vui lòng chọn đơn vị vận chuyển!");
     // Giao nguyên lô: khối lượng lấy theo tồn của lô, không tách lô
-    const lotChon = inventoryList.find(
-      (l) => l.ma_lo_nong_san === dispatchForm.maLo,
-    );
+    const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
     const xuatKg = Number(lotChon?.so_luong_hien_tai);
-    if (!xuatKg || xuatKg <= 0)
-      return alert("Lô được chọn không còn hàng để giao!");
+    if (!xuatKg || xuatKg <= 0) return alert("Lô được chọn không còn hàng để giao!");
 
     try {
       const res = await createDispatch({
@@ -533,14 +550,8 @@ const NhaPhanPhoiPage = () => {
       setShowCreateDispatchModal(false);
       await loadAll();
       await baoKetQua(
-        {
-          ...res,
-          message: `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.`,
-        },
-        {
-          thanhCong: `Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""}.`,
-          taiLai: loadAll,
-        },
+        { ...res, message: `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.` },
+        { thanhCong: `Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""}.`, taiLai: loadAll },
       );
     } catch (err) {
       alert(err.message || "Không thể lập phiếu xuất kho");
@@ -1492,9 +1503,15 @@ const NhaPhanPhoiPage = () => {
                                     {order.trang_thai === "DANG_GIAO" &&
                                     order.trang_thai_van_don === "CHO_TIEP_NHAN"
                                       ? "Đã tới nơi - Chờ đại lý nhận"
-                                      : DISPATCH_STATUS_LABEL[
-                                          order.trang_thai
-                                        ] || order.trang_thai}
+                                      : order.trang_thai_van_don ===
+                                          "DANG_TRA_HANG"
+                                        ? "Đại lý từ chối - hàng đang chở trả về"
+                                        : order.trang_thai_van_don ===
+                                            "DA_TRA_LAI"
+                                          ? "Hàng đã trả về - chờ bạn nhận lại"
+                                          : DISPATCH_STATUS_LABEL[
+                                              order.trang_thai
+                                            ] || order.trang_thai}
                                   </span>
                                 )}
                               </td>
@@ -1505,6 +1522,20 @@ const NhaPhanPhoiPage = () => {
                                     justifyContent: "center",
                                   }}
                                 >
+                                  {order.trang_thai_van_don ===
+                                    "DA_TRA_LAI" && (
+                                    <button
+                                      type="button"
+                                      className="btn-primary-action"
+                                      style={{ marginRight: 8 }}
+                                      title="Hàng đại lý từ chối đã được chở về kho của bạn"
+                                      onClick={() => handleNhanLaiHang(order)}
+                                    >
+                                      {order.cho_ky === "NHAN_LAI"
+                                        ? "Ký nhận lại hàng"
+                                        : "Đã nhận lại hàng"}
+                                    </button>
+                                  )}
                                   <button
                                     type="button"
                                     className="btn-action-view-outline"
@@ -1533,9 +1564,9 @@ const NhaPhanPhoiPage = () => {
                 <div className="bc-tab">
                   <p className="bc-tab-desc">
                     Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận)
-                    hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác
-                    nhận giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký
-                    lấy hàng và tới nơi. Các bước của một lô ký theo thứ tự.
+                    hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác nhận
+                    giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký lấy hàng và tới nơi. Các
+                    bước của một lô ký theo thứ tự.
                   </p>
                   <BlockchainPanel />
                 </div>
@@ -1940,7 +1971,8 @@ const NhaPhanPhoiPage = () => {
             <div className="modal-body">
               <p style={{ fontSize: 13, color: "#4b5563", marginBottom: 12 }}>
                 Từ chối nhận vận đơn <b>{selectedOrder.ma_van_don}</b> mang lô{" "}
-                <b>{selectedOrder.ma_lo_nong_san}</b>. Bắt buộc nhập lý do:
+                <b>{selectedOrder.ma_lo_nong_san}</b>. Sau khi bạn ký từ chối,
+                đơn vị vận chuyển sẽ chở hàng trả về nơi gửi. Bắt buộc nhập lý do:
               </p>
               <div className="form-group">
                 <label>Lý do từ chối nhận (*)</label>
@@ -2035,9 +2067,7 @@ const NhaPhanPhoiPage = () => {
                           {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
                           {lot.han_luu_kho ? ` - Hạn: ${lot.han_luu_kho}` : ""})
                           {isRevoked ? " [BỊ THU HỒI - KHÓA]" : ""}
-                          {choKy && !isRevoked
-                            ? " [CHỜ KÝ - ký ở tab Ký blockchain]"
-                            : ""}
+                          {choKy && !isRevoked ? " [CHỜ KÝ - ký ở tab Ký blockchain]" : ""}
                         </option>
                       );
                     })}
@@ -2056,9 +2086,7 @@ const NhaPhanPhoiPage = () => {
                     }}
                   >
                     {(() => {
-                      const lotChon = inventoryList.find(
-                        (l) => l.ma_lo_nong_san === dispatchForm.maLo,
-                      );
+                      const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
                       return lotChon
                         ? `Giao nguyên lô: ${formatWeight(lotChon.so_luong_hien_tai, lotChon.don_vi_tinh)}`
                         : "Chọn lô để xem khối lượng";
@@ -2096,10 +2124,9 @@ const NhaPhanPhoiPage = () => {
                   lineHeight: 1.5,
                 }}
               >
-                Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận.
-                Sau đó bạn ký "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị
-                vận chuyển tự ký lấy hàng và đến nơi trên trang của họ, rồi đại
-                lý ký nhận.
+                Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận. Sau đó bạn ký
+                "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị vận chuyển tự ký lấy hàng và
+                đến nơi trên trang của họ, rồi đại lý ký nhận.
               </p>
             </div>
             <div className="modal-footer">

@@ -36,6 +36,16 @@ export const fetchXacThuc = async (maLo) => {
   return (await parseJson(res)).data;
 };
 
+// Bên gửi (nông dân / sơ chế / nhà phân phối) bấm "đã nhận lại hàng" khi hàng bị bên nhận từ chối đã được chở về.
+// Trả { cho_ky, message }: cho_ky = true thì cần ký (RETURN_RECEIVED) để lệnh đóng và lô dùng lại được.
+export const nhanLaiHangTra = async (maVanDon) => {
+  const res = await fetch(
+    `${API_URL}/van-don/${encodeURIComponent(maVanDon)}/nhan-lai`,
+    { method: "PUT", headers: jsonHeaders() },
+  );
+  return parseJson(res);
+};
+
 // Ví của người dùng đang đăng nhập
 export const fetchViCuaToi = async () => {
   const res = await fetch(`${API_URL}/vi`, { headers: authHeaders() });

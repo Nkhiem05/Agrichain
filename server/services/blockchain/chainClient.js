@@ -59,7 +59,12 @@ const taoProvider = (cfg) => {
     "User-Agent",
     process.env.BLOCKCHAIN_RPC_USER_AGENT || USER_AGENT_MAC_DINH,
   );
-  return new JsonRpcProvider(req, cfg.chainId, { staticNetwork: true });
+  // batchMaxCount: 1 = mỗi yêu cầu gửi riêng, không gộp nhiều lời gọi thành một mảng JSON-RPC.
+  // Nút RPC công cộng của Monad từ chối kiểu gộp này ("403 Restricted JSON RPC method"), trong khi từng lời gọi riêng thì được.
+  return new JsonRpcProvider(req, cfg.chainId, {
+    staticNetwork: true,
+    batchMaxCount: 1,
+  });
 };
 
 let cache = null;

@@ -158,7 +158,7 @@ const thucHienBuocCoKy = async (
   return true;
 };
 
-// Gắn cờ cho mỗi chuyến: cho_ky = bước đã bấm đang chờ ký (LAY_HANG | DEN_NOI | TU_CHOI);
+// Gắn cờ cho mỗi chuyến: cho_ky = bước đã bấm đang chờ ký (LAY_HANG | DEN_NOI | TU_CHOI | TRA_HANG_TOI_NOI);
 // chua_ky_lenh = bên gửi chưa ký lệnh vận chuyển
 const ganCoKy = async (executor, rows, maDonVi) => {
   rows.forEach((r) => {
@@ -175,7 +175,7 @@ const ganCoKy = async (executor, rows, maDonVi) => {
     FROM lich_su_truy_xuat_lo ls
     JOIN blockchain_outbox o ON o.event_id = ls.ma_lich_su
     WHERE ls.blockchain_sync_status <> 'CONFIRMED'
-      AND ls.loai_hoat_dong IN ('TRANSPORT_ORDERED', 'PICKUP_CONFIRMED', 'DELIVERY_CONFIRMED', 'HANDOVER_REJECTED')
+      AND ls.loai_hoat_dong IN ('TRANSPORT_ORDERED', 'PICKUP_CONFIRMED', 'DELIVERY_CONFIRMED', 'HANDOVER_REJECTED', 'RETURN_SHIPPED')
       AND JSON_UNQUOTE(JSON_EXTRACT(ls.du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) IN (?)
     `,
     [rows.map((r) => r.ma_van_don)],
@@ -426,7 +426,7 @@ const taoMaMoi = async (executor, bang, cot, tienTo) => {
 };
 
 // Chuyến đang chạy (đã chấp nhận, chưa tới nơi) của từng tài xế / biển số để báo "đang bận"
-const CHUYEN_DANG_CHAY = ["CHO_LAY_HANG", "DANG_VAN_CHUYEN"];
+const CHUYEN_DANG_CHAY = ["CHO_LAY_HANG", "DANG_VAN_CHUYEN", "DANG_TRA_HANG"];
 const chuyenDangChay = async (executor, maDonVi) => {
   const [rows] = await executor.query(
     `
@@ -961,6 +961,53 @@ const confirmArrival = async (req, res) => {
   }
 };
 
+// Chở hàng bị bên nhận từ chối về tới nơi gửi: đơn vị vận chuyển bấm "đã trả hàng về" rồi ký (RETURN_SHIPPED).
+// Chuyến chỉ chuyển sang "đã trả về, chờ bên gửi nhận lại" sau khi ký xong.
+const confirmReturn = async (req, res) => {
+  const { maVanDon } = req.params;
+
+  try {
+    const maDonVi = getTransporterId(req);
+
+    const choKy = await withTransaction(async (connection) => {
+      const [rows] = await connection.execute(
+        `SELECT trang_thai FROM lenh_van_chuyen WHERE ma_van_don = ? AND ma_don_vi_van_chuyen = ? LIMIT 1 FOR UPDATE`,
+        [maVanDon, maDonVi],
+      );
+
+      if (rows.length === 0)
+        throw new ApiError(404, "Không tìm thấy chuyến vận chuyển");
+      if (rows[0].trang_thai !== "DANG_TRA_HANG") {
+        throw new ApiError(409, "Chuyến không ở trạng thái đang trả hàng về");
+      }
+
+      return thucHienBuocCoKy(
+        connection,
+        maVanDon,
+        "RETURN_SHIPPED",
+        maDonVi,
+        {},
+        { hanh_dong: "TRA_HANG_TOI_NOI" },
+      );
+    });
+
+    return res.json({
+      success: true,
+      cho_ky: choKy,
+      message: choKy
+        ? "Đã tạo yêu cầu xác nhận trả hàng về. Hãy ký bằng MetaMask để bên gửi xác nhận nhận lại hàng."
+        : "Đã xác nhận trả hàng về, chờ bên gửi xác nhận nhận lại",
+    });
+  } catch (err) {
+    return sendError(
+      res,
+      err,
+      "Lỗi xác nhận trả hàng về:",
+      "Không thể xác nhận trả hàng về",
+    );
+  }
+};
+
 module.exports = {
   getMyTrips,
   getTripById,
@@ -976,4 +1023,5 @@ module.exports = {
   rejectTrip,
   confirmPickup,
   confirmArrival,
+  confirmReturn,
 };

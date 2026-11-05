@@ -115,41 +115,31 @@ const ghiSuKienVanDon = async (
   });
 };
 
-// Bên nhận (sơ chế / phân phối) từ chối khi hàng đã đến nơi. Trên chain lô chuyển sang "bị từ chối" và
-// chỉ dùng lại được sau 2 bước trả hàng, nên xếp luôn cả 3 sự kiện vào hàng chờ ký:
-//   HANDOVER_REJECTED (bên nhận ký) -> RETURN_SHIPPED (vận chuyển ký khi đã chở về)
-//   -> RETURN_RECEIVED (bên gửi ký khi đã nhận lại hàng).
-// Mỗi bên ký đúng lúc việc đó xảy ra; chữ ký chính là xác nhận của họ.
-// ketQuaTam (tùy chọn): lệnh chỉ chuyển sang "từ chối" sau khi bên nhận ký sự kiện HANDOVER_REJECTED (xem ghiNhan.js).
+// Bên nhận (sơ chế / phân phối / đại lý) từ chối khi hàng đã đến nơi. Trên chain lô chuyển sang "bị từ chối" và
+// chỉ dùng lại được sau 2 bước trả hàng. Chỉ ghi sự kiện HANDOVER_REJECTED (bên nhận ký) ở đây; hai bước còn lại
+// được tạo đúng lúc việc đó xảy ra, giống chiều đi:
+//   vận chuyển bấm "đã chở hàng về" -> RETURN_SHIPPED (vận chuyển ký)
+//   bên gửi bấm "đã nhận lại hàng"  -> RETURN_RECEIVED (bên gửi ký)
+// ketQuaTam (tùy chọn): lệnh chỉ chuyển sang "đang trả hàng" sau khi bên nhận ký sự kiện HANDOVER_REJECTED (xem ghiNhan.js).
 const ghiSuKienTuChoiNhanHang = async (
   executor,
   maVanDon,
   ketQuaTam = null,
 ) => {
   const [rows] = await executor.query(
-    `SELECT ma_nguoi_gui, ma_don_vi_van_chuyen, ma_ben_nhan FROM lenh_van_chuyen WHERE ma_van_don = ? LIMIT 1`,
+    `SELECT ma_ben_nhan FROM lenh_van_chuyen WHERE ma_van_don = ? LIMIT 1`,
     [maVanDon],
   );
   if (rows.length === 0)
     throw new Error(`Không tìm thấy lệnh vận chuyển ${maVanDon}`);
-  const v = rows[0];
-  const tuChoi = await ghiSuKienVanDon(
+  return ghiSuKienVanDon(
     executor,
     maVanDon,
     "HANDOVER_REJECTED",
-    v.ma_ben_nhan,
+    rows[0].ma_ben_nhan,
     { ben_tu_choi: "BEN_NHAN" },
     ketQuaTam,
-  );
-  if (!tuChoi) return null; // lô không được theo dõi trên chain
-  await ghiSuKienVanDon(
-    executor,
-    maVanDon,
-    "RETURN_SHIPPED",
-    v.ma_don_vi_van_chuyen,
-  );
-  await ghiSuKienVanDon(executor, maVanDon, "RETURN_RECEIVED", v.ma_nguoi_gui);
-  return tuChoi;
+  ); // null nếu lô không được theo dõi trên chain
 };
 
 // Lô mới tạo từ sơ chế / tách / gộp: ghi BATCH_RELATION (cơ sở ký createChild, lấy khối lượng từ lô nguồn).
@@ -159,8 +149,24 @@ const ghiSuKienLoCon = async (executor, maLoMoi) => {
   return lot && Number(lot.latest_event_sequence) > 0 ? lot : null;
 };
 
-// Sơ chế đổi giai đoạn: sang "đang đóng gói" -> PROCESSING_DONE; "hoàn tất" -> PROCESSING_DONE + PACKAGING_DONE.
-// Mỗi loại chỉ ghi một lần cho mỗi lô; cơ sở sơ chế ký (hàm step trên hợp đồng).
+// Các sự kiện sơ chế theo thứ tự quy trình; cơ sở sơ chế (chủ lô) ký từng bước bằng hàm step của hợp đồng:
+//   bắt đầu sơ chế -> PROCESSING_STARTED; sang "phân loại" -> + WASHING_DONE (rửa, diệt khuẩn xong);
+//   sang "đóng gói" -> + PROCESSING_DONE; "hoàn tất" -> + PACKAGING_DONE.
+// Đổi giai đoạn nhảy cóc thì ghi bù các bước trước còn thiếu. Mỗi loại chỉ ghi một lần cho mỗi lô.
+const SU_KIEN_SO_CHE = [
+  "PROCESSING_STARTED",
+  "WASHING_DONE",
+  "PROCESSING_DONE",
+  "PACKAGING_DONE",
+];
+// Số sự kiện cần có để lô sơ chế tới một giai đoạn ("BAT_DAU" = vừa bắt đầu sơ chế)
+const SO_SU_KIEN_TOI_GIAI_DOAN = {
+  BAT_DAU: 1,
+  DANG_RUA_KHU_KHUAN: 1,
+  DANG_PHAN_LOAI: 2,
+  DANG_DONG_GOI: 3,
+  DA_HOAN_TAT: 4,
+};
 // ketQuaTam (tùy chọn): thay đổi giai đoạn CHƯA áp dụng; gắn vào sự kiện cuối cùng của lần đổi này (tham_so.ap_dung)
 // để lô sơ chế chỉ chuyển giai đoạn sau khi cơ sở đã ký xong. Trả [] nếu không có sự kiện mới nào cần ký.
 const ghiSuKienGiaiDoanSoChe = async (
@@ -169,12 +175,7 @@ const ghiSuKienGiaiDoanSoChe = async (
   giaiDoan,
   ketQuaTam = null,
 ) => {
-  const can =
-    giaiDoan === "DA_HOAN_TAT"
-      ? ["PROCESSING_DONE", "PACKAGING_DONE"]
-      : giaiDoan === "DANG_DONG_GOI"
-        ? ["PROCESSING_DONE"]
-        : [];
+  const can = SU_KIEN_SO_CHE.slice(0, SO_SU_KIEN_TOI_GIAI_DOAN[giaiDoan] || 0);
   if (can.length === 0) return [];
 
   const [rows] = await executor.query(
@@ -192,13 +193,18 @@ const ghiSuKienGiaiDoanSoChe = async (
   if (rows.length === 0) throw new Error(`Không tìm thấy lô sơ chế ${maSoChe}`);
   const sc = rows[0];
 
-  const daGhi = [];
+  // Chỉ ghi những sự kiện chưa có; thay đổi giai đoạn (ketQuaTam) gắn vào sự kiện cuối cùng vừa ghi
+  const canGhi = [];
   for (const loai of can) {
     const [co] = await executor.query(
       `SELECT 1 FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? AND loai_hoat_dong = ? LIMIT 1`,
       [sc.ma_lo_moi, loai],
     );
-    if (co.length > 0) continue;
+    if (co.length === 0) canGhi.push(loai);
+  }
+
+  const daGhi = [];
+  for (const loai of canGhi) {
     const kq = await ghiSuKien(executor, {
       maLo: sc.ma_lo_moi,
       loai,
@@ -209,12 +215,14 @@ const ghiSuKienGiaiDoanSoChe = async (
         khu_vuc_so_che: sc.khu_vuc_so_che,
         quy_cach_tieu_chuan: sc.quy_cach_tieu_chuan,
         ngay_bat_dau: sc.ngay_bat_dau,
-        giai_doan: giaiDoan,
+        giai_doan: giaiDoan === "BAT_DAU" ? "DANG_RUA_KHU_KHUAN" : giaiDoan,
         so_luong: sc.so_luong,
         don_vi_tinh: sc.don_vi_tinh,
       },
       thamSo:
-        ketQuaTam && loai === can[can.length - 1] ? { ap_dung: ketQuaTam } : {},
+        ketQuaTam && loai === canGhi[canGhi.length - 1]
+          ? { ap_dung: ketQuaTam }
+          : {},
     });
     if (!kq) break; // lô không được theo dõi trên chain
     daGhi.push(loai);
@@ -251,7 +259,8 @@ const goSuKienSoCheChuaKy = async (executor, maLo) => {
     `
     SELECT ma_lich_su, so_thu_tu_su_kien AS stt, blockchain_sync_status AS trang_thai
     FROM lich_su_truy_xuat_lo
-    WHERE ma_lo_nong_san = ? AND loai_hoat_dong IN ('PROCESSING_DONE', 'PACKAGING_DONE')
+    WHERE ma_lo_nong_san = ?
+      AND loai_hoat_dong IN ('PROCESSING_STARTED', 'WASHING_DONE', 'PROCESSING_DONE', 'PACKAGING_DONE')
     `,
     [maLo],
   );
@@ -263,7 +272,7 @@ const goSuKienSoCheChuaKy = async (executor, maLo) => {
     `
     SELECT COUNT(*) AS c FROM lich_su_truy_xuat_lo
     WHERE ma_lo_nong_san = ? AND so_thu_tu_su_kien >= ?
-      AND loai_hoat_dong NOT IN ('PROCESSING_DONE', 'PACKAGING_DONE')
+      AND loai_hoat_dong NOT IN ('PROCESSING_STARTED', 'WASHING_DONE', 'PROCESSING_DONE', 'PACKAGING_DONE')
     `,
     [maLo, dauTien],
   );

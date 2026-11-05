@@ -37,6 +37,8 @@ const TRANG_THAI_HANG = {
   CHO_TIEP_NHAN: { text: "Đã tới - chờ bạn nhận hàng", tone: "warning" },
   HOAN_THANH: { text: "Đã nhận", tone: "success" },
   TU_CHOI: { text: "Đã từ chối", tone: "danger" },
+  DANG_TRA_HANG: { text: "Đã từ chối - chở hàng trả về", tone: "warning" },
+  DA_TRA_LAI: { text: "Đã từ chối - hàng đã trả về", tone: "gray" },
 };
 
 const TRANG_THAI_XAC_THUC = {
@@ -73,12 +75,7 @@ const DaiLyPage = () => {
 
   // Menu thao tác (⋮) của từng lô trong cửa hàng
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [menuPos, setMenuPos] = useState({
-    right: 0,
-    top: 0,
-    bottom: 0,
-    up: false,
-  });
+  const [menuPos, setMenuPos] = useState({ right: 0, top: 0, bottom: 0, up: false });
 
   const handleToggleMenu = (e, id) => {
     e.stopPropagation();
@@ -574,9 +571,7 @@ const DaiLyPage = () => {
                         if (Number(l.so_su_kien) === 0) {
                           // Lô cũ chưa có sự kiện nào trên blockchain: không có chữ ký để đối soát
                           xt = {
-                            text: xong
-                              ? "Hoàn thành (chưa lên chain)"
-                              : "Chưa ghi lên chain",
+                            text: xong ? "Hoàn thành (chưa lên chain)" : "Chưa ghi lên chain",
                             tone: "gray",
                           };
                           xtGhiChu =
@@ -588,10 +583,13 @@ const DaiLyPage = () => {
                             tone: "warning",
                           };
                           xtGhiChu = `Còn thiếu chữ ký của ${nguoiKy.ho_ten}${vaiTro ? ` (${vaiTro})` : ""} ở bước "${TEN_SU_KIEN[nguoiKy.loai] || nguoiKy.loai}"`;
+                        } else if (l.ly_do_xac_thuc) {
+                          xtGhiChu = l.ly_do_xac_thuc;
+                          if (l.integrity_status === "NOT_CHECKED")
+                            xt = { text: "Chưa đối soát được", tone: "gray" };
                         } else if (xong && l.integrity_status === "VERIFIED") {
                           xt = { text: "Hoàn thành", tone: "success" };
-                          xtGhiChu =
-                            "Đã bán hết, mọi chữ ký đã có trên blockchain và dữ liệu khớp";
+                          xtGhiChu = "Đã bán hết, mọi chữ ký đã có trên blockchain và dữ liệu khớp";
                         }
                         return (
                           <tr key={l.ma_lo_nong_san}>
@@ -629,10 +627,7 @@ const DaiLyPage = () => {
                                   className="btn-more-dots"
                                   title="Thao tác"
                                   onClick={(e) =>
-                                    handleToggleMenu(
-                                      e,
-                                      `lo-${l.ma_lo_nong_san}`,
-                                    )
+                                    handleToggleMenu(e, `lo-${l.ma_lo_nong_san}`)
                                   }
                                 >
                                   <MoreVertical size={18} />
@@ -782,8 +777,8 @@ const DaiLyPage = () => {
                 <strong>
                   {tuChoiItem.ma_lo_nong_san} - {tuChoiItem.ten_san_pham}
                 </strong>
-                . Lý do sẽ được ghi lại và bạn cần ký xác nhận ở mục Ký
-                blockchain.
+                . Sau khi bạn ký từ chối ở mục Ký blockchain, đơn vị vận chuyển
+                sẽ chở hàng trả về nhà phân phối.
               </p>
               <div className="form-group">
                 <label>Lý do từ chối (*)</label>

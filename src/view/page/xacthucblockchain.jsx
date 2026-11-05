@@ -172,10 +172,7 @@ const DanhSachSuKien = ({ suKien, lienKetTx }) => (
     {suKien.map((e) => {
       const link = lienKetTx(e.tx_hash);
       return (
-        <li
-          key={e.stt}
-          className={e.trang_thai === "CONFIRMED" ? "" : "bc-pending"}
-        >
+        <li key={e.stt} className={e.trang_thai === "CONFIRMED" ? "" : "bc-pending"}>
           <div className="bc-event-title">
             <ShieldCheck size={14} />
             <span>{TEN_SU_KIEN[e.loai] || e.loai}</span>
@@ -197,11 +194,7 @@ const DanhSachSuKien = ({ suKien, lienKetTx }) => (
                 )}
               </>
             ) : (
-              <>
-                {e.trang_thai === "SUBMITTED"
-                  ? "Đã gửi, đang chờ blockchain xác nhận"
-                  : "Chưa ký lên blockchain"}
-              </>
+              <>{e.trang_thai === "SUBMITTED" ? "Đã gửi, đang chờ blockchain xác nhận" : "Chưa ký lên blockchain"}</>
             )}
           </div>
         </li>
@@ -225,9 +218,7 @@ const giaiDoanLo = {
 
 const kgLo = (v, dv) => {
   const n = Number(v);
-  return Number.isFinite(n)
-    ? `${n.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${dv || ""}`.trim()
-    : "";
+  return Number.isFinite(n) ? `${n.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} ${dv || ""}`.trim() : "";
 };
 
 // Thẻ chi tiết: kết quả đối chiếu + các sự kiện đã ký
@@ -260,9 +251,7 @@ export const XacThucBlockchainCard = ({ maLo }) => {
   const goc = data.explorer_url ? data.explorer_url.replace(/\/$/, "") : null;
   const lienKetTx = (tx) => (goc && tx ? `${goc}/tx/${tx}` : null);
   const lienKetHopDong =
-    goc && data.contract_address
-      ? `${goc}/address/${data.contract_address}`
-      : null;
+    goc && data.contract_address ? `${goc}/address/${data.contract_address}` : null;
   const tren = data.tren_chain;
   const nguon = data.dong_doi?.lo_nguon || [];
   const con = data.dong_doi?.lo_con || [];
@@ -286,16 +275,12 @@ export const XacThucBlockchainCard = ({ maLo }) => {
       )}
 
       <p className="bc-muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
-        Mỗi bước dưới đây do chính bên liên quan ký bằng ví riêng. Hệ thống đối
-        chiếu dữ liệu lưu trữ với mã băm trên blockchain; dữ liệu bị sửa sẽ
-        không khớp.
+        Mỗi bước dưới đây do chính bên liên quan ký bằng ví riêng. Hệ thống đối chiếu dữ liệu
+        lưu trữ với mã băm trên blockchain; dữ liệu bị sửa sẽ không khớp.
       </p>
 
       {tren?.tonTai && (
-        <p
-          className="tx-hash-label"
-          style={{ fontSize: 11.5, lineHeight: 1.6 }}
-        >
+        <p className="tx-hash-label" style={{ fontSize: 11.5, lineHeight: 1.6 }}>
           Trên blockchain: khối lượng {gramSangKg(tren.khoiLuongGram)}
           {" • "}
           {tren.khongDat
@@ -318,28 +303,19 @@ export const XacThucBlockchainCard = ({ maLo }) => {
             Hành trình trước đó ({nguon.length} lô nguồn)
           </div>
           <p className="bc-muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
-            Lô này được tạo ra từ các lô dưới đây. Mỗi lô có chuỗi chữ ký riêng,
-            được đối chiếu độc lập với blockchain.
+            Lô này được tạo ra từ các lô dưới đây. Mỗi lô có chuỗi chữ ký riêng, được đối chiếu độc lập với blockchain.
           </p>
           {nguonTuXa.map((n) => {
             const xt = n.xac_thuc;
             const tt2 = xt ? TRANG_THAI_XAC_THUC[xt.trang_thai] : null;
             return (
-              <details
-                key={n.ma_lo}
-                className="bc-lineage-item"
-                data-lo={n.ma_lo}
-              >
+              <details key={n.ma_lo} className="bc-lineage-item" data-lo={n.ma_lo}>
                 <summary>
                   <b>Lô {n.ma_lo}</b>
                   <span className="bc-lineage-note">
-                    {NHAN_QUAN_HE[n.loai_lien_ket] || "tạo"}{" "}
-                    {kgLo(n.so_luong, n.don_vi_tinh)} → lô {n.tao_ra_lo}
+                    {NHAN_QUAN_HE[n.loai_lien_ket] || "tạo"} {kgLo(n.so_luong, n.don_vi_tinh)} → lô {n.tao_ra_lo}
                   </span>
-                  <span
-                    className="bc-lineage-state"
-                    style={{ color: tt2 ? tt2.mauNen : "#d1d5db" }}
-                  >
+                  <span className="bc-lineage-state" style={{ color: tt2 ? tt2.mauNen : "#d1d5db" }}>
                     {xt
                       ? xt.so_su_kien > 0
                         ? `${xt.da_xac_nhan}/${xt.so_su_kien} sự kiện • ${tt2.nhan}`
@@ -348,18 +324,13 @@ export const XacThucBlockchainCard = ({ maLo }) => {
                   </span>
                 </summary>
                 {xt?.ly_do?.length > 0 && (
-                  <ul
-                    className="bc-reasons"
-                    style={{ color: tt2 ? tt2.mauNen : undefined }}
-                  >
+                  <ul className="bc-reasons" style={{ color: tt2 ? tt2.mauNen : undefined }}>
                     {xt.ly_do.map((l) => (
                       <li key={l}>{l}</li>
                     ))}
                   </ul>
                 )}
-                {xt?.su_kien?.length > 0 && (
-                  <DanhSachSuKien suKien={xt.su_kien} lienKetTx={lienKetTx} />
-                )}
+                {xt?.su_kien?.length > 0 && <DanhSachSuKien suKien={xt.su_kien} lienKetTx={lienKetTx} />}
               </details>
             );
           })}
@@ -372,40 +343,28 @@ export const XacThucBlockchainCard = ({ maLo }) => {
         </div>
       )}
 
-      {data.su_kien.length > 0 && (
-        <DanhSachSuKien suKien={data.su_kien} lienKetTx={lienKetTx} />
-      )}
+      {data.su_kien.length > 0 && <DanhSachSuKien suKien={data.su_kien} lienKetTx={lienKetTx} />}
 
       {/* Hành trình tiếp theo: các lô con đã tách / gộp / chế biến ra từ lô này */}
       {con.length > 0 && (
         <div className="bc-lineage" data-testid="bc-lo-con">
-          <div className="bc-lineage-title">
-            Hành trình tiếp theo ({con.length} lô con)
-          </div>
+          <div className="bc-lineage-title">Hành trình tiếp theo ({con.length} lô con)</div>
           <p className="bc-muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
-            Hàng của lô này đã được chia / chuyển thành các lô dưới đây. Xem mã
-            lô con để biết hàng đi tiếp tới đâu.
+            Hàng của lô này đã được chia / chuyển thành các lô dưới đây. Xem mã lô con để biết hàng đi tiếp tới đâu.
           </p>
           <ul className="bc-lineage-list">
             {con.map((c) => (
               <li key={c.ma_lo} data-lo={c.ma_lo}>
                 <b>Lô {c.ma_lo}</b>
                 <span className="bc-lineage-note">
-                  {NHAN_QUAN_HE[c.loai_lien_ket] || "tạo"}{" "}
-                  {kgLo(c.so_luong, c.don_vi_tinh)}
+                  {NHAN_QUAN_HE[c.loai_lien_ket] || "tạo"} {kgLo(c.so_luong, c.don_vi_tinh)}
                   {c.tao_tu_lo !== maLo ? ` (từ lô ${c.tao_tu_lo})` : ""}
                 </span>
                 <span className="bc-lineage-note">
                   {c.nguoi_giu}
-                  {TEN_VAI_TRO_KY[c.vai_tro_nguoi_giu]
-                    ? ` (${TEN_VAI_TRO_KY[c.vai_tro_nguoi_giu]})`
-                    : ""}
-                  {giaiDoanLo[c.giai_doan]
-                    ? ` • ${giaiDoanLo[c.giai_doan]}`
-                    : ""}
-                  {c.so_su_kien > 0
-                    ? ` • ${c.da_ky}/${c.so_su_kien} sự kiện đã ký`
-                    : ""}
+                  {TEN_VAI_TRO_KY[c.vai_tro_nguoi_giu] ? ` (${TEN_VAI_TRO_KY[c.vai_tro_nguoi_giu]})` : ""}
+                  {giaiDoanLo[c.giai_doan] ? ` • ${giaiDoanLo[c.giai_doan]}` : ""}
+                  {c.so_su_kien > 0 ? ` • ${c.da_ky}/${c.so_su_kien} sự kiện đã ký` : ""}
                 </span>
               </li>
             ))}
@@ -418,12 +377,7 @@ export const XacThucBlockchainCard = ({ maLo }) => {
           Đã ký {data.da_xac_nhan}/{data.so_su_kien} sự kiện
         </span>
         {lienKetHopDong ? (
-          <a
-            href={lienKetHopDong}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: "#bbf7d0" }}
-          >
+          <a href={lienKetHopDong} target="_blank" rel="noopener noreferrer" style={{ color: "#bbf7d0" }}>
             {data.ten_mang} • Hợp đồng {rutGon(data.contract_address)}
           </a>
         ) : (

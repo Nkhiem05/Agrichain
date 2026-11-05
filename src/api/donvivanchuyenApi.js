@@ -69,6 +69,15 @@ const confirmArrival = async (maVanDon) => {
   return parseJson(res);
 };
 
+// Chở hàng bị bên nhận từ chối về tới nơi gửi (vận chuyển bấm rồi ký)
+const confirmReturn = async (maVanDon) => {
+  const res = await fetch(`${API_URL}/${maVanDon}/tra-hang`, {
+    method: "PUT",
+    headers: jsonHeaders(),
+  });
+  return parseJson(res);
+};
+
 // Quản lý tài xế
 const fetchDrivers = async () => {
   const res = await fetch(`${API_URL}/tai-xe`, { headers: authHeaders() });
@@ -146,6 +155,7 @@ export {
   rejectTrip,
   confirmPickup,
   confirmArrival,
+  confirmReturn,
   fetchDrivers,
   createDriver,
   updateDriver,

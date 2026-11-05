@@ -29,5 +29,6 @@ router.put("/:maVanDon/chap-nhan", donvivanchuyenController.acceptTrip);
 router.put("/:maVanDon/tu-choi", donvivanchuyenController.rejectTrip);
 router.put("/:maVanDon/lay-hang", donvivanchuyenController.confirmPickup);
 router.put("/:maVanDon/den-noi", donvivanchuyenController.confirmArrival);
+router.put("/:maVanDon/tra-hang", donvivanchuyenController.confirmReturn);
 
 module.exports = router;

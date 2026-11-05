@@ -19,7 +19,8 @@ import {
 import "../../css/nongdan.css";
 import BlockchainPanel from "../blockchainpannel";
 import { useNavigate } from "react-router-dom";
-import { kyCacSuKienDangCho } from "../../../api/blockchainApi";
+import { baoKetQua } from "../kyNgay";
+import { kyCacSuKienDangCho, nhanLaiHangTra } from "../../../api/blockchainApi";
 import {
   fileUrl,
   fetchNongTrai,
@@ -141,6 +142,16 @@ const SHIPPING_STATUS = {
   CHO_TIEP_NHAN: { label: "Chờ tiếp nhận", tone: "purple", icon: "clock" },
   HOAN_THANH: { label: "Đã hoàn thành", tone: "success", icon: "check" },
   TU_CHOI: { label: "Bị từ chối", tone: "danger", icon: "none" },
+  DANG_TRA_HANG: {
+    label: "Bị từ chối - đang chở trả về",
+    tone: "warning",
+    icon: "truck",
+  },
+  DA_TRA_LAI: {
+    label: "Hàng đã trả về - chờ bạn nhận lại",
+    tone: "purple",
+    icon: "clock",
+  },
   DA_HUY: { label: "Đã hủy", tone: "danger", icon: "none" },
 };
 
@@ -1476,6 +1487,20 @@ const DashboardPage = () => {
     await fetchShippingOrders();
   };
 
+  // Hàng bị bên nhận từ chối đã được chở về: bấm "đã nhận lại hàng" rồi ký; lệnh đóng và lô dùng lại được sau khi ký xong
+  const handleNhanLaiHang = async (order) => {
+    try {
+      const kq = await nhanLaiHangTra(order.ma_van_don);
+      setShippingDetail(null);
+      await baoKetQua(kq, {
+        thanhCong: `Đã nhận lại hàng của lệnh ${order.ma_van_don}. Lô đã dùng lại được.`,
+        taiLai: fetchShippingOrders,
+      });
+    } catch (err) {
+      alert(err.message || "Không thể xác nhận nhận lại hàng");
+    }
+  };
+
   const handleCancelShipping = async (maVanDon) => {
     if (!window.confirm("Bạn có chắc muốn hủy lệnh vận chuyển này?")) return;
 
@@ -2593,14 +2618,21 @@ const DashboardPage = () => {
                             {formatDateTime(order.thoi_gian_xuat)}
                           </td>
                           <td>
-                            <span className={`status-pill ${status.tone}`}>
-                              {status.icon === "truck" && <Truck size={15} />}
-                              {status.icon === "clock" && <Clock size={15} />}
-                              {status.icon === "check" && (
-                                <CheckCircle2 size={15} />
-                              )}
-                              {status.label}
-                            </span>
+                            {order.cho_ky_nhan_lai ? (
+                              <span className="status-pill warning">
+                                <Clock size={15} />
+                                Chờ ký nhận lại hàng
+                              </span>
+                            ) : (
+                              <span className={`status-pill ${status.tone}`}>
+                                {status.icon === "truck" && <Truck size={15} />}
+                                {status.icon === "clock" && <Clock size={15} />}
+                                {status.icon === "check" && (
+                                  <CheckCircle2 size={15} />
+                                )}
+                                {status.label}
+                              </span>
+                            )}
                             {order.can_ky_lenh && (
                               <div
                                 style={{
@@ -2615,6 +2647,18 @@ const DashboardPage = () => {
                             )}
                           </td>
                           <td className="col-actions">
+                            {order.trang_thai === "DA_TRA_LAI" && (
+                              <button
+                                type="button"
+                                className="btn-save"
+                                style={{ marginRight: 8 }}
+                                onClick={() => handleNhanLaiHang(order)}
+                              >
+                                {order.cho_ky_nhan_lai
+                                  ? "Ký nhận lại hàng"
+                                  : "Đã nhận lại hàng"}
+                              </button>
+                            )}
                             {order.can_ky_lenh && (
                               <button
                                 type="button"
@@ -3582,6 +3626,18 @@ const DashboardPage = () => {
                   onClick={() => handleKyLenhVanChuyen(shippingDetail)}
                 >
                   Ký xác nhận lấy hàng đi
+                </button>
+              )}
+
+              {shippingDetail.trang_thai === "DA_TRA_LAI" && (
+                <button
+                  type="button"
+                  className="btn-save"
+                  onClick={() => handleNhanLaiHang(shippingDetail)}
+                >
+                  {shippingDetail.cho_ky_nhan_lai
+                    ? "Ký nhận lại hàng"
+                    : "Đã nhận lại hàng"}
                 </button>
               )}
 

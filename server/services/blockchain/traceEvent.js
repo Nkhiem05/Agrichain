@@ -331,19 +331,13 @@ const dongBoLoaiSuKienDb = async (db) => {
       (k) => !kieu.includes(`'${k}'`),
     );
     if (thieu.length === 0) return;
-    const moi = kieu.replace(
-      /\)$/,
-      `,${thieu.map((k) => `'${k}'`).join(",")})`,
-    );
+    const moi = kieu.replace(/\)$/, `,${thieu.map((k) => `'${k}'`).join(",")})`);
     await db.query(
       `ALTER TABLE lich_su_truy_xuat_lo MODIFY COLUMN loai_hoat_dong ${moi} NOT NULL`,
     );
     console.log(`Đã thêm loại sự kiện vào cơ sở dữ liệu: ${thieu.join(", ")}`);
   } catch (err) {
-    console.error(
-      "Không cập nhật được các loại sự kiện blockchain:",
-      err.message,
-    );
+    console.error("Không cập nhật được các loại sự kiện blockchain:", err.message);
   }
 };
 

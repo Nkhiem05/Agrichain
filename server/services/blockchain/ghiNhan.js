@@ -118,9 +118,10 @@ const apDungKetQuaVanDon = async (executor, maVanDon, ap) => {
       }
     }
   } else if (ap.hanh_dong === "BEN_NHAN_TU_CHOI") {
-    // Bên nhận đã ký từ chối khi hàng đến nơi
+    // Bên nhận đã ký từ chối khi hàng đến nơi: hàng còn trên xe, đơn vị vận chuyển phải chở trả về nơi gửi
+    // (DANG_TRA_HANG -> vận chuyển ký đã trả về -> DA_TRA_LAI -> bên gửi ký nhận lại -> TU_CHOI là đóng hẳn)
     const [kq] = await executor.query(
-      `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_TIEP_NHAN'`,
+      `UPDATE lenh_van_chuyen SET trang_thai = 'DANG_TRA_HANG', ghi_chu = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_TIEP_NHAN'`,
       [ap.ghi_chu ?? null, maVanDon],
     );
     // Phiếu xuất kho cho đại lý (nếu có) bị hủy theo khi đại lý từ chối
@@ -130,6 +131,18 @@ const apDungKetQuaVanDon = async (executor, maVanDon, ap) => {
         [maVanDon],
       );
     }
+  } else if (ap.hanh_dong === "TRA_HANG_TOI_NOI") {
+    // Đơn vị vận chuyển đã ký: chở hàng bị từ chối về tới bên gửi, chờ bên gửi ký nhận lại
+    await executor.query(
+      `UPDATE lenh_van_chuyen SET trang_thai = 'DA_TRA_LAI' WHERE ma_van_don = ? AND trang_thai = 'DANG_TRA_HANG'`,
+      [maVanDon],
+    );
+  } else if (ap.hanh_dong === "BEN_GUI_NHAN_LAI") {
+    // Bên gửi đã ký nhận lại hàng: lệnh đóng hẳn, lô dùng lại được ở bên gửi
+    await executor.query(
+      `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI' WHERE ma_van_don = ? AND trang_thai = 'DA_TRA_LAI'`,
+      [maVanDon],
+    );
   } else if (ap.hanh_dong === "TU_CHOI") {
     await executor.query(
       `UPDATE lenh_van_chuyen SET trang_thai = 'TU_CHOI', ghi_chu = ? WHERE ma_van_don = ? AND trang_thai = 'CHO_CHAP_NHAN'`,
