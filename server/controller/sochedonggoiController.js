@@ -192,6 +192,8 @@ const TEN_BUOC_KY = {
   RETURN_SHIPPED: "xác nhận chở hàng trả về",
   RETURN_RECEIVED: "xác nhận nhận lại hàng",
   BATCH_RELATION: "tạo lô (sơ chế / tách / gộp)",
+  PROCESSING_STARTED: "bắt đầu sơ chế",
+  WASHING_DONE: "hoàn tất rửa, diệt khuẩn",
   PROCESSING_DONE: "hoàn tất sơ chế",
   PACKAGING_DONE: "hoàn tất đóng gói",
   CORRECTION: "đính chính",
@@ -602,6 +604,7 @@ const createProcessingBatch = async (req, res) => {
     if (!ma_lo) throw new ApiError(400, "Vui lòng chọn lô đã tiếp nhận");
 
     let maSoChe;
+    let choKy = false;
 
     for (let attempt = 1; ; attempt++) {
       try {
@@ -681,6 +684,15 @@ const createProcessingBatch = async (req, res) => {
             [ma_lo],
           );
 
+          // Blockchain: ghi sự kiện "bắt đầu sơ chế" để cơ sở ký. Chưa ký thì các bước sơ chế sau chưa làm được
+          // (đổi giai đoạn đòi lô đã ký xong sự kiện trước).
+          const daGhi = await ghiSuKienGiaiDoanSoChe(
+            connection,
+            newMaSoChe,
+            "BAT_DAU",
+          );
+          choKy = daGhi.length > 0 && layCauHinh().daCauHinh;
+
           return newMaSoChe;
         });
 
@@ -693,7 +705,10 @@ const createProcessingBatch = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `Đã bắt đầu sơ chế trên lô ${ma_lo} (giữ nguyên mã lô, không tạo mã mới)`,
+      cho_ky: choKy,
+      message: choKy
+        ? `Đã bắt đầu sơ chế trên lô ${ma_lo}. Hãy ký bước "bắt đầu sơ chế" ở tab "Ký blockchain" để làm các bước tiếp theo.${await nhacViCoSo(maCoSo)}`
+        : `Đã bắt đầu sơ chế trên lô ${ma_lo} (giữ nguyên mã lô, không tạo mã mới)`,
       data: { ma_so_che: maSoChe, ma_lo },
     });
   } catch (err) {

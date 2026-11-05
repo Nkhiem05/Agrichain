@@ -1,6 +1,12 @@
 const fs = require("fs");
 const path = require("path");
-const { JsonRpcProvider, Contract, Interface, getAddress } = require("ethers");
+const {
+  JsonRpcProvider,
+  FetchRequest,
+  Contract,
+  Interface,
+  getAddress,
+} = require("ethers");
 const { ABI } = require("./eventTypes");
 const { batchIdCuaLo } = require("./canonical");
 
@@ -42,15 +48,27 @@ const layCauHinh = () => {
   };
 };
 
+// Một số nút RPC (đứng sau Cloudflare / QuickNode) trả 403 Forbidden cho yêu cầu Node không có User-Agent kiểu trình duyệt,
+// dù MetaMask trên trình duyệt vẫn chạy. Gửi kèm User-Agent trình duyệt để dùng được nút RPC hiện tại.
+// Đổi bằng BLOCKCHAIN_RPC_USER_AGENT trong .env nếu cần.
+const USER_AGENT_MAC_DINH =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+const taoProvider = (cfg) => {
+  const req = new FetchRequest(cfg.rpcUrl);
+  req.setHeader(
+    "User-Agent",
+    process.env.BLOCKCHAIN_RPC_USER_AGENT || USER_AGENT_MAC_DINH,
+  );
+  return new JsonRpcProvider(req, cfg.chainId, { staticNetwork: true });
+};
+
 let cache = null;
 const layContract = () => {
   const cfg = layCauHinh();
   if (!cfg.contractAddress) return null;
   const key = `${cfg.rpcUrl}|${cfg.chainId}|${cfg.contractAddress}`;
   if (!cache || cache.key !== key) {
-    const provider = new JsonRpcProvider(cfg.rpcUrl, cfg.chainId, {
-      staticNetwork: true,
-    });
+    const provider = taoProvider(cfg);
     cache = {
       key,
       provider,

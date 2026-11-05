@@ -24,6 +24,9 @@ const EVENT_TYPES = {
   RETURN_SHIPPED: { ma: 18, ham: "returnShip" },
   RETURN_RECEIVED: { ma: 19, ham: "returnReceive" },
   CORRECTION: { ma: 20, ham: "correct" },
+  // Các bước sơ chế do cơ sở sơ chế (chủ lô) ký (hàm step của hợp đồng)
+  PROCESSING_STARTED: { ma: 21, ham: "step" },
+  WASHING_DONE: { ma: 22, ham: "step" },
 };
 
 // nguoi_dung.vai_tro -> Role trên contract. ADMIN và CONSUMER không cần vai trò on-chain.

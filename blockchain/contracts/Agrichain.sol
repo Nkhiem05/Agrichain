@@ -38,6 +38,8 @@ contract AgriChain {
     uint8 public constant RETURN_SHIPPED = 18;
     uint8 public constant RETURN_RECEIVED = 19;
     uint8 public constant CORRECTION = 20;
+    uint8 public constant PROCESSING_STARTED = 21;  // sơ chế: bắt đầu sơ chế trên lô đã nhận
+    uint8 public constant WASHING_DONE = 22;        // sơ chế: rửa sạch, diệt khuẩn xong (sang phân loại)
 
     // Trạng thái lô
     uint8 public constant BATCH_ACTIVE = 1;    // còn hàng, dùng được
@@ -406,7 +408,8 @@ contract AgriChain {
 
     // -------------------------------------------- sự kiện thường của người đang giữ lô
 
-    /// @notice Sơ chế xong / đóng gói xong (sơ chế), đóng lô khi bán hết (đại lý).
+    /// @notice Các bước sơ chế do cơ sở sơ chế (chủ lô) ký: bắt đầu, rửa xong, sơ chế xong, đóng gói xong;
+    ///         đóng lô khi bán hết do đại lý ký.
     function step(bytes32 batchId, uint8 eventType, bytes32 prevHash, bytes32 eventHash) external {
         _requireActive();
         Batch storage b = _batch(batchId);
@@ -414,7 +417,12 @@ contract AgriChain {
         require(b.status == BATCH_ACTIVE && b.orderStage == ORDER_NONE, "lo khong o trang thai nay");
 
         Role r = roleOf[msg.sender];
-        if (eventType == PROCESSING_DONE || eventType == PACKAGING_DONE) {
+        if (
+            eventType == PROCESSING_STARTED ||
+            eventType == WASHING_DONE ||
+            eventType == PROCESSING_DONE ||
+            eventType == PACKAGING_DONE
+        ) {
             require(r == Role.PROCESSOR, "chi co so so che");
         } else if (eventType == COMPLETE_CONFIRMED) {
             require(r == Role.RETAILER, "chi dai ly");

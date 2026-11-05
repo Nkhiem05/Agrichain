@@ -318,7 +318,37 @@ const ghiSuKien = async (
   return taoSuKien(executor, lot, { loai, maNguoiKy, duLieu, thamSo });
 };
 
+// Cột lich_su_truy_xuat_lo.loai_hoat_dong là ENUM: khi hợp đồng có loại sự kiện mới (eventTypes.js) thì thêm giá trị còn thiếu.
+// Chạy một lần khi khởi động server (ALTER TABLE tự chốt giao dịch nên không được gọi giữa một giao dịch nghiệp vụ).
+const dongBoLoaiSuKienDb = async (db) => {
+  try {
+    const [rows] = await db.query(
+      "SHOW COLUMNS FROM lich_su_truy_xuat_lo LIKE 'loai_hoat_dong'",
+    );
+    const kieu = rows[0]?.Type || "";
+    if (!/^enum\(/i.test(kieu)) return;
+    const thieu = Object.keys(EVENT_TYPES).filter(
+      (k) => !kieu.includes(`'${k}'`),
+    );
+    if (thieu.length === 0) return;
+    const moi = kieu.replace(
+      /\)$/,
+      `,${thieu.map((k) => `'${k}'`).join(",")})`,
+    );
+    await db.query(
+      `ALTER TABLE lich_su_truy_xuat_lo MODIFY COLUMN loai_hoat_dong ${moi} NOT NULL`,
+    );
+    console.log(`Đã thêm loại sự kiện vào cơ sở dữ liệu: ${thieu.join(", ")}`);
+  } catch (err) {
+    console.error(
+      "Không cập nhật được các loại sự kiện blockchain:",
+      err.message,
+    );
+  }
+};
+
 module.exports = {
+  dongBoLoaiSuKienDb,
   ghiSuKien,
   baoDamSuKienGoc,
   layBanChupMuaVu,

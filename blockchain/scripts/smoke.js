@@ -42,6 +42,8 @@ const T = {
   RELATION: 10,
   PROCESSING_DONE: 11,
   PACKAGING_DONE: 12,
+  PROCESSING_STARTED: 21,
+  WASHING_DONE: 22,
   DISPATCHED: 13,
   SAMPLING: 15,
   COMPLETE: 16,
@@ -367,6 +369,22 @@ check(
 );
 
 // 6. Sơ chế: lô nguồn bị trừ khối lượng, hết thì "đã dùng", không dùng lại được
+// các bước sơ chế do chủ lô có vai trò sơ chế ký: bắt đầu -> rửa xong -> sơ chế xong
+{
+  const e = next(L1);
+  await rejects(
+    c.connect(farmer).step(L1, T.PROCESSING_STARTED, e.prev, e.eventHash),
+    "khong phai nguoi giu lo",
+  );
+  await rejects(
+    c.connect(shop).step(L1, T.WASHING_DONE, e.prev, e.eventHash),
+    "khong phai nguoi giu lo",
+  );
+}
+await sign(L1, (p, e) =>
+  c.connect(factory).step(L1, T.PROCESSING_STARTED, p, e),
+);
+await sign(L1, (p, e) => c.connect(factory).step(L1, T.WASHING_DONE, p, e));
 await sign(L1, (p, e) => c.connect(factory).step(L1, T.PROCESSING_DONE, p, e));
 const P1 = id("LO-P1");
 {
@@ -510,6 +528,14 @@ assert.equal((await batch(D1)).owner, await addr(agent));
   const e = next(D1);
   await rejects(
     c.connect(agent).step(D1, T.PROCESSING_DONE, e.prev, e.eventHash),
+    "chi co so so che",
+  );
+  await rejects(
+    c.connect(agent).step(D1, T.PROCESSING_STARTED, e.prev, e.eventHash),
+    "chi co so so che",
+  );
+  await rejects(
+    c.connect(agent).step(D1, T.WASHING_DONE, e.prev, e.eventHash),
     "chi co so so che",
   );
   await rejects(
