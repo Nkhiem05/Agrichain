@@ -571,7 +571,17 @@ const DaiLyPage = () => {
                           TRANG_THAI_XAC_THUC[l.integrity_status] ||
                           TRANG_THAI_XAC_THUC.NOT_CHECKED;
                         let xtGhiChu = "";
-                        if (nguoiKy) {
+                        if (Number(l.so_su_kien) === 0) {
+                          // Lô cũ chưa có sự kiện nào trên blockchain: không có chữ ký để đối soát
+                          xt = {
+                            text: xong
+                              ? "Hoàn thành (chưa lên chain)"
+                              : "Chưa ghi lên chain",
+                            tone: "gray",
+                          };
+                          xtGhiChu =
+                            "Lô cũ chưa được theo dõi trên blockchain nên không có chữ ký nào để đối soát";
+                        } else if (nguoiKy) {
                           const vaiTro = TEN_VAI_TRO_KY[nguoiKy.vai_tro] || "";
                           xt = {
                             text: `Chờ ${vaiTro || nguoiKy.ho_ten} ký`,

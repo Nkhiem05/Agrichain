@@ -282,7 +282,7 @@ const getStock = async (req, res) => {
     const [rows] = await db.execute(
       `
       SELECT lo.ma_lo_nong_san, sp.ten_san_pham, lo.so_luong_hien_tai, lo.don_vi_tinh, lo.giai_doan_hien_tai,
-             lo.integrity_status, lo.updated_at,
+             lo.integrity_status, lo.updated_at, lo.latest_event_sequence AS so_su_kien,
              (SELECT gui.ho_ten FROM lenh_van_chuyen v JOIN nguoi_dung gui ON gui.ma_nguoi_dung = v.ma_nguoi_gui
                WHERE v.ma_lo_nong_san = lo.ma_lo_nong_san AND v.trang_thai = 'HOAN_THANH'
                ORDER BY v.updated_at DESC LIMIT 1) AS nhap_tu
@@ -339,7 +339,11 @@ const getStock = async (req, res) => {
             vai_tro: dang.vai_tro,
             loai: dang.loai,
           };
-        } else if (r.integrity_status !== "VERIFIED") {
+        } else if (
+          Number(r.so_su_kien) > 0 &&
+          r.integrity_status !== "VERIFIED"
+        ) {
+          // so_su_kien = 0: lô cũ chưa được theo dõi trên blockchain, không có chữ ký nào để đối soát
           try {
             const kq = await xacThucMotLo(r.ma_lo_nong_san);
             if (kq?.trang_thai) r.integrity_status = kq.trang_thai;
