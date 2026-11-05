@@ -174,25 +174,51 @@ await rejects(
 await ok(c.setLocked(await addr(farmer), false));
 check("ví bị khóa không ký được, mở lại thì ký được");
 
-// 3. Kiểm định: niêm phong -> chủ lô ký biên bản -> công bố (đúng cơ quan, đúng bộ ngưỡng)
+// 3. Kiểm định: chủ lô ký biên bản lấy mẫu TRƯỚC -> cơ quan niêm phong -> công bố (đúng cơ quan, đúng bộ ngưỡng)
 const KD1 = id("KD-001");
-await sign(L1, (p, e) =>
-  c.connect(certA).certify(L1, KD1, T.SAMPLING, 0, ZeroHash, p, e),
-);
 {
   const e = next(L1);
+  // cơ quan chưa niêm phong được khi chủ lô chưa ký; chưa niêm phong thì cũng chưa công bố được
+  await rejects(
+    c
+      .connect(certA)
+      .certify(L1, KD1, T.SAMPLING, 0, ZeroHash, e.prev, e.eventHash),
+    "chu lo chua ky bien ban lay mau",
+  );
   await rejects(
     c
       .connect(certA)
       .certify(L1, KD1, T.CERT_ISSUED, 0, NGUONG, e.prev, e.eventHash),
-    "chu lo chua ky",
+    "ho so kiem dinh khong ton tai",
   );
+  // ví không phải chủ lô không ký xác nhận được
   await rejects(
     c.connect(farmer2).confirmSampling(L1, KD1, e.prev, e.eventHash),
     "chi chu lo",
   );
+  await rejects(
+    c.connect(certA).confirmSampling(L1, KD1, e.prev, e.eventHash),
+    "chi chu lo",
+  );
 }
 await sign(L1, (p, e) => c.connect(farmer).confirmSampling(L1, KD1, p, e));
+{
+  const e = next(L1);
+  // chủ lô đã ký thì hồ sơ này không ký xác nhận lần 2; cơ quan chưa niêm phong thì chưa công bố được
+  await rejects(
+    c.connect(farmer).confirmSampling(L1, KD1, e.prev, e.eventHash),
+    "ho so kiem dinh da ton tai",
+  );
+  await rejects(
+    c
+      .connect(certA)
+      .certify(L1, KD1, T.CERT_ISSUED, 0, NGUONG, e.prev, e.eventHash),
+    "chi co quan da niem phong",
+  );
+}
+await sign(L1, (p, e) =>
+  c.connect(certA).certify(L1, KD1, T.SAMPLING, 0, ZeroHash, p, e),
+);
 {
   const e = next(L1);
   await rejects(
@@ -227,10 +253,10 @@ check(
 
 const kiemDinh = async (lot, ma, cq, chu, dat) => {
   const kd = id(ma);
+  await sign(lot, (p, e) => c.connect(chu).confirmSampling(lot, kd, p, e));
   await sign(lot, (p, e) =>
     c.connect(cq).certify(lot, kd, T.SAMPLING, 0, ZeroHash, p, e),
   );
-  await sign(lot, (p, e) => c.connect(chu).confirmSampling(lot, kd, p, e));
   await sign(lot, (p, e) =>
     c
       .connect(cq)

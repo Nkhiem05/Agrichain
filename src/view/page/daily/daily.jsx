@@ -10,10 +10,12 @@ import {
   XCircle,
   Truck,
   Eye,
+  MoreVertical,
 } from "lucide-react";
 import "../../css/nhaphanphoi.css";
 import BlockchainPanel from "../blockchainpannel";
 import { baoKetQua } from "../kyNgay";
+import { TEN_SU_KIEN, TEN_VAI_TRO_KY } from "../xacthucblockchain";
 import {
   fetchHangDangToi,
   xacNhanNhanHang,
@@ -29,7 +31,7 @@ const DEFAULT_LOGO_IMG =
   "https://res.cloudinary.com/dfnssx2gm/image/upload/v1790660244/Agrichain_3_lnxgb2.png";
 
 const TRANG_THAI_HANG = {
-  CHO_CHAP_NHAN: { text: "Chờ đơn vị vận chuyển nhận chuyến", tone: "warning" },
+  CHO_CHAP_NHAN: { text: "Chờ vận chuyển nhận chuyến", tone: "warning" },
   CHO_LAY_HANG: { text: "Chờ lấy hàng tại kho", tone: "info" },
   DANG_VAN_CHUYEN: { text: "Đang trên đường tới", tone: "info" },
   CHO_TIEP_NHAN: { text: "Đã tới - chờ bạn nhận hàng", tone: "warning" },
@@ -43,6 +45,13 @@ const TRANG_THAI_XAC_THUC = {
   MISMATCH: { text: "Dữ liệu bị sửa", tone: "danger" },
   BROKEN_CHAIN: { text: "Chuỗi bị đứt", tone: "danger" },
   NOT_CHECKED: { text: "Chưa đối soát", tone: "gray" },
+};
+
+// Bước đại lý đã bấm nhưng chưa ký (cờ cho_ky từ server): hiện thay cho trạng thái, chỉ một nhãn mỗi ô
+const NHAN_CHO_KY = {
+  NHAN_HANG: "Chờ ký nhận hàng",
+  TU_CHOI_NHAN: "Chờ ký từ chối",
+  BAN_HET: "Chờ ký bán hết",
 };
 
 const soKg = (v, dv) =>
@@ -61,6 +70,51 @@ const DaiLyPage = () => {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [dangXuLy, setDangXuLy] = useState("");
+
+  // Menu thao tác (⋮) của từng lô trong cửa hàng
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [menuPos, setMenuPos] = useState({
+    right: 0,
+    top: 0,
+    bottom: 0,
+    up: false,
+  });
+
+  const handleToggleMenu = (e, id) => {
+    e.stopPropagation();
+    if (openDropdown === id) {
+      setOpenDropdown(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMenuPos({
+      right: window.innerWidth - rect.right,
+      top: rect.bottom + 6,
+      bottom: window.innerHeight - rect.top + 6,
+      up: window.innerHeight - rect.bottom < 160,
+    });
+    setOpenDropdown(id);
+  };
+
+  useEffect(() => {
+    const dong = (e) => {
+      if (
+        e.type === "click" &&
+        (e.target.closest(".dropdown-container") ||
+          e.target.closest(".dropdown-menu"))
+      )
+        return;
+      setOpenDropdown(null);
+    };
+    document.addEventListener("click", dong);
+    window.addEventListener("scroll", dong, true);
+    window.addEventListener("resize", dong);
+    return () => {
+      document.removeEventListener("click", dong);
+      window.removeEventListener("scroll", dong, true);
+      window.removeEventListener("resize", dong);
+    };
+  }, []);
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -89,6 +143,48 @@ const DaiLyPage = () => {
     if (user) loadAll();
   }, [user, loadAll]);
 
+  // Tải lại danh sách âm thầm (không hiện "đang tải") để trạng thái luôn mới:
+  // bên vận chuyển báo đã đến nơi, bước ký blockchain vừa xác nhận... đều tự hiện, không cần F5.
+  const taiLaiNgam = useCallback(async () => {
+    try {
+      const [toi, k] = await Promise.all([fetchHangDangToi(), fetchKhoDaiLy()]);
+      setHangToi(toi?.data || []);
+      setKho(k?.data || []);
+    } catch (err) {
+      console.error("Không tải lại được dữ liệu đại lý:", err);
+    }
+  }, []);
+
+  // Chuyển tab (vd từ "Ký blockchain" quay lại "Nhận hàng") thì lấy dữ liệu mới ngay
+  useEffect(() => {
+    if (user) taiLaiNgam();
+  }, [activeTab, user, taiLaiNgam]);
+
+  // Quay lại cửa sổ / tab trình duyệt, và định kỳ 10 giây khi đang mở trang
+  useEffect(() => {
+    if (!user) return undefined;
+    const lamMoi = () => {
+      if (document.visibilityState === "visible") taiLaiNgam();
+    };
+    window.addEventListener("focus", lamMoi);
+    document.addEventListener("visibilitychange", lamMoi);
+    const timer = setInterval(lamMoi, 10000);
+    return () => {
+      window.removeEventListener("focus", lamMoi);
+      document.removeEventListener("visibilitychange", lamMoi);
+      clearInterval(timer);
+    };
+  }, [user, taiLaiNgam]);
+
+  // Có bước đang chờ blockchain xác nhận thì kiểm tra dày hơn (5 giây) cho tới khi xong
+  const coBuocChoKy =
+    hangToi.some((h) => h.cho_ky) || kho.some((l) => l.cho_ky);
+  useEffect(() => {
+    if (!coBuocChoKy) return undefined;
+    const timer = setInterval(taiLaiNgam, 5000);
+    return () => clearInterval(timer);
+  }, [coBuocChoKy, taiLaiNgam]);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -108,14 +204,28 @@ const DaiLyPage = () => {
     }
   };
 
+  // Hộp thoại nhập liệu (thay cho window.prompt): nhận hàng (cân thực tế) và từ chối (lý do)
+  const [nhanItem, setNhanItem] = useState(null);
+  const [canThucTe, setCanThucTe] = useState("");
+  const [tuChoiItem, setTuChoiItem] = useState(null);
+  const [lyDoTuChoi, setLyDoTuChoi] = useState("");
+
   const nhanHang = (item) => {
-    const nhap = window.prompt(
-      `Nhận lô ${item.ma_lo_nong_san} (${item.ten_san_pham}).\nKhối lượng gửi: ${soKg(item.khoi_luong, item.don_vi_tinh)}.\nNhập khối lượng cân thực tế:`,
-      String(Number(item.khoi_luong)),
-    );
-    if (nhap === null) return;
-    const kl = Number(String(nhap).replace(",", "."));
+    setCanThucTe(String(Number(item.khoi_luong)));
+    setNhanItem(item);
+  };
+
+  const dongHopNhan = () => {
+    setNhanItem(null);
+    setCanThucTe("");
+  };
+
+  const xacNhanNhan = () => {
+    if (!nhanItem) return;
+    const kl = Number(String(canThucTe).replace(",", "."));
     if (!kl || kl <= 0) return alert("Khối lượng không hợp lệ");
+    const item = nhanItem;
+    dongHopNhan();
     chay(
       item.ma_van_don,
       () => xacNhanNhanHang(item.ma_van_don, kl),
@@ -124,11 +234,24 @@ const DaiLyPage = () => {
   };
 
   const tuChoi = (item) => {
-    const lyDo = window.prompt(`Lý do từ chối nhận lô ${item.ma_lo_nong_san}:`);
-    if (!lyDo || !lyDo.trim()) return;
+    setLyDoTuChoi("");
+    setTuChoiItem(item);
+  };
+
+  const dongHopTuChoi = () => {
+    setTuChoiItem(null);
+    setLyDoTuChoi("");
+  };
+
+  const xacNhanTuChoi = () => {
+    if (!tuChoiItem) return;
+    const lyDo = lyDoTuChoi.trim();
+    if (!lyDo) return alert("Vui lòng nhập lý do từ chối");
+    const item = tuChoiItem;
+    dongHopTuChoi();
     chay(
       item.ma_van_don,
-      () => tuChoiNhanHang(item.ma_van_don, lyDo.trim()),
+      () => tuChoiNhanHang(item.ma_van_don, lyDo),
       `Đã từ chối nhận lô ${item.ma_lo_nong_san}.`,
     );
   };
@@ -358,30 +481,27 @@ const DaiLyPage = () => {
                               )}
                             </td>
                             <td>
-                              <span className={`status-pill ${tt.tone}`}>
-                                {tt.text}
-                              </span>
-                              {h.cho_ky && (
+                              {h.cho_ky ? (
                                 <span
-                                  className="status-pill warning"
-                                  style={{ marginLeft: 6 }}
+                                  className="status-pill dl-pill warning"
                                   title="Bạn đã bấm nhưng chưa ký: bước này chỉ có hiệu lực sau khi ký"
                                 >
-                                  Chờ ký
+                                  {NHAN_CHO_KY[h.cho_ky] || "Chờ ký"}
+                                </span>
+                              ) : (
+                                <span
+                                  className={`status-pill dl-pill ${tt.tone}`}
+                                >
+                                  {tt.text}
                                 </span>
                               )}
                             </td>
-                            <td
-                              style={{
-                                textAlign: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
+                            <td style={{ textAlign: "center" }}>
                               {h.trang_thai === "CHO_TIEP_NHAN" ? (
-                                <>
+                                <div className="dl-actions">
                                   <button
                                     type="button"
-                                    className="btn-primary-action"
+                                    className="dl-btn primary"
                                     disabled={Boolean(dangXuLy)}
                                     onClick={() => nhanHang(h)}
                                   >
@@ -389,14 +509,13 @@ const DaiLyPage = () => {
                                   </button>{" "}
                                   <button
                                     type="button"
-                                    className="btn-cancel"
+                                    className="dl-btn reject"
                                     disabled={Boolean(dangXuLy)}
                                     onClick={() => tuChoi(h)}
-                                    style={{ color: "#dc2626" }}
                                   >
                                     <XCircle size={14} /> Từ chối
                                   </button>
-                                </>
+                                </div>
                               ) : (
                                 "—"
                               )}
@@ -445,10 +564,25 @@ const DaiLyPage = () => {
                       </tr>
                     ) : (
                       kho.map((l) => {
-                        const xt =
+                        const xong = l.giai_doan_hien_tai === "COMPLETED";
+                        const nguoiKy = l.cho_chu_ky_cua;
+                        // Cột Xác thực: còn chữ ký chưa ký -> nói rõ ai đang phải ký; lô đã bán hết và khớp chain -> Hoàn thành
+                        let xt =
                           TRANG_THAI_XAC_THUC[l.integrity_status] ||
                           TRANG_THAI_XAC_THUC.NOT_CHECKED;
-                        const xong = l.giai_doan_hien_tai === "COMPLETED";
+                        let xtGhiChu = "";
+                        if (nguoiKy) {
+                          const vaiTro = TEN_VAI_TRO_KY[nguoiKy.vai_tro] || "";
+                          xt = {
+                            text: `Chờ ${vaiTro || nguoiKy.ho_ten} ký`,
+                            tone: "warning",
+                          };
+                          xtGhiChu = `Còn thiếu chữ ký của ${nguoiKy.ho_ten}${vaiTro ? ` (${vaiTro})` : ""} ở bước "${TEN_SU_KIEN[nguoiKy.loai] || nguoiKy.loai}"`;
+                        } else if (xong && l.integrity_status === "VERIFIED") {
+                          xt = { text: "Hoàn thành", tone: "success" };
+                          xtGhiChu =
+                            "Đã bán hết, mọi chữ ký đã có trên blockchain và dữ liệu khớp";
+                        }
                         return (
                           <tr key={l.ma_lo_nong_san}>
                             <td>
@@ -462,56 +596,91 @@ const DaiLyPage = () => {
                                 : soKg(l.so_luong_hien_tai, l.don_vi_tinh)}
                             </td>
                             <td>
-                              <span className={`status-pill ${xt.tone}`}>
-                                {xt.text}
-                              </span>
-                              {l.cho_ky && (
+                              {l.cho_ky ? (
                                 <span
-                                  className="status-pill warning"
-                                  style={{ marginLeft: 6 }}
+                                  className="status-pill dl-pill warning"
                                   title="Đã bấm bán hết nhưng chưa ký: lô chỉ kết thúc sau khi ký"
                                 >
-                                  Chờ ký bán hết
+                                  {NHAN_CHO_KY[l.cho_ky] || "Chờ ký"}
+                                </span>
+                              ) : (
+                                <span
+                                  className={`status-pill dl-pill ${xt.tone}`}
+                                  title={xtGhiChu || undefined}
+                                >
+                                  {xt.text}
                                 </span>
                               )}
                             </td>
-                            <td
-                              style={{
-                                textAlign: "center",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              <button
-                                type="button"
-                                className="btn-action-view-outline"
-                                onClick={() =>
-                                  navigate(
-                                    `/lo-hang/${encodeURIComponent(l.ma_lo_nong_san)}`,
-                                  )
-                                }
-                                title="Xem chi tiết lô và lấy mã QR"
-                              >
-                                <Eye size={14} /> Chi tiết &amp; QR
-                              </button>{" "}
-                              <a
-                                className="btn-action-view-outline"
-                                href={`/chi-tiet-user?malohang=${encodeURIComponent(l.ma_lo_nong_san)}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                title="Trang tra cứu của người mua"
-                              >
-                                <Eye size={14} /> Tra cứu
-                              </a>{" "}
-                              {!xong && (
+                            <td style={{ textAlign: "center" }}>
+                              <div className="dropdown-container">
                                 <button
                                   type="button"
-                                  className="btn-primary-action"
-                                  disabled={Boolean(dangXuLy)}
-                                  onClick={() => banHet(l)}
+                                  className="btn-more-dots"
+                                  title="Thao tác"
+                                  onClick={(e) =>
+                                    handleToggleMenu(
+                                      e,
+                                      `lo-${l.ma_lo_nong_san}`,
+                                    )
+                                  }
                                 >
-                                  <CheckCircle2 size={14} /> Đã bán hết
+                                  <MoreVertical size={18} />
                                 </button>
-                              )}
+                                {openDropdown === `lo-${l.ma_lo_nong_san}` && (
+                                  <div
+                                    className={`dropdown-menu dropdown-fixed ${menuPos.up ? "dropdown-up" : ""}`}
+                                    style={{
+                                      right: menuPos.right,
+                                      ...(menuPos.up
+                                        ? { bottom: menuPos.bottom }
+                                        : { top: menuPos.top }),
+                                    }}
+                                  >
+                                    <div
+                                      className="dropdown-item"
+                                      onClick={() => {
+                                        setOpenDropdown(null);
+                                        navigate(
+                                          `/lo-hang/${encodeURIComponent(l.ma_lo_nong_san)}`,
+                                        );
+                                      }}
+                                    >
+                                      <Eye size={15} />
+                                      Chi tiết &amp; QR
+                                    </div>
+                                    <div
+                                      className="dropdown-item"
+                                      onClick={() => {
+                                        setOpenDropdown(null);
+                                        window.open(
+                                          `/chi-tiet-user?malohang=${encodeURIComponent(l.ma_lo_nong_san)}`,
+                                          "_blank",
+                                          "noreferrer",
+                                        );
+                                      }}
+                                    >
+                                      <Eye size={15} />
+                                      Tra cứu (trang người mua)
+                                    </div>
+                                    {!xong && (
+                                      <>
+                                        <div className="dropdown-divider"></div>
+                                        <div
+                                          className="dropdown-item"
+                                          onClick={() => {
+                                            setOpenDropdown(null);
+                                            if (!dangXuLy) banHet(l);
+                                          }}
+                                        >
+                                          <CheckCircle2 size={15} />
+                                          Đã bán hết
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -534,6 +703,108 @@ const DaiLyPage = () => {
           )}
         </main>
       </div>
+
+      {/* ================= POPUP: NHẬN HÀNG & CÂN THỰC TẾ ================= */}
+      {nhanItem && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3>Xác Nhận Nhận Hàng & Cân Thực Tế</h3>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: "#4b5563", marginBottom: 14 }}>
+                Đang nhận lô:{" "}
+                <strong style={{ color: "#278d49" }}>
+                  {nhanItem.ma_lo_nong_san} - {nhanItem.ten_san_pham}
+                </strong>
+              </p>
+              <div className="form-group">
+                <label>Khối lượng nhà phân phối gửi</label>
+                <input
+                  type="text"
+                  disabled
+                  value={soKg(nhanItem.khoi_luong, nhanItem.don_vi_tinh)}
+                  style={{ backgroundColor: "#f3f4f6" }}
+                />
+              </div>
+              <div className="form-group">
+                <label>
+                  Khối lượng cân thực tế ({nhanItem.don_vi_tinh || "kg"}) (*)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  value={canThucTe}
+                  onChange={(e) => setCanThucTe(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && xacNhanNhan()}
+                  placeholder={`Nhập số ${nhanItem.don_vi_tinh || "kg"} thực tế...`}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={dongHopNhan}
+              >
+                Hủy
+              </button>
+              <button type="button" className="btn-save" onClick={xacNhanNhan}>
+                Xác nhận nhận hàng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= POPUP: TỪ CHỐI NHẬN HÀNG ================= */}
+      {tuChoiItem && (
+        <div className="modal-overlay">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h3 style={{ color: "#dc2626" }}>Từ Chối Nhận Hàng</h3>
+            </div>
+            <div className="modal-body">
+              <p style={{ color: "#4b5563", marginBottom: 12 }}>
+                Bạn đang từ chối lô{" "}
+                <strong>
+                  {tuChoiItem.ma_lo_nong_san} - {tuChoiItem.ten_san_pham}
+                </strong>
+                . Lý do sẽ được ghi lại và bạn cần ký xác nhận ở mục Ký
+                blockchain.
+              </p>
+              <div className="form-group">
+                <label>Lý do từ chối (*)</label>
+                <textarea
+                  rows={3}
+                  placeholder="VD: Hàng dập nát, thiếu số lượng, sai chủng loại..."
+                  value={lyDoTuChoi}
+                  onChange={(e) => setLyDoTuChoi(e.target.value)}
+                  autoFocus
+                ></textarea>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={dongHopTuChoi}
+              >
+                Đóng
+              </button>
+              <button
+                type="button"
+                className="btn-save danger"
+                onClick={xacNhanTuChoi}
+              >
+                Xác nhận từ chối
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

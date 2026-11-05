@@ -74,6 +74,17 @@ const INCOMING_STATUS = {
   TU_CHOI: { text: "Đã từ chối", tone: "danger", icon: XCircle },
 };
 
+// Bước nhà phân phối đã bấm nhưng chưa ký (cờ cho_ky do server trả về)
+const NHAN_CHO_KY_NHAP = {
+  NHAP_KHO: "Chờ ký nhập kho",
+  TU_CHOI: "Chờ ký từ chối",
+};
+const NHAN_CHO_KY_XUAT = {
+  XUAT_KHO: "Chờ ký xuất kho",
+  TOI_NOI: "Chờ ký tới nơi",
+  TAO_PHIEU: "Chờ ký xác nhận lấy hàng đi",
+};
+
 // Nhãn tiếng Việt cho trạng thái phiếu xuất kho (phieu_xuat_kho.trang_thai)
 const DISPATCH_STATUS_LABEL = {
   CHO_XUAT: "Chờ xuất kho",
@@ -446,7 +457,9 @@ const NhaPhanPhoiPage = () => {
       /* dùng danh sách đã có */
     }
     if (dsVanChuyen.length === 0) {
-      alert("Chưa có tài khoản đơn vị vận chuyển nào để thuê giao hàng. Hãy tạo tài khoản vận chuyển trước.");
+      alert(
+        "Chưa có tài khoản đơn vị vận chuyển nào để thuê giao hàng. Hãy tạo tài khoản vận chuyển trước.",
+      );
       return;
     }
     if (!dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG")) {
@@ -454,6 +467,15 @@ const NhaPhanPhoiPage = () => {
         'Chưa có đại lý nào đang hợp tác. Hãy thêm đại lý ở mục "Đại lý" rồi lập phiếu phân phối.',
       );
       setActiveTab("tab-dealers");
+      return;
+    }
+    // Đại lý phải liên kết ví MetaMask (đã duyệt) mới nhận được phiếu phân phối và vận chuyển
+    if (
+      !dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi)
+    ) {
+      alert(
+        "Chưa có đại lý nào liên kết ví MetaMask. Đại lý cần liên kết ví ở trang của họ thì bạn mới lập phiếu phân phối và vận chuyển được.",
+      );
       return;
     }
 
@@ -472,11 +494,8 @@ const NhaPhanPhoiPage = () => {
     setDispatchForm({
       // Ưu tiên đại lý đã gắn tài khoản (đại lý ký nhận hàng trên blockchain bằng tài khoản đó)
       daiLyId:
-        (
-          dsDaiLy.find(
-            (d) => d.trang_thai === "HOAT_DONG" && d.ma_nguoi_dung,
-          ) || dsDaiLy.find((d) => d.trang_thai === "HOAT_DONG")
-        )?.ma_dai_ly || "",
+        dsDaiLy.find((d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi)
+          ?.ma_dai_ly || "",
       maLo: validLots.find((lot) => !lot.cho_ky)?.ma_lo_nong_san || "",
       soLuongXuat: "",
       maDonViVanChuyen: dsVanChuyen[0]?.ma_nguoi_dung || "",
@@ -486,12 +505,22 @@ const NhaPhanPhoiPage = () => {
 
   const handleSaveDispatch = async () => {
     if (!dispatchForm.daiLyId) return alert("Vui lòng chọn đại lý nhận hàng!");
+    const daiLyChon = dealers.find((d) => d.ma_dai_ly === dispatchForm.daiLyId);
+    if (daiLyChon && !daiLyChon.da_lien_ket_vi) {
+      return alert(
+        `Đại lý ${daiLyChon.ten} chưa liên kết ví MetaMask nên chưa lập phiếu phân phối và vận chuyển được.`,
+      );
+    }
     if (!dispatchForm.maLo) return alert("Vui lòng chọn lô xuất hàng!");
-    if (!dispatchForm.maDonViVanChuyen) return alert("Vui lòng chọn đơn vị vận chuyển!");
+    if (!dispatchForm.maDonViVanChuyen)
+      return alert("Vui lòng chọn đơn vị vận chuyển!");
     // Giao nguyên lô: khối lượng lấy theo tồn của lô, không tách lô
-    const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
+    const lotChon = inventoryList.find(
+      (l) => l.ma_lo_nong_san === dispatchForm.maLo,
+    );
     const xuatKg = Number(lotChon?.so_luong_hien_tai);
-    if (!xuatKg || xuatKg <= 0) return alert("Lô được chọn không còn hàng để giao!");
+    if (!xuatKg || xuatKg <= 0)
+      return alert("Lô được chọn không còn hàng để giao!");
 
     try {
       const res = await createDispatch({
@@ -504,8 +533,14 @@ const NhaPhanPhoiPage = () => {
       setShowCreateDispatchModal(false);
       await loadAll();
       await baoKetQua(
-        { ...res, message: `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.` },
-        { thanhCong: `Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""}.`, taiLai: loadAll },
+        {
+          ...res,
+          message: `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.`,
+        },
+        {
+          thanhCong: `Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""}.`,
+          taiLai: loadAll,
+        },
       );
     } catch (err) {
       alert(err.message || "Không thể lập phiếu xuất kho");
@@ -925,18 +960,21 @@ const NhaPhanPhoiPage = () => {
                                   {order.thoi_gian_xuat}
                                 </td>
                                 <td>
-                                  <span
-                                    className={`status-pill ${statusInfo.tone}`}
-                                  >
-                                    <StatusIcon size={13} /> {statusInfo.text}
-                                  </span>
-                                  {order.cho_ky && (
+                                  {/* Chỉ hiện MỘT trạng thái: bạn đã bấm nhập kho / từ chối mà chưa ký
+                                      thì hiện "Chờ ký ..." thay cho trạng thái vận đơn; còn lại hiện trạng thái vận đơn. */}
+                                  {NHAN_CHO_KY_NHAP[order.cho_ky] ? (
                                     <span
                                       className="status-pill warning"
-                                      style={{ marginLeft: 6 }}
                                       title="Bạn đã bấm nhưng chưa ký: bước này chỉ có hiệu lực sau khi ký"
                                     >
-                                      {({ NHAP_KHO: "Chờ ký nhập kho", TU_CHOI: "Chờ ký từ chối" })[order.cho_ky] || "Chờ ký"}
+                                      <Clock size={13} />{" "}
+                                      {NHAN_CHO_KY_NHAP[order.cho_ky]}
+                                    </span>
+                                  ) : (
+                                    <span
+                                      className={`status-pill ${statusInfo.tone}`}
+                                    >
+                                      <StatusIcon size={13} /> {statusInfo.text}
                                     </span>
                                   )}
                                 </td>
@@ -1430,32 +1468,35 @@ const NhaPhanPhoiPage = () => {
                                 )}
                               </td>
                               <td>
-                                <span
-                                  className={`status-pill ${
-                                    order.trang_thai === "DA_GIAO"
-                                      ? "success"
-                                      : order.trang_thai === "DANG_GIAO"
-                                        ? "info"
-                                        : order.trang_thai === "DA_HUY"
-                                          ? "danger"
-                                          : "warning"
-                                  }`}
-                                >
-                                  {order.trang_thai === "DANG_GIAO" &&
-                                  order.trang_thai_van_don === "CHO_TIEP_NHAN"
-                                    ? "Đã tới nơi - Chờ đại lý nhận"
-                                    : DISPATCH_STATUS_LABEL[order.trang_thai] ||
-                                      order.trang_thai}
-                                </span>
-                                  {order.cho_ky && (
-                                    <span
-                                      className="status-pill warning"
-                                      style={{ marginLeft: 6 }}
-                                      title="Bạn đã bấm nhưng chưa ký: bước này chỉ có hiệu lực sau khi ký"
-                                    >
-                                      {({ XUAT_KHO: "Chờ ký xuất kho", TOI_NOI: "Chờ ký tới nơi", TAO_PHIEU: "Chờ ký xác nhận lấy hàng đi" })[order.cho_ky] || "Chờ ký"}
-                                    </span>
-                                  )}
+                                {/* Chỉ hiện MỘT trạng thái: đang chờ ký thì hiện "Chờ ký ...", ngược lại hiện trạng thái phiếu */}
+                                {NHAN_CHO_KY_XUAT[order.cho_ky] ? (
+                                  <span
+                                    className="status-pill warning"
+                                    title="Bạn đã bấm nhưng chưa ký: bước này chỉ có hiệu lực sau khi ký"
+                                  >
+                                    <Clock size={13} />{" "}
+                                    {NHAN_CHO_KY_XUAT[order.cho_ky]}
+                                  </span>
+                                ) : (
+                                  <span
+                                    className={`status-pill ${
+                                      order.trang_thai === "DA_GIAO"
+                                        ? "success"
+                                        : order.trang_thai === "DANG_GIAO"
+                                          ? "info"
+                                          : order.trang_thai === "DA_HUY"
+                                            ? "danger"
+                                            : "warning"
+                                    }`}
+                                  >
+                                    {order.trang_thai === "DANG_GIAO" &&
+                                    order.trang_thai_van_don === "CHO_TIEP_NHAN"
+                                      ? "Đã tới nơi - Chờ đại lý nhận"
+                                      : DISPATCH_STATUS_LABEL[
+                                          order.trang_thai
+                                        ] || order.trang_thai}
+                                  </span>
+                                )}
                               </td>
                               <td>
                                 <div
@@ -1492,9 +1533,9 @@ const NhaPhanPhoiPage = () => {
                 <div className="bc-tab">
                   <p className="bc-tab-desc">
                     Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận)
-                    hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác nhận
-                    giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký lấy hàng và tới nơi. Các
-                    bước của một lô ký theo thứ tự.
+                    hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác
+                    nhận giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký
+                    lấy hàng và tới nơi. Các bước của một lô ký theo thứ tự.
                   </p>
                   <BlockchainPanel />
                 </div>
@@ -1954,9 +1995,17 @@ const NhaPhanPhoiPage = () => {
                   {dealers
                     .filter((d) => d.trang_thai === "HOAT_DONG")
                     .map((d) => (
-                      <option key={d.ma_dai_ly} value={d.ma_dai_ly}>
+                      <option
+                        key={d.ma_dai_ly}
+                        value={d.ma_dai_ly}
+                        disabled={!d.da_lien_ket_vi}
+                      >
                         {d.ten} ({d.dia_chi})
-                        {d.ma_nguoi_dung ? "" : " - chưa gắn tài khoản"}
+                        {!d.ma_nguoi_dung
+                          ? " - chưa gắn tài khoản"
+                          : !d.da_lien_ket_vi
+                            ? " - chưa liên kết ví MetaMask"
+                            : ""}
                       </option>
                     ))}
                 </select>
@@ -1986,7 +2035,9 @@ const NhaPhanPhoiPage = () => {
                           {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
                           {lot.han_luu_kho ? ` - Hạn: ${lot.han_luu_kho}` : ""})
                           {isRevoked ? " [BỊ THU HỒI - KHÓA]" : ""}
-                          {choKy && !isRevoked ? " [CHỜ KÝ - ký ở tab Ký blockchain]" : ""}
+                          {choKy && !isRevoked
+                            ? " [CHỜ KÝ - ký ở tab Ký blockchain]"
+                            : ""}
                         </option>
                       );
                     })}
@@ -2005,7 +2056,9 @@ const NhaPhanPhoiPage = () => {
                     }}
                   >
                     {(() => {
-                      const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
+                      const lotChon = inventoryList.find(
+                        (l) => l.ma_lo_nong_san === dispatchForm.maLo,
+                      );
                       return lotChon
                         ? `Giao nguyên lô: ${formatWeight(lotChon.so_luong_hien_tai, lotChon.don_vi_tinh)}`
                         : "Chọn lô để xem khối lượng";
@@ -2043,9 +2096,10 @@ const NhaPhanPhoiPage = () => {
                   lineHeight: 1.5,
                 }}
               >
-                Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận. Sau đó bạn ký
-                "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị vận chuyển tự ký lấy hàng và
-                đến nơi trên trang của họ, rồi đại lý ký nhận.
+                Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận.
+                Sau đó bạn ký "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị
+                vận chuyển tự ký lấy hàng và đến nơi trên trang của họ, rồi đại
+                lý ký nhận.
               </p>
             </div>
             <div className="modal-footer">

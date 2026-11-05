@@ -34,12 +34,12 @@ const moTaSuKien = (loai, thamSo, nhanDien) => {
       break;
     case "SAMPLING_SEALED":
       ketQua =
-        "Xác nhận đã lấy mẫu và niêm phong. Sau đó chủ lô ký biên bản lấy mẫu, rồi bạn mới công bố được kết quả.";
+        "Ký niêm phong mẫu kiểm định. Chỉ ký được sau khi chủ lô (nông dân) đã ký xác nhận biên bản lấy mẫu. Ký xong bạn mới nhập chỉ số và công bố được kết quả.";
       them(chiTiet, "Hồ sơ kiểm định", ts.ma_kiem_dinh);
       break;
     case "SAMPLING_CONFIRMED":
       ketQua =
-        "Xác nhận biên bản lấy mẫu của cơ quan kiểm định. Sau khi bạn ký, cơ quan mới công bố được kết quả.";
+        "Xác nhận biên bản lấy mẫu của cơ quan kiểm định đúng với lô của bạn. Bạn ký trước, sau đó cơ quan kiểm định mới ký niêm phong mẫu và công bố được kết quả.";
       them(chiTiet, "Hồ sơ kiểm định", ts.ma_kiem_dinh);
       break;
     case "CERTIFICATE_ISSUED":

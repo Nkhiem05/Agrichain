@@ -33,17 +33,19 @@ class LoiNghiepVu extends Error {
 }
 
 const CHUA_KY_LAY_MAU =
-  "Biên bản lấy mẫu chưa được ký. Hãy ký rồi nhập chỉ số.";
-const CHU_LO_CHUA_KY_XAC_NHAN = "Chờ nông dân ký biên bản xác nhận lấy mẫu";
+  'Bạn chưa ký niêm phong mẫu. Hãy ký ở mục "Ký blockchain" rồi nhập chỉ số.';
+const CHU_LO_CHUA_KY_XAC_NHAN =
+  'Chờ nông dân ký xác nhận biên bản lấy mẫu trước, sau đó bạn ký niêm phong ở mục "Ký blockchain".';
 const CHUA_KY_LAY_MAU_CONG_BO =
-  "Biên bản lấy mẫu chưa được ký. Hãy ký rồi thử lại.";
+  'Bạn chưa ký niêm phong mẫu. Hãy ký ở mục "Ký blockchain" rồi công bố.';
 const DA_GUI_CONG_BO =
   'Hồ sơ đang chờ ký công bố. Hãy vào mục "Ký blockchain" để ký.';
 const DA_GUI_THU_HOI =
   'Hồ sơ đang chờ ký thu hồi. Hãy vào mục "Ký blockchain" để ký.';
 // Trạng thái ký blockchain của hồ sơ: Map mã hồ sơ -> { theoDoi, daKyLayMau, daKyXacNhan, choKyCongBo }.
-//  - daKyLayMau : SAMPLING_SEALED (cơ quan ký) đã lên chain -> mới được nhập chỉ số xét nghiệm
-//  - daKyXacNhan: SAMPLING_CONFIRMED (chủ lô ký xác nhận biên bản lấy mẫu) đã lên chain -> mới được công bố
+//  Thứ tự ký: chủ lô ký xác nhận biên bản lấy mẫu TRƯỚC, cơ quan kiểm định ký niêm phong SAU.
+//  - daKyXacNhan: SAMPLING_CONFIRMED (chủ lô ký xác nhận biên bản lấy mẫu) đã lên chain -> cơ quan mới ký niêm phong được
+//  - daKyLayMau : SAMPLING_SEALED (cơ quan ký niêm phong) đã lên chain -> mới được nhập chỉ số xét nghiệm và công bố
 //  - choKyCongBo: đã bấm công bố (đạt / không đạt), sự kiện đang chờ cơ quan ký
 // Chưa cấu hình blockchain, hoặc lô không được theo dõi (không có sự kiện niêm phong): không chặn (cả hai = true).
 const trangThaiKyLayMau = async (executor, dsMaKiemDinh) => {
@@ -367,8 +369,10 @@ const getSamplingScheduleList = async (req, res) => {
   }
 };
 
-// Cập nhật lấy mẫu & niêm phong. Lưu xong thì biên bản được ghi vào hàng chờ ký blockchain
-// (SAMPLING_SEALED, cơ quan kiểm định ký) và không sửa được nữa: chủ lô sẽ ký xác nhận đúng nội dung này.
+// Cập nhật lấy mẫu & niêm phong. Lưu xong thì biên bản không sửa được nữa và được ghi vào hàng chờ ký blockchain theo thứ tự:
+//   1. SAMPLING_CONFIRMED: chủ lô (nông dân) ký xác nhận đúng nội dung biên bản lấy mẫu TRƯỚC
+//   2. SAMPLING_SEALED   : sau đó cơ quan kiểm định mới ký niêm phong mẫu
+// Hai sự kiện nối tiếp trong chuỗi của lô nên cơ quan không ký niêm phong được khi chủ lô chưa ký.
 const updateSampleDetail = async (req, res) => {
   const { code } = req.query;
   const { sealcode, sampleweight, samplemethod, visualconsition } = req.body;
@@ -398,17 +402,18 @@ const updateSampleDetail = async (req, res) => {
          WHERE ma_kiem_dinh = ?`,
         [sealcode, sampleweight, samplemethod, visualconsition, code],
       );
-      await ghiSuKienKiemDinhTrong(conn, code, "SAMPLING_SEALED");
-      // Chủ lô xác nhận biên bản này bằng chữ ký: sự kiện chờ chủ lô ký xuất hiện ở tab "Ký blockchain" của nông dân
+      // Chủ lô xác nhận biên bản này bằng chữ ký TRƯỚC: sự kiện chờ chủ lô ký xuất hiện ở tab "Ký blockchain" của nông dân
       await ghiSuKienKiemDinhTrong(conn, code, "SAMPLING_CONFIRMED", {
         apDung: { chu_lo_xac_nhan: true },
       });
+      // Cơ quan kiểm định ký niêm phong sau khi chủ lô đã ký
+      await ghiSuKienKiemDinhTrong(conn, code, "SAMPLING_SEALED");
     });
 
     return res.status(200).json({
       status: true,
       message:
-        'Đã lấy mẫu. Chờ chủ lô ký xác nhận biên bản lấy mẫu (tab "Ký blockchain" của nông dân)',
+        'Đã lập biên bản lấy mẫu. Chờ nông dân ký xác nhận trước, sau đó bạn ký niêm phong ở mục "Ký blockchain"',
     });
   } catch (err) {
     if (err.status)
@@ -531,8 +536,13 @@ const saveTestIndicators = async (req, res) => {
       });
     }
 
-    // Biên bản lấy mẫu phải đã được cơ quan ký lên blockchain thì mới nhập chỉ số xét nghiệm
+    // Chủ lô phải đã ký xác nhận biên bản lấy mẫu và cơ quan đã ký niêm phong thì mới nhập chỉ số xét nghiệm
     const ky = (await trangThaiKyLayMau(db, [code])).get(code);
+    if (!ky.daKyXacNhan) {
+      return res
+        .status(200)
+        .json({ status: false, message: CHU_LO_CHUA_KY_XAC_NHAN });
+    }
     if (!ky.daKyLayMau) {
       return res.status(200).json({ status: false, message: CHUA_KY_LAY_MAU });
     }
@@ -620,24 +630,14 @@ const updateInspectionStatus = async (req, res) => {
         ) {
           throw new LoiNghiepVu(409, DA_GUI_CONG_BO);
         }
-        // Cơ quan phải đã ký niêm phong mẫu lên blockchain, rồi chủ lô ký xác nhận biên bản lấy mẫu
-        // (hợp đồng cũng chặn nếu thiếu bước chủ lô ký)
+        // Chủ lô phải đã ký xác nhận biên bản lấy mẫu, rồi cơ quan ký niêm phong mẫu lên blockchain
+        // (hợp đồng cũng chặn nếu sai thứ tự)
         const ky = (await trangThaiKyLayMau(conn, [code])).get(code);
         if (ky.theoDoi) {
+          if (!ky.daKyXacNhan)
+            throw new LoiNghiepVu(409, CHU_LO_CHUA_KY_XAC_NHAN);
           if (!ky.daKyLayMau)
             throw new LoiNghiepVu(409, CHUA_KY_LAY_MAU_CONG_BO);
-          if (!ky.daKyXacNhan) {
-            // Hồ sơ niêm phong trước khi chủ lô phải ký: bổ sung sự kiện xác nhận để chủ lô ký.
-            // Trả kết quả (không ném lỗi) để sự kiện vừa tạo không bị hoàn tác.
-            await ghiSuKienKiemDinhTrong(conn, code, "SAMPLING_CONFIRMED", {
-              apDung: { chu_lo_xac_nhan: true },
-            });
-            await conn.query(
-              `UPDATE kiem_dinh_lo_hang SET chu_lo_da_xac_nhan = 0 WHERE ma_kiem_dinh = ?`,
-              [code],
-            );
-            return { khongThucHien: true, message: CHU_LO_CHUA_KY_XAC_NHAN };
-          }
         } else if (!hoSo.chu_lo_da_xac_nhan) {
           throw new LoiNghiepVu(409, CHU_LO_CHUA_KY_XAC_NHAN);
         }

@@ -134,7 +134,11 @@ export default function AgriChainLogistics() {
   });
 
   const [drivers, setDrivers] = useState([]);
+  // Tài xế đang chạy chuyến khác (CHO_LAY_HANG / DANG_VAN_CHUYEN) thì không cho chọn nhận chuyến mới
+  const taiXeRanh = drivers.filter((d) => !d.dang_chay_chuyen);
   const [vehicles, setVehicles] = useState([]);
+  // Xe đã có chuyến chở (chờ lấy hàng / đang vận chuyển) thì không cho chọn cho chuyến mới
+  const xeRanh = vehicles.filter((v) => !v.dang_chay_chuyen);
   const [driverForm, setDriverForm] = useState(EMPTY_DRIVER);
   const [editingDriver, setEditingDriver] = useState(null);
   const [vehicleForm, setVehicleForm] = useState(EMPTY_VEHICLE);
@@ -1318,7 +1322,6 @@ export default function AgriChainLogistics() {
                                           <div className="dropdown-divider"></div>
                                           <div
                                             className="dropdown-item"
-                                            style={{ color: "#16a34a" }}
                                             onClick={() =>
                                               handleOpenAccept(trip)
                                             }
@@ -1343,7 +1346,6 @@ export default function AgriChainLogistics() {
                                           <div className="dropdown-divider"></div>
                                           <div
                                             className="dropdown-item"
-                                            style={{ color: "#2563eb" }}
                                             onClick={() =>
                                               handleOpenPickup(trip)
                                             }
@@ -1360,7 +1362,6 @@ export default function AgriChainLogistics() {
                                           <div className="dropdown-divider"></div>
                                           <div
                                             className="dropdown-item"
-                                            style={{ color: "#16a34a" }}
                                             onClick={() =>
                                               handleConfirmArrival(trip)
                                             }
@@ -1661,14 +1662,15 @@ export default function AgriChainLogistics() {
                     }
                     className="form-select"
                   >
-                    <option value="">-- Chọn tài xế từ danh sách --</option>
-                    {drivers.map((d) => (
+                    <option value="">
+                      {taiXeRanh.length === 0
+                        ? "-- Không còn tài xế rảnh --"
+                        : "-- Chọn tài xế từ danh sách --"}
+                    </option>
+                    {taiXeRanh.map((d) => (
                       <option key={d.ma_tai_xe} value={d.ma_tai_xe}>
                         {d.ho_ten}
                         {d.so_dien_thoai ? ` - ${d.so_dien_thoai}` : ""}
-                        {d.dang_chay_chuyen
-                          ? ` (đang chạy ${d.dang_chay_chuyen})`
-                          : ""}
                       </option>
                     ))}
                   </select>
@@ -1686,17 +1688,16 @@ export default function AgriChainLogistics() {
                     className="form-select"
                   >
                     <option value="">
-                      -- Chọn phương tiện từ danh sách --
+                      {xeRanh.length === 0
+                        ? "-- Không còn phương tiện rảnh --"
+                        : "-- Chọn phương tiện từ danh sách --"}
                     </option>
-                    {vehicles.map((v) => (
+                    {xeRanh.map((v) => (
                       <option key={v.ma_phuong_tien} value={v.ma_phuong_tien}>
                         {v.bien_so}
                         {v.loai_xe ? ` - ${v.loai_xe}` : ""}
                         {v.tai_trong_kg
                           ? ` (${Number(v.tai_trong_kg).toLocaleString("vi-VN")} kg)`
-                          : ""}
-                        {v.dang_chay_chuyen
-                          ? ` (đang chạy ${v.dang_chay_chuyen})`
                           : ""}
                       </option>
                     ))}

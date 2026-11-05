@@ -55,50 +55,67 @@ const normalizeStatus = (s) =>
     .toUpperCase()
     .replace(/\s+/g, "_");
 
-// Chủ lô đã ký xác nhận biên bản lấy mẫu chưa (bắt buộc trước khi công bố kết quả)
-const BadgeChuLoXacNhan = ({ item }) =>
-  item.chu_lo_da_xac_nhan ? (
-    <span
-      style={{
-        fontSize: 12.5,
-        fontWeight: 600,
-        color: "#047857",
-        background: "#ecfdf5",
-        border: "1px solid #a7f3d0",
-        borderRadius: 999,
-        padding: "3px 10px",
-        marginLeft: 8,
-      }}
-    >
-      Chủ lô đã ký xác nhận biên bản lấy mẫu
-    </span>
-  ) : (
-    <span
-      style={{
-        fontSize: 12.5,
-        fontWeight: 600,
-        color: "#b45309",
-        background: "#fffbeb",
-        border: "1px solid #fde68a",
-        borderRadius: 999,
-        padding: "3px 10px",
-        marginLeft: 8,
-      }}
-      title='Chủ lô ký xác nhận ở trang Nông dân → tab "Ký blockchain". Có bước này mới công bố được kết quả.'
-    >
-      Chờ chủ lô ký xác nhận biên bản lấy mẫu
-    </span>
-  );
+// Thứ tự ký lấy mẫu: bước 1 nông dân (chủ lô) ký xác nhận biên bản, bước 2 cơ quan kiểm định ký niêm phong
+const kieuBadgeKy = (daXong) => ({
+  fontSize: 12.5,
+  fontWeight: 600,
+  color: daXong ? "#047857" : "#b45309",
+  background: daXong ? "#ecfdf5" : "#fffbeb",
+  border: `1px solid ${daXong ? "#a7f3d0" : "#fde68a"}`,
+  borderRadius: 999,
+  padding: "3px 10px",
+  marginLeft: 8,
+});
+
+const BadgeChuLoXacNhan = ({ item }) => (
+  <>
+    {item.chu_lo_da_xac_nhan ? (
+      <span style={kieuBadgeKy(true)}>
+        Chủ lô đã ký xác nhận biên bản lấy mẫu
+      </span>
+    ) : (
+      <span
+        style={kieuBadgeKy(false)}
+        title='Bước 1: nông dân ký xác nhận ở trang Nông dân → tab "Ký blockchain". Xong bước này bạn mới ký niêm phong được.'
+      >
+        Chờ chủ lô ký xác nhận biên bản lấy mẫu (bước 1)
+      </span>
+    )}
+    {item.chu_lo_da_xac_nhan && item.da_ky_lay_mau === false && (
+      <span
+        style={kieuBadgeKy(false)}
+        title='Bước 2: bạn ký niêm phong mẫu ở mục "Ký blockchain". Ký xong mới nhập chỉ số và công bố được.'
+      >
+        Chờ bạn ký niêm phong mẫu (bước 2)
+      </span>
+    )}
+  </>
+);
 
 // Nút công bố vẫn bấm được khi chủ lô chưa ký xác nhận biên bản lấy mẫu: bấm thì báo bằng alert
+// Giá trị mặc định của các ô nhập (dùng khi mở form và khi reset lúc đóng form)
+const PHUONG_PHAP_LAY_MAU_MAC_DINH =
+  "Lấy chéo góc 5 điểm ngẫu nhiên trên liếp vườn";
+const LY_DO_THU_HOI_MAC_DINH =
+  "Phát hiện tồn dư chất cấm vượt ngưỡng kiểm định an toàn";
+const FORM_KIEM_DINH_VIEN_TRONG = {
+  ho_ten: "",
+  chuc_vu: "",
+  so_dien_thoai: "",
+  email: "",
+};
+
 const CANH_BAO_CHU_LO_CHUA_XAC_NHAN =
   "Chờ nông dân ký xác nhận biên bản lấy mẫu bạn mới có thể công bố.";
 
 // Chưa ký blockchain thì không nhập chỉ số / không công bố: nút vẫn bấm được nhưng chỉ hiện alert
 const CANH_BAO_CHUA_KY_LAY_MAU =
-  'Biên bản lấy mẫu chưa được ký. Hãy ký ở mục "Ký blockchain" và thử lại.';
+  'Bạn chưa ký niêm phong mẫu. Hãy ký ở mục "Ký blockchain" rồi nhập chỉ số.';
 const CANH_BAO_CHUA_KY_LAY_MAU_CONG_BO =
-  'Biên bản lấy mẫu chưa được ký. Hãy ký ở mục "Ký blockchain" và thử lại.';
+  'Bạn chưa ký niêm phong mẫu. Hãy ký ở mục "Ký blockchain" rồi công bố.';
+// Thứ tự ký lấy mẫu: nông dân (chủ lô) ký xác nhận biên bản TRƯỚC, cơ quan kiểm định ký niêm phong SAU
+const CANH_BAO_CHO_NONG_DAN_KY =
+  'Chờ nông dân ký xác nhận biên bản lấy mẫu trước, sau đó bạn ký niêm phong ở mục "Ký blockchain".';
 // Lý do chưa công bố được (null = được công bố). da_ky_lay_mau do server trả về, thiếu thì coi như không chặn.
 const canhBaoTruocCongBo = (item) => {
   if (item.cho_ky_cong_bo) return CANH_BAO_DA_GUI_CONG_BO;
@@ -255,9 +272,7 @@ function Coquankiemdinh() {
   const [loadingStandards, setLoadingStandards] = useState(false);
 
   const [revokeItem, setRevokeItem] = useState(null);
-  const [revokeReason, setRevokeReason] = useState(
-    "Phát hiện tồn dư chất cấm vượt ngưỡng kiểm định an toàn",
-  );
+  const [revokeReason, setRevokeReason] = useState(LY_DO_THU_HOI_MAC_DINH);
 
   const [selectedPublishItem, setSelectedPublishItem] = useState(null);
 
@@ -269,20 +284,65 @@ function Coquankiemdinh() {
   const [selectedInspectorId, setSelectedInspectorId] = useState("");
   const [modalInspectorOpen, setModalInspectorOpen] = useState(false);
   const [editingInspectorId, setEditingInspectorId] = useState(null);
-  const [inspectorForm, setInspectorForm] = useState({
-    ho_ten: "",
-    chuc_vu: "",
-    so_dien_thoai: "",
-    email: "",
-  });
+  const [inspectorForm, setInspectorForm] = useState(
+    FORM_KIEM_DINH_VIEN_TRONG,
+  );
   const [inspectorFormError, setInspectorFormError] = useState("");
   const [inspectorSaving, setInspectorSaving] = useState(false);
   const [sealCode, setSealCode] = useState("");
   const [sampleWeight, setSampleWeight] = useState("");
   const [sampleMethod, setSampleMethod] = useState(
-    "Lấy chéo góc 5 điểm ngẫu nhiên trên liếp vườn",
+    PHUONG_PHAP_LAY_MAU_MAC_DINH,
   );
   const [visualCondition, setVisualCondition] = useState("");
+
+  // Form nào đóng lại (bấm Hủy, dấu X, hoặc gửi xong) thì xóa sạch dữ liệu đã nhập,
+  // để lần sau mở form không còn dữ liệu của lần trước.
+  useEffect(() => {
+    if (modalAcceptOpen) return;
+    setDay("");
+    setTime("");
+    setSelectedInspectorId("");
+    setAcceptData({ code: "", farm: "" });
+  }, [modalAcceptOpen]);
+
+  useEffect(() => {
+    if (modalSamplingOpen) return;
+    setSamplingData({ requestCode: "", batchCode: "", farmName: "" });
+    setSealCode("");
+    setSampleWeight("");
+    setSampleMethod(PHUONG_PHAP_LAY_MAU_MAC_DINH);
+    setVisualCondition("");
+  }, [modalSamplingOpen]);
+
+  useEffect(() => {
+    if (modalPublishOpen) return;
+    setStandardIndicators([]);
+    setIndicatorValues({});
+  }, [modalPublishOpen]);
+
+  useEffect(() => {
+    if (modalRevokeOpen) return;
+    setRevokeItem(null);
+    setRevokeReason(LY_DO_THU_HOI_MAC_DINH);
+  }, [modalRevokeOpen]);
+
+  useEffect(() => {
+    if (modalFailOpen) return;
+    setFailItem(null);
+  }, [modalFailOpen]);
+
+  useEffect(() => {
+    if (modalConfirmPublishOpen) return;
+    setSelectedPublishItem(null);
+  }, [modalConfirmPublishOpen]);
+
+  useEffect(() => {
+    if (modalInspectorOpen) return;
+    setEditingInspectorId(null);
+    setInspectorForm(FORM_KIEM_DINH_VIEN_TRONG);
+    setInspectorFormError("");
+  }, [modalInspectorOpen]);
 
   const activeInspectors = inspectors.filter((i) => i.trang_thai === 1);
 
@@ -457,7 +517,11 @@ function Coquankiemdinh() {
   // Mở popup và gửi yêu cầu đến server tải các tiêu chuẩn của bảng ngưỡng kiểm định chuẩn
   const handleOpenPublishModal = async (item) => {
     if (item.da_ky_lay_mau === false) {
-      alert(CANH_BAO_CHUA_KY_LAY_MAU);
+      alert(
+        item.chu_lo_da_xac_nhan
+          ? CANH_BAO_CHUA_KY_LAY_MAU
+          : CANH_BAO_CHO_NONG_DAN_KY,
+      );
       return;
     }
     if (item.cho_ky_cong_bo) {
@@ -524,7 +588,7 @@ function Coquankiemdinh() {
     }
     setRevokeItem(item);
     setCode(item.ma_kiem_dinh);
-    setRevokeReason("Phát hiện tồn dư chất cấm vượt ngưỡng kiểm định an toàn");
+    setRevokeReason(LY_DO_THU_HOI_MAC_DINH);
     setModalRevokeOpen(true);
   };
 
@@ -2332,7 +2396,7 @@ function Coquankiemdinh() {
                         return;
                       }
                       alert(
-                        `${ketQua.message}. Biên bản đã niêm phong, không sửa được nữa; vào mục "Ký blockchain" để ký.`,
+                        `${ketQua.message}. Biên bản đã khóa, không sửa được nữa.`,
                       );
                       setModalSamplingOpen(false);
                       fetchSamplingRequests();

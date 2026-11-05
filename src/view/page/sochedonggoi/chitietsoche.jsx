@@ -2611,9 +2611,7 @@ const ProcessingPage = () => {
           <div className="modal-overlay">
             <div className="modal-container">
               <div className="modal-header">
-                <h3>
-                  <Combine size={18} color="#2e8b57" /> Gộp Các Lô Nông Sản
-                </h3>
+                <h3>Gộp Các Lô Nông Sản</h3>
                 <button
                   className="modal-close-btn"
                   onClick={() => setShowMergeModal(false)}
@@ -2632,23 +2630,9 @@ const ProcessingPage = () => {
                       Chưa có lô nào khả dụng để gộp.
                     </p>
                   ) : (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "6px",
-                      }}
-                    >
+                    <div className="merge-lot-list">
                       {splitMergeLots.map((l) => (
-                        <label
-                          key={l.ma_lo_nong_san}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "8px",
-                            fontSize: "13px",
-                          }}
-                        >
+                        <label key={l.ma_lo_nong_san} className="merge-lot-row">
                           <input
                             type="checkbox"
                             checked={mergeSelected.includes(l.ma_lo_nong_san)}
@@ -2656,8 +2640,10 @@ const ProcessingPage = () => {
                               handleToggleMergeSelect(l.ma_lo_nong_san)
                             }
                           />
-                          {l.ma_lo_nong_san} - {l.ten_san_pham} (
-                          {formatWeight(l.so_luong_hien_tai, l.don_vi_tinh)})
+                          <span className="merge-lot-text">
+                            {l.ma_lo_nong_san} - {l.ten_san_pham} (
+                            {formatWeight(l.so_luong_hien_tai, l.don_vi_tinh)})
+                          </span>
                         </label>
                       ))}
                     </div>

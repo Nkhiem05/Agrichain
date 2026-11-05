@@ -14,14 +14,14 @@
     "emitsTypeDeclarations": true
   },
   "C:\\xampp\\htdocs\\Agrichain\\blockchain\\contracts\\Agrichain.sol": {
-    "jobHash": "solc-0_8_24-631d695cba098cb3182f6c06c361c303b92de394",
+    "jobHash": "solc-0_8_24-18330242f4aec1d41bc665426d85bf33a7e412e3",
     "isolated": false,
     "compilerType": "solc",
     "artifactPaths": [
       "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\contracts\\Agrichain.sol\\AgriChain.json"
     ],
-    "buildInfoPath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\build-info\\solc-0_8_24-631d695cba098cb3182f6c06c361c303b92de394.json",
-    "buildInfoOutputPath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\build-info\\solc-0_8_24-631d695cba098cb3182f6c06c361c303b92de394.output.json",
+    "buildInfoPath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\build-info\\solc-0_8_24-18330242f4aec1d41bc665426d85bf33a7e412e3.json",
+    "buildInfoOutputPath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\build-info\\solc-0_8_24-18330242f4aec1d41bc665426d85bf33a7e412e3.output.json",
     "typeFilePath": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts\\contracts\\Agrichain.sol\\artifacts.d.ts",
     "wasm": false,
     "artifactsDirectory": "C:\\xampp\\htdocs\\Agrichain\\blockchain\\artifacts",

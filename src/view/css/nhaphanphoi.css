@@ -751,3 +751,68 @@
 .nhaphanphoi .btn-save.danger:hover {
   background-color: #b91c1c;
 }
+
+/* ===== TRANG ĐẠI LÝ: nút và nhãn trạng thái cùng một kích thước ===== */
+.nhaphanphoi .status-pill.dl-pill {
+  box-sizing: border-box;
+  width: 200px;
+  min-width: 200px;
+  height: 30px;
+  padding: 0 10px;
+}
+
+.nhaphanphoi .dl-btn {
+  box-sizing: border-box;
+  height: 32px;
+  min-width: 128px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.nhaphanphoi .dl-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.nhaphanphoi .dl-btn.primary {
+  background-color: #2e8b57;
+  color: #ffffff;
+}
+.nhaphanphoi .dl-btn.primary:hover:not(:disabled) {
+  background-color: #257247;
+}
+.nhaphanphoi .dl-btn.outline {
+  background-color: #ffffff;
+  color: #2563eb;
+  border-color: #93c5fd;
+}
+.nhaphanphoi .dl-btn.outline:hover {
+  background-color: #eff6ff;
+}
+.nhaphanphoi .dl-btn.reject {
+  background-color: #ffffff;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+.nhaphanphoi .dl-btn.reject:hover:not(:disabled) {
+  background-color: #fef2f2;
+}
+
+.nhaphanphoi .dl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}

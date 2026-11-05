@@ -384,7 +384,9 @@ const dongBoVaiTro = async (req, res) => {
   try {
     const txHash = txHashHopLe(req.body?.txHash);
     if (!txHash) throw new ApiError(400, "Thiếu mã giao dịch hợp lệ");
-    const ds = Array.isArray(req.body?.dia_chi) ? req.body.dia_chi.map(chuanHoaDiaChi) : [];
+    const ds = Array.isArray(req.body?.dia_chi)
+      ? req.body.dia_chi.map(chuanHoaDiaChi)
+      : [];
     if (ds.length === 0) throw new ApiError(400, "Thiếu danh sách ví");
 
     let gd;
@@ -415,7 +417,10 @@ const dongBoVaiTro = async (req, res) => {
         throw new ApiError(502, "Không đọc được blockchain, thử lại sau");
       }
       if (mongDoi && thucTe === mongDoi) {
-        await db.query(`UPDATE vi_blockchain SET tx_gan_vai_tro = ? WHERE dia_chi_vi = ?`, [txHash, r.dia_chi_vi]);
+        await db.query(
+          `UPDATE vi_blockchain SET tx_gan_vai_tro = ? WHERE dia_chi_vi = ?`,
+          [txHash, r.dia_chi_vi],
+        );
         daDongBo.push(getAddress(r.dia_chi_vi));
       } else {
         conLech.push(getAddress(r.dia_chi_vi));
@@ -1376,7 +1381,13 @@ const chayDoiSoat = async (req, res) => {
 // Dòng dõi của lô: lô nguồn (đi ngược về nông trại, mỗi lô được xác thực chuỗi riêng) và lô con (tách / gộp / sơ chế ra từ lô này).
 // Khi một lô tách thành nhiều lô, mỗi lô con vẫn lần ngược được tới lô gốc qua các liên kết này.
 const TOI_DA_LO_DONG_DOI = 15;
-const MUC_NGHIEM_TRONG = { VERIFIED: 0, NOT_CHECKED: 0, INCOMPLETE: 1, MISMATCH: 2, BROKEN_CHAIN: 3 };
+const MUC_NGHIEM_TRONG = {
+  VERIFIED: 0,
+  NOT_CHECKED: 0,
+  INCOMPLETE: 1,
+  MISMATCH: 2,
+  BROKEN_CHAIN: 3,
+};
 
 const layDongDoi = async (maLo) => {
   const nguon = [];
@@ -1393,7 +1404,8 @@ const layDongDoi = async (maLo) => {
         [ma],
       );
       for (const r of rows) {
-        if (daThay.has(r.ma_lo_nguon) || nguon.length >= TOI_DA_LO_DONG_DOI) continue;
+        if (daThay.has(r.ma_lo_nguon) || nguon.length >= TOI_DA_LO_DONG_DOI)
+          continue;
         daThay.add(r.ma_lo_nguon);
         let xacThuc = null;
         try {
@@ -1435,7 +1447,8 @@ const layDongDoi = async (maLo) => {
         [ma],
       );
       for (const r of rows) {
-        if (daThayCon.has(r.ma_lo) || con.length >= TOI_DA_LO_DONG_DOI) continue;
+        if (daThayCon.has(r.ma_lo) || con.length >= TOI_DA_LO_DONG_DOI)
+          continue;
         daThayCon.add(r.ma_lo);
         con.push({
           ma_lo: r.ma_lo,
@@ -1463,12 +1476,15 @@ const xacThucLo = async (req, res) => {
     const data = await xacThucMotLo(req.params.maLo);
     // Dòng dõi là phần thêm: lỗi ở đây không được làm hỏng kết quả xác thực của chính lô này
     try {
-      const maLo = String(req.params.maLo || "").replace(/^#/, "").trim();
+      const maLo = String(req.params.maLo || "")
+        .replace(/^#/, "")
+        .trim();
       data.dong_doi = await layDongDoi(maLo);
       let toanChuoi = data.trang_thai;
       for (const n of data.dong_doi.lo_nguon) {
         const tt = n.xac_thuc?.trang_thai;
-        if (tt && MUC_NGHIEM_TRONG[tt] > MUC_NGHIEM_TRONG[toanChuoi]) toanChuoi = tt;
+        if (tt && MUC_NGHIEM_TRONG[tt] > MUC_NGHIEM_TRONG[toanChuoi])
+          toanChuoi = tt;
       }
       data.trang_thai_toan_chuoi = toanChuoi;
     } catch (err) {
@@ -1503,4 +1519,5 @@ module.exports = {
   daGuiSuKien,
   xacNhanSuKien,
   xacThucLo,
+  xacThucMotLo,
 };

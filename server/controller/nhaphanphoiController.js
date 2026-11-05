@@ -175,7 +175,9 @@ const gioChoKy = async (rows) => {
     const cua = ev.filter((e) => e.ma_van_don === r.ma_van_don);
     // ưu tiên bước muộn nhất đang chờ
     const thuTu = ["TOI_NOI", "XUAT_KHO", "NHAP_KHO", "TU_CHOI", "TAO_PHIEU"];
-    const co = cua.map((e) => TEN[e.loai]).sort((x, y) => thuTu.indexOf(x) - thuTu.indexOf(y))[0];
+    const co = cua
+      .map((e) => TEN[e.loai])
+      .sort((x, y) => thuTu.indexOf(x) - thuTu.indexOf(y))[0];
     if (co) r.cho_ky = co;
   });
 };
@@ -501,7 +503,10 @@ const confirmReceive = async (req, res) => {
         {
           hanh_dong: "NHAN_HANG",
           khoi_luong_nhan: khoiLuongThucTe,
-          nhap_kho: { vi_tri_luu_kho: viTriKho, han_luu_kho: hanLuuKho || null },
+          nhap_kho: {
+            vi_tri_luu_kho: viTriKho,
+            han_luu_kho: hanLuuKho || null,
+          },
         },
       );
     });
@@ -806,7 +811,8 @@ const createDispatch = async (req, res) => {
     if (!ma_lo_nong_san)
       throw new ApiError(400, "Vui lòng chọn lô hàng cần xuất");
     // Có blockchain: giao nguyên lô nên số lượng lấy theo tồn của lô, không cần nhập
-    if (!coChuoi && !so_luong_xuat) throw new ApiError(400, "Số lượng xuất phải lớn hơn 0");
+    if (!coChuoi && !so_luong_xuat)
+      throw new ApiError(400, "Số lượng xuất phải lớn hơn 0");
     if (!["TU_GIAO", "DV_VAN_CHUYEN"].includes(hinh_thuc)) {
       throw new ApiError(400, "Hình thức giao hàng không hợp lệ");
     }
@@ -835,6 +841,19 @@ const createDispatch = async (req, res) => {
               409,
               "Đại lý chưa gắn tài khoản đại lý nên không ký nhận hàng trên blockchain được. Hãy sửa đại lý và chọn tài khoản",
             );
+          }
+          // Đại lý phải liên kết ví MetaMask (đã được admin duyệt) thì mới lập phiếu và vận chuyển được,
+          // vì họ phải ký nhận hàng bằng ví của mình
+          if (coChuoi) {
+            const thieuVi = await chuaCoViDuyet(connection, [
+              dealer.ma_nguoi_dung,
+            ]);
+            if (thieuVi.length > 0) {
+              throw new ApiError(
+                409,
+                `Đại lý ${dealer.ten} chưa liên kết ví MetaMask (hoặc ví chưa được duyệt) nên chưa lập phiếu phân phối và vận chuyển được. Hãy nhờ đại lý liên kết ví ở trang của họ trước.`,
+              );
+            }
           }
 
           const [lots] = await connection.execute(
@@ -1001,8 +1020,9 @@ const createDispatch = async (req, res) => {
           // Không có blockchain: trừ tồn kho như cách cũ. Có blockchain: lô được giao nguyên, đổi chủ khi đại lý ký nhận
           if (!coChuoi) {
             const conLai =
-              Math.round((Number(lot.so_luong_hien_tai) - so_luong_xuat) * 1000) /
-              1000;
+              Math.round(
+                (Number(lot.so_luong_hien_tai) - so_luong_xuat) * 1000,
+              ) / 1000;
             await connection.execute(
               `UPDATE lo_nong_san SET so_luong_hien_tai = ? WHERE ma_lo_nong_san = ?`,
               [conLai, ma_lo_nong_san],
@@ -1312,6 +1332,25 @@ const getDealers = async (req, res) => {
       `,
       [maNpp],
     );
+
+    // da_lien_ket_vi: tài khoản đại lý đã có ví MetaMask được duyệt (điều kiện để lập phiếu phân phối)
+    const coVi = new Set();
+    try {
+      const dsTaiKhoan = rows.map((r) => r.ma_nguoi_dung).filter(Boolean);
+      if (dsTaiKhoan.length > 0) {
+        const [vi] = await db.query(
+          `SELECT DISTINCT ma_nguoi_dung FROM vi_blockchain WHERE ma_nguoi_dung IN (?) AND trang_thai = 1 AND trang_thai_duyet = 'DA_DUYET'`,
+          [dsTaiKhoan],
+        );
+        vi.forEach((v) => coVi.add(v.ma_nguoi_dung));
+      }
+    } catch {
+      /* chưa có bảng ví blockchain: coi như chưa liên kết */
+    }
+    rows.forEach((r) => {
+      // Chưa bật blockchain thì không đòi ví
+      r.da_lien_ket_vi = !layCauHinh().daCauHinh || coVi.has(r.ma_nguoi_dung);
+    });
 
     return res.json({ success: true, data: rows });
   } catch (err) {

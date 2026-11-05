@@ -49,6 +49,7 @@ contract AgriChain {
     // Trạng thái chứng nhận (theo từng hồ sơ kiểm định)
     uint8 public constant CERT_NONE = 0;
     uint8 public constant CERT_SEALED = 1;     // đã niêm phong mẫu, chờ công bố
+    uint8 public constant CERT_OWNER_OK = 5;   // chủ lô đã ký xác nhận biên bản lấy mẫu, chờ cơ quan niêm phong
     uint8 public constant CERT_PASSED = 2;
     uint8 public constant CERT_FAILED = 3;
     uint8 public constant CERT_REVOKED = 4;
@@ -192,13 +193,13 @@ contract AgriChain {
         Cert storage c = certs[certId];
 
         if (eventType == SAMPLING_SEALED) {
-            require(!c.exists, "ho so kiem dinh da ton tai");
+            // Chủ lô phải ký xác nhận biên bản lấy mẫu TRƯỚC (confirmSampling), cơ quan mới niêm phong được
+            require(c.exists && c.batchId == batchId, "chu lo chua ky bien ban lay mau");
+            require(c.state == CERT_OWNER_OK, "ho so khong o buoc niem phong");
+            require(c.ownerAtSeal == b.owner, "chu lo da thay doi");
             require(b.status == BATCH_ACTIVE && b.orderStage == ORDER_NONE, "lo khong o trang thai lay mau duoc");
-            c.exists = true;
             c.state = CERT_SEALED;
             c.issuer = msg.sender;
-            c.ownerAtSeal = b.owner;
-            c.batchId = batchId;
         } else {
             require(c.exists && c.batchId == batchId, "ho so kiem dinh khong ton tai");
             require(c.issuer == msg.sender, "chi co quan da niem phong / da cap");
@@ -227,15 +228,21 @@ contract AgriChain {
         _link(batchId, b, eventType, prevHash, eventHash);
     }
 
-    /// @notice Chủ lô (lúc lấy mẫu) ký xác nhận biên bản lấy mẫu đúng lô của mình.
+    /// @notice Chủ lô ký xác nhận biên bản lấy mẫu của chính lô mình TRƯỚC; sau đó cơ quan kiểm định mới ký
+    ///         niêm phong mẫu (certify với SAMPLING_SEALED) và công bố kết quả.
     function confirmSampling(bytes32 batchId, bytes32 certId, bytes32 prevHash, bytes32 eventHash) external {
         _requireActive();
         Batch storage b = _batch(batchId);
+        require(b.owner == msg.sender, "chi chu lo duoc ky");
+        require(b.status == BATCH_ACTIVE && b.orderStage == ORDER_NONE, "lo khong o trang thai lay mau duoc");
         Cert storage c = certs[certId];
-        require(c.exists && c.batchId == batchId, "ho so kiem dinh khong ton tai");
-        require(c.ownerAtSeal == msg.sender, "chi chu lo luc lay mau duoc ky");
-        require(c.state == CERT_SEALED && !c.ownerConfirmed, "khong o buoc xac nhan lay mau");
+        require(!c.exists, "ho so kiem dinh da ton tai");
+        c.exists = true;
+        c.state = CERT_OWNER_OK;
         c.ownerConfirmed = true;
+        c.ownerAtSeal = msg.sender;
+        c.batchId = batchId;
+        emit CertChanged(certId, batchId, address(0), CERT_OWNER_OK);
         _link(batchId, b, SAMPLING_CONFIRMED, prevHash, eventHash);
     }
 
