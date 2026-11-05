@@ -469,7 +469,9 @@ const NhaPhanPhoiPage = () => {
       /* dùng danh sách đã có */
     }
     if (dsVanChuyen.length === 0) {
-      alert("Chưa có tài khoản đơn vị vận chuyển nào để thuê giao hàng. Hãy tạo tài khoản vận chuyển trước.");
+      alert(
+        "Chưa có tài khoản đơn vị vận chuyển nào để thuê giao hàng. Hãy tạo tài khoản vận chuyển trước.",
+      );
       return;
     }
     if (!dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG")) {
@@ -480,7 +482,11 @@ const NhaPhanPhoiPage = () => {
       return;
     }
     // Đại lý phải liên kết ví MetaMask (đã duyệt) mới nhận được phiếu phân phối và vận chuyển
-    if (!dsDaiLy.some((d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi)) {
+    if (
+      !dsDaiLy.some(
+        (d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi !== false,
+      )
+    ) {
       alert(
         "Chưa có đại lý nào liên kết ví MetaMask. Đại lý cần liên kết ví ở trang của họ thì bạn mới lập phiếu phân phối và vận chuyển được.",
       );
@@ -502,8 +508,9 @@ const NhaPhanPhoiPage = () => {
     setDispatchForm({
       // Ưu tiên đại lý đã gắn tài khoản (đại lý ký nhận hàng trên blockchain bằng tài khoản đó)
       daiLyId:
-        dsDaiLy.find((d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi)
-          ?.ma_dai_ly || "",
+        dsDaiLy.find(
+          (d) => d.trang_thai === "HOAT_DONG" && d.da_lien_ket_vi !== false,
+        )?.ma_dai_ly || "",
       maLo: validLots.find((lot) => !lot.cho_ky)?.ma_lo_nong_san || "",
       soLuongXuat: "",
       maDonViVanChuyen: dsVanChuyen[0]?.ma_nguoi_dung || "",
@@ -524,20 +531,26 @@ const NhaPhanPhoiPage = () => {
     }
   };
 
+  // Đại lý chưa liên kết ví MetaMask (hoặc ví chưa được duyệt) thì không ký nhận hàng được => không lập phiếu / lệnh vận chuyển
+  const canhBaoDaiLyChuaCoVi = (dl) =>
+    `Đại lý ${dl.ten} chưa liên kết ví MetaMask nên chưa lập được phiếu phân phối và lệnh vận chuyển. Hãy nhờ đại lý liên kết ví ở Trang cá nhân của họ và chờ quản trị viên duyệt ví.`;
+
   const handleSaveDispatch = async () => {
     if (!dispatchForm.daiLyId) return alert("Vui lòng chọn đại lý nhận hàng!");
     const daiLyChon = dealers.find((d) => d.ma_dai_ly === dispatchForm.daiLyId);
-    if (daiLyChon && !daiLyChon.da_lien_ket_vi) {
-      return alert(
-        `Đại lý ${daiLyChon.ten} chưa liên kết ví MetaMask nên chưa lập phiếu phân phối và vận chuyển được.`,
-      );
+    if (daiLyChon && daiLyChon.da_lien_ket_vi === false) {
+      return alert(canhBaoDaiLyChuaCoVi(daiLyChon));
     }
     if (!dispatchForm.maLo) return alert("Vui lòng chọn lô xuất hàng!");
-    if (!dispatchForm.maDonViVanChuyen) return alert("Vui lòng chọn đơn vị vận chuyển!");
+    if (!dispatchForm.maDonViVanChuyen)
+      return alert("Vui lòng chọn đơn vị vận chuyển!");
     // Giao nguyên lô: khối lượng lấy theo tồn của lô, không tách lô
-    const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
+    const lotChon = inventoryList.find(
+      (l) => l.ma_lo_nong_san === dispatchForm.maLo,
+    );
     const xuatKg = Number(lotChon?.so_luong_hien_tai);
-    if (!xuatKg || xuatKg <= 0) return alert("Lô được chọn không còn hàng để giao!");
+    if (!xuatKg || xuatKg <= 0)
+      return alert("Lô được chọn không còn hàng để giao!");
 
     try {
       const res = await createDispatch({
@@ -550,8 +563,14 @@ const NhaPhanPhoiPage = () => {
       setShowCreateDispatchModal(false);
       await loadAll();
       await baoKetQua(
-        { ...res, message: `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.` },
-        { thanhCong: `Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""}.`, taiLai: loadAll },
+        {
+          ...res,
+          message: `${res?.message || "Đã lập phiếu xuất kho"}: ${res?.data?.ma_phieu || ""}.`,
+        },
+        {
+          thanhCong: `Đã lập phiếu xuất kho ${res?.data?.ma_phieu || ""}.`,
+          taiLai: loadAll,
+        },
       );
     } catch (err) {
       alert(err.message || "Không thể lập phiếu xuất kho");
@@ -1564,9 +1583,9 @@ const NhaPhanPhoiPage = () => {
                 <div className="bc-tab">
                   <p className="bc-tab-desc">
                     Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận)
-                    hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác nhận
-                    giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký lấy hàng và tới nơi. Các
-                    bước của một lô ký theo thứ tự.
+                    hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác
+                    nhận giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký
+                    lấy hàng và tới nơi. Các bước của một lô ký theo thứ tự.
                   </p>
                   <BlockchainPanel />
                 </div>
@@ -1972,7 +1991,8 @@ const NhaPhanPhoiPage = () => {
               <p style={{ fontSize: 13, color: "#4b5563", marginBottom: 12 }}>
                 Từ chối nhận vận đơn <b>{selectedOrder.ma_van_don}</b> mang lô{" "}
                 <b>{selectedOrder.ma_lo_nong_san}</b>. Sau khi bạn ký từ chối,
-                đơn vị vận chuyển sẽ chở hàng trả về nơi gửi. Bắt buộc nhập lý do:
+                đơn vị vận chuyển sẽ chở hàng trả về nơi gửi. Bắt buộc nhập lý
+                do:
               </p>
               <div className="form-group">
                 <label>Lý do từ chối nhận (*)</label>
@@ -2016,31 +2036,51 @@ const NhaPhanPhoiPage = () => {
                 <label>Chọn Đại Lý Nhận Hàng (*)</label>
                 <select
                   value={dispatchForm.daiLyId}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setDispatchForm({
                       ...dispatchForm,
                       daiLyId: e.target.value,
-                    })
-                  }
+                    });
+                    const dl = dealers.find(
+                      (d) => d.ma_dai_ly === e.target.value,
+                    );
+                    if (dl && dl.da_lien_ket_vi === false)
+                      alert(canhBaoDaiLyChuaCoVi(dl));
+                  }}
                 >
                   <option value="">-- Chọn đại lý --</option>
                   {dealers
                     .filter((d) => d.trang_thai === "HOAT_DONG")
                     .map((d) => (
-                      <option
-                        key={d.ma_dai_ly}
-                        value={d.ma_dai_ly}
-                        disabled={!d.da_lien_ket_vi}
-                      >
+                      <option key={d.ma_dai_ly} value={d.ma_dai_ly}>
                         {d.ten} ({d.dia_chi})
                         {!d.ma_nguoi_dung
                           ? " - chưa gắn tài khoản"
-                          : !d.da_lien_ket_vi
+                          : d.da_lien_ket_vi === false
                             ? " - chưa liên kết ví MetaMask"
                             : ""}
                       </option>
                     ))}
                 </select>
+                {dealers.find((d) => d.ma_dai_ly === dispatchForm.daiLyId)
+                  ?.da_lien_ket_vi === false && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "8px 12px",
+                      borderRadius: 8,
+                      background: "#fffbeb",
+                      border: "1px solid #fde68a",
+                      color: "#b45309",
+                      fontSize: 12.5,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {canhBaoDaiLyChuaCoVi(
+                      dealers.find((d) => d.ma_dai_ly === dispatchForm.daiLyId),
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="form-grid-2">
@@ -2067,7 +2107,9 @@ const NhaPhanPhoiPage = () => {
                           {formatWeight(lot.so_luong_hien_tai, lot.don_vi_tinh)}
                           {lot.han_luu_kho ? ` - Hạn: ${lot.han_luu_kho}` : ""})
                           {isRevoked ? " [BỊ THU HỒI - KHÓA]" : ""}
-                          {choKy && !isRevoked ? " [CHỜ KÝ - ký ở tab Ký blockchain]" : ""}
+                          {choKy && !isRevoked
+                            ? " [CHỜ KÝ - ký ở tab Ký blockchain]"
+                            : ""}
                         </option>
                       );
                     })}
@@ -2086,7 +2128,9 @@ const NhaPhanPhoiPage = () => {
                     }}
                   >
                     {(() => {
-                      const lotChon = inventoryList.find((l) => l.ma_lo_nong_san === dispatchForm.maLo);
+                      const lotChon = inventoryList.find(
+                        (l) => l.ma_lo_nong_san === dispatchForm.maLo,
+                      );
                       return lotChon
                         ? `Giao nguyên lô: ${formatWeight(lotChon.so_luong_hien_tai, lotChon.don_vi_tinh)}`
                         : "Chọn lô để xem khối lượng";
@@ -2124,9 +2168,10 @@ const NhaPhanPhoiPage = () => {
                   lineHeight: 1.5,
                 }}
               >
-                Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận. Sau đó bạn ký
-                "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị vận chuyển tự ký lấy hàng và
-                đến nơi trên trang của họ, rồi đại lý ký nhận.
+                Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận.
+                Sau đó bạn ký "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị
+                vận chuyển tự ký lấy hàng và đến nơi trên trang của họ, rồi đại
+                lý ký nhận.
               </p>
             </div>
             <div className="modal-footer">
@@ -2141,6 +2186,16 @@ const NhaPhanPhoiPage = () => {
                 type="button"
                 className="btn-save"
                 onClick={handleSaveDispatch}
+                disabled={
+                  dealers.find((d) => d.ma_dai_ly === dispatchForm.daiLyId)
+                    ?.da_lien_ket_vi === false
+                }
+                style={
+                  dealers.find((d) => d.ma_dai_ly === dispatchForm.daiLyId)
+                    ?.da_lien_ket_vi === false
+                    ? { opacity: 0.5, cursor: "not-allowed" }
+                    : undefined
+                }
               >
                 Tạo Phiếu Xuất Kho
               </button>

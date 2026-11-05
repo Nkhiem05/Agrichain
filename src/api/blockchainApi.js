@@ -302,7 +302,7 @@ export const kyCacSuKienDangCho = async ({ maLo = null } = {}) => {
       lyDo:
         choKy.length === 0
           ? "không có sự kiện nào cần ký (lô này không được theo dõi trên blockchain)"
-          : `sự kiện của bạn chưa ký được: ${choKy[0].ly_do || "đang chờ điều kiện"}`,
+          : choKy[0].ly_do || "đang chờ điều kiện để ký",
     };
   }
 

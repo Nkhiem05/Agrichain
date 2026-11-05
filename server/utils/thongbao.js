@@ -189,13 +189,21 @@ const layKhung = () => {
 // Đoán loại từ câu chữ khi gọi kiểu alert("...")
 export const doanLoai = (noiDung) => {
   const s = String(noiDung).toLowerCase();
+  // Nhắc "chờ bên khác ký / bạn cần ký" là thông báo (vàng), không phải lỗi, kể cả khi câu có chữ "chưa ký được"
+  if (
+    /chưa ký|chờ .{0,80}ký|cần ký|hãy ký|vui lòng ký|ký ở tab|tab "ký blockchain"/.test(
+      s,
+    ) &&
+    !/thất bại|không thể|\blỗi\b|không kết nối/.test(s)
+  )
+    return "canhBao";
   if (
     /thất bại|không thể|\blỗi\b|không kết nối|chưa ký được|không tìm thấy|không xác định được|không hợp lệ|không đổi được|không thành công/.test(
       s,
     )
   )
     return "loi";
-  if (/^\s*đã\b/.test(s)) return "thanhCong";
+  if (/^\s*đã(\s|$)/.test(s)) return "thanhCong";
   if (/thành công|hoàn tất|\bxong\b/.test(s) && !/nhưng|vui lòng|chưa /.test(s))
     return "thanhCong";
   return "canhBao"; // còn lại là thông báo chung (vàng)

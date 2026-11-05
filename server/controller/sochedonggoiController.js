@@ -1607,7 +1607,7 @@ const createShipment = async (req, res) => {
         maVanDon = await withTransaction(async (connection) => {
           const [lots] = await connection.execute(
             `
-            SELECT so_luong_hien_tai, don_vi_tinh, tinh_trang_su_dung
+            SELECT so_luong_hien_tai, don_vi_tinh, tinh_trang_su_dung, latest_event_sequence
             FROM lo_nong_san
             WHERE ma_lo_nong_san = ? AND ma_nguoi_quan_ly = ?
             LIMIT 1
@@ -1625,6 +1625,14 @@ const createShipment = async (req, res) => {
 
           if (lots[0].tinh_trang_su_dung !== "ACTIVE") {
             throw new ApiError(409, "Lô hàng không còn khả dụng");
+          }
+
+          // Mọi bước vận chuyển phải có chữ ký: lô cũ chưa có sự kiện nào trên blockchain thì không có gì để ký
+          if (layCauHinh().daCauHinh && Number(lots[0].latest_event_sequence) === 0) {
+            throw new ApiError(
+              409,
+              `Lô ${ma_lo_nong_san} là lô cũ, chưa được ghi lên blockchain nên không có chữ ký nào để xác nhận khi vận chuyển. Chỉ vận chuyển được lô đã có trên blockchain (lô tạo từ mùa vụ của nông dân sau khi bật blockchain)`,
+            );
           }
 
           // Lô phải ký xong các bước trước (tạo lô, sơ chế, đóng gói) mới bàn giao được

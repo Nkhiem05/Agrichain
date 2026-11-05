@@ -91,7 +91,10 @@ const getIncoming = async (req, res) => {
       LEFT JOIN nguoi_dung vc ON vc.ma_nguoi_dung = v.ma_don_vi_van_chuyen
       LEFT JOIN phieu_xuat_kho p ON p.ma_van_don = v.ma_van_don
       WHERE v.ma_ben_nhan = ? AND v.trang_thai <> 'DA_HUY'
-      ORDER BY FIELD(v.trang_thai, 'CHO_TIEP_NHAN', 'DANG_VAN_CHUYEN', 'CHO_LAY_HANG', 'CHO_CHAP_NHAN'), v.created_at DESC
+      ORDER BY CASE v.trang_thai
+                 WHEN 'CHO_TIEP_NHAN' THEN 0 WHEN 'DANG_VAN_CHUYEN' THEN 1
+                 WHEN 'CHO_LAY_HANG' THEN 2 WHEN 'CHO_CHAP_NHAN' THEN 3 ELSE 4 END,
+               v.created_at DESC, v.ma_van_don DESC
       `,
       [maDaiLy],
     );
