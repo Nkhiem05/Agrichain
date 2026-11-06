@@ -17,6 +17,8 @@ const getTraceDetail = async (req, res) => {
         l.giai_doan_hien_tai,
         l.integrity_status,
         l.latest_event_hash,
+        l.vi_tri_luu_kho,
+        DATE_FORMAT(l.han_luu_kho, '%Y-%m-%d') AS han_luu_kho,
         sp.ten_san_pham,
         sp.loai_san_pham,
         sp.mo_ta_san_pham
@@ -163,7 +165,8 @@ const getTraceDetail = async (req, res) => {
       [cleanBatchCode],
     );
 
-    // 5. Vận chuyển & Phân phối
+    // 5. Vận chuyển: mọi chặng của lô theo thứ tự thời gian (nông trại → sơ chế → nhà phân phối → đại lý).
+    // Kèm vai trò bên gửi / bên nhận để giao diện xếp đúng chặng.
     const [shippingRows] = await db.query(
       `SELECT 
         vc.ma_van_don,
@@ -172,15 +175,50 @@ const getTraceDetail = async (req, res) => {
         vc.ten_tai_xe,
         vc.bien_so_xe,
         vc.trang_thai,
+        vc.khoi_luong,
+        vc.khoi_luong_nhan,
+        vc.don_vi_tinh,
+        vc.updated_at AS thoi_gian_cap_nhat,
         dv.ho_ten AS ten_don_vi_van_chuyen,
-        bn.ho_ten AS ten_ben_nhan
+        gui.ho_ten AS ten_ben_gui,
+        gui.vai_tro AS vai_tro_ben_gui,
+        bn.ho_ten AS ten_ben_nhan,
+        bn.vai_tro AS vai_tro_ben_nhan
       FROM lenh_van_chuyen vc
       JOIN nguoi_dung dv ON vc.ma_don_vi_van_chuyen = dv.ma_nguoi_dung
+      LEFT JOIN nguoi_dung gui ON vc.ma_nguoi_gui = gui.ma_nguoi_dung
       LEFT JOIN nguoi_dung bn ON vc.ma_ben_nhan = bn.ma_nguoi_dung
       WHERE vc.ma_lo_nong_san IN (?, ?)
-      ORDER BY vc.created_at DESC`,
+        AND vc.trang_thai <> 'DA_HUY'
+      ORDER BY vc.created_at ASC, vc.ma_van_don ASC`,
       [cleanBatchCode, sourceBatchCode],
     );
+
+    // Phiếu xuất kho của nhà phân phối cho đại lý (bước phân phối và đại lý)
+    let distributionRows = [];
+    try {
+      const [phieu] = await db.query(
+        `SELECT 
+          p.ma_phieu,
+          p.so_luong_xuat,
+          p.don_vi_tinh,
+          p.trang_thai,
+          p.thoi_gian_xuat,
+          p.thoi_gian_giao,
+          np.ho_ten AS ten_nha_phan_phoi,
+          dl.ten AS ten_dai_ly
+        FROM phieu_xuat_kho p
+        LEFT JOIN nguoi_dung np ON np.ma_nguoi_dung = p.ma_nha_phan_phoi
+        LEFT JOIN dai_ly dl ON dl.ma_dai_ly = p.ma_dai_ly
+        WHERE (p.ma_lo_nong_san IN (?, ?) OR p.ma_lo_xuat IN (?, ?))
+          AND p.trang_thai <> 'DA_HUY'
+        ORDER BY p.created_at ASC`,
+        [cleanBatchCode, sourceBatchCode, cleanBatchCode, sourceBatchCode],
+      );
+      distributionRows = phieu;
+    } catch (err) {
+      if (err.code !== "ER_NO_SUCH_TABLE") throw err;
+    }
 
     // 6. Bản ghi chuỗi khối Blockchain
     const [bcRows] = await db.query(
@@ -202,6 +240,7 @@ const getTraceDetail = async (req, res) => {
         audit: auditData ? { ...auditData, indicators: auditIndicators } : null,
         processing: processRows.length > 0 ? processRows[0] : null,
         shipping: shippingRows,
+        distribution: distributionRows,
       },
     });
   } catch (error) {

@@ -266,6 +266,8 @@ export const XacThucBlockchainCard = ({ maLo }) => {
         </span>
       </div>
 
+      {/* Chỉ hiện một phần: nội dung dài thì cuộn trong khung, tiêu đề và chân thẻ luôn thấy */}
+      <div className="bc-card-scroll">
       {data.ly_do?.length > 0 && (
         <ul className="bc-reasons" style={{ color: tt.mauNen }}>
           {data.ly_do.map((l) => (
@@ -371,6 +373,8 @@ export const XacThucBlockchainCard = ({ maLo }) => {
           </ul>
         </div>
       )}
+
+      </div>
 
       <div className="blockchain-card-footer">
         <span>

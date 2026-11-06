@@ -201,6 +201,45 @@ const apDungBanHet = async (executor, ap) => {
   );
 };
 
+// Tách / gộp lô: lô con chỉ xuất hiện (ACTIVE) và lô nguồn chỉ bị trừ khối lượng SAU KHI cơ sở đã ký createChild lên blockchain.
+// Lúc bấm tách / gộp lô con được tạo ở trạng thái chờ (CANCELLED) và lô nguồn còn nguyên.
+// Chỉ áp dụng khi lô con còn ở trạng thái chờ nên gọi lại vẫn an toàn.
+const apDungTachGop = async (executor, ap) => {
+  if (!ap?.ma_lo_con) return;
+  const [kq] = await executor.query(
+    `UPDATE lo_nong_san SET tinh_trang_su_dung = 'ACTIVE' WHERE ma_lo_nong_san = ? AND tinh_trang_su_dung = 'CANCELLED'`,
+    [ap.ma_lo_con],
+  );
+  if (kq.affectedRows === 0) return;
+  const [lienKet] = await executor.query(
+    `
+    SELECT ma_lo_nguon, loai_lien_ket, so_luong_tham_gia
+    FROM lien_ket_nguon_goc_lo
+    WHERE ma_lo_duoc_tao_ra = ? AND loai_lien_ket IN ('SPLIT', 'MERGE')
+    `,
+    [ap.ma_lo_con],
+  );
+  for (const l of lienKet) {
+    if (l.loai_lien_ket === "MERGE") {
+      await executor.query(
+        `UPDATE lo_nong_san SET so_luong_hien_tai = 0, tinh_trang_su_dung = 'CONSUMED_BY_MERGE' WHERE ma_lo_nong_san = ?`,
+        [l.ma_lo_nguon],
+      );
+    } else {
+      // tình trạng tính trước (theo khối lượng cũ), sau đó mới trừ khối lượng
+      await executor.query(
+        `
+        UPDATE lo_nong_san
+        SET tinh_trang_su_dung = IF(so_luong_hien_tai - ? <= 0, 'CONSUMED_BY_SPLIT', tinh_trang_su_dung),
+            so_luong_hien_tai = GREATEST(so_luong_hien_tai - ?, 0)
+        WHERE ma_lo_nong_san = ?
+        `,
+        [l.so_luong_tham_gia, l.so_luong_tham_gia, l.ma_lo_nguon],
+      );
+    }
+  }
+};
+
 // Sự kiện vừa lên chain mang kết quả kiểm định chờ áp dụng thì áp dụng ngay (trong cùng transaction xác nhận)
 const apDungKetQuaKhiXacNhan = async (executor, maLichSu) => {
   const [rows] = await executor.query(
@@ -217,6 +256,8 @@ const apDungKetQuaKhiXacNhan = async (executor, maLichSu) => {
     await apDungGiaiDoanSoChe(executor, ts.ap_dung);
   } else if (ts.ap_dung?.hanh_dong === "BAN_HET") {
     await apDungBanHet(executor, ts.ap_dung);
+  } else if (ts.ap_dung?.hanh_dong === "TACH_GOP") {
+    await apDungTachGop(executor, ts.ap_dung);
   } else if (ts.ap_dung?.hanh_dong) {
     await apDungKetQuaVanDon(executor, ts.ma_van_don, ts.ap_dung);
   } else {
@@ -306,6 +347,7 @@ module.exports = {
   apDungKetQuaVanDon,
   apDungGiaiDoanSoChe,
   apDungBanHet,
+  apDungTachGop,
   capNhatTrangThaiLo,
   ghiNhanDaXacNhan,
   ghiNhanDaGui,

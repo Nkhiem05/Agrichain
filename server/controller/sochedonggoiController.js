@@ -24,7 +24,8 @@ Có blockchain: mỗi bước của cơ sở tạo một sự kiện chờ ký v
   - tiếp nhận / từ chối lô: lệnh chỉ đổi trạng thái, lô chỉ vào kho sau khi ký (xem ghiNhan.js)
   - đổi giai đoạn sơ chế (đóng gói / hoàn tất): giai đoạn chỉ đổi sau khi ký
   - sơ chế làm ngay trên lô đã nhận, GIỮ NGUYÊN MÃ LÔ do nông dân tạo (không sinh mã lô mới)
-  - tách / gộp lô: lô mới phải ký xong thì mới sơ chế tiếp, tách, gộp hay bàn giao được
+  - tách / gộp lô: lô con chỉ xuất hiện và lô nguồn chỉ bị trừ khối lượng SAU KHI cơ sở ký tạo lô con (xem ghiNhan.js);
+    trong lúc chờ ký, lô nguồn không dùng tiếp được
   - tạo lệnh bàn giao: đơn vị vận chuyển chỉ thực hiện được sau khi cơ sở ký lệnh
 ==================================================
 */
@@ -205,6 +206,12 @@ const lyDoLoChuaKy = async (executor, maLo, maCoSo) => {
   if (!layCauHinh().daCauHinh) return null;
   const sk = await suKienChuaKyCuaLo(executor, maLo);
   if (!sk) return null;
+  // Lô nguồn của lần tách / gộp mà lô con chưa ký xong
+  if (sk.ma_lo_con) {
+    return sk.ma_nguoi_ky === maCoSo
+      ? `Lô ${maLo} đang chờ bạn ký bước tạo lô ${sk.ma_lo_con} (tách / gộp). Hãy vào tab "Ký blockchain" ký xong bước này trước`
+      : `Lô ${maLo} đang chờ ${sk.ma_nguoi_ky} ký bước tạo lô ${sk.ma_lo_con} (tách / gộp) trên blockchain`;
+  }
   const buoc = TEN_BUOC_KY[sk.loai] || sk.loai;
   return sk.ma_nguoi_ky === maCoSo
     ? `Lô ${maLo} còn bước "${buoc}" chưa ký blockchain. Hãy vào tab "Ký blockchain" ký xong bước này trước`
@@ -251,6 +258,33 @@ const ganTrangThaiKy = async (executor, rows, truong, maCoSo) => {
         : `Lô ${r[truong]} đang chờ ${dau.ma_nguoi_ky} ký bước "${buoc}" trên blockchain.`;
     r.cho_ky_giai_doan = cua.find((e) => e.giai_doan)?.giai_doan || null;
   });
+
+  // Lô nguồn của lần tách / gộp mà lô con chưa ký: lô chưa bị trừ khối lượng nhưng chưa dùng tiếp được
+  const conMoi = rows.filter((r) => !r.chua_ky_lo);
+  if (conMoi.length > 0) {
+    const [con] = await executor.query(
+      `
+      SELECT lk.ma_lo_nguon, lk.ma_lo_duoc_tao_ra AS ma_lo_con, ls.ma_nguoi_dung AS ma_nguoi_ky
+      FROM lien_ket_nguon_goc_lo lk
+      JOIN lich_su_truy_xuat_lo ls
+        ON ls.ma_lo_nong_san = lk.ma_lo_duoc_tao_ra
+       AND ls.loai_hoat_dong = 'BATCH_RELATION'
+       AND ls.blockchain_sync_status <> 'CONFIRMED'
+      WHERE lk.loai_lien_ket IN ('SPLIT', 'MERGE') AND lk.ma_lo_nguon IN (?)
+      ORDER BY ls.so_thu_tu_su_kien
+      `,
+      [[...new Set(conMoi.map((r) => r[truong]))]],
+    );
+    conMoi.forEach((r) => {
+      const c = con.find((x) => x.ma_lo_nguon === r[truong]);
+      if (!c) return;
+      r.chua_ky_lo = true;
+      r.ly_do_chua_ky =
+        c.ma_nguoi_ky === maCoSo
+          ? `Lô ${r[truong]} đang chờ bạn ký bước tạo lô ${c.ma_lo_con} (tách / gộp). Hãy vào tab "Ký blockchain" ký xong bước này trước.`
+          : `Lô ${r[truong]} đang chờ ${c.ma_nguoi_ky} ký bước tạo lô ${c.ma_lo_con} (tách / gộp) trên blockchain.`;
+    });
+  }
 };
 
 // Lệnh vận chuyển có đang chờ cơ sở ký bước nào không (cho_ky = NHAN_HANG | TU_CHOI_NHAN | NHAN_LAI; cho_ky_lenh = lệnh bàn giao chưa ký)
@@ -1070,6 +1104,15 @@ const getSplitMergeLog = async (req, res) => {
       LEFT JOIN san_pham_nong_san spNguon ON loNguon.ma_san_pham = spNguon.ma_san_pham
       WHERE lk.loai_lien_ket IN ('SPLIT', 'MERGE')
         AND loMoi.ma_nguoi_quan_ly = ?
+        AND (
+          loMoi.tinh_trang_su_dung <> 'CANCELLED'
+          OR EXISTS (
+            SELECT 1 FROM lich_su_truy_xuat_lo ls
+            WHERE ls.ma_lo_nong_san = loMoi.ma_lo_nong_san
+              AND ls.loai_hoat_dong = 'BATCH_RELATION'
+              AND ls.blockchain_sync_status <> 'CONFIRMED'
+          )
+        )
       ORDER BY lk.thoi_diem_tao_lien_ket DESC
       `,
       [maCoSo],
@@ -1114,6 +1157,7 @@ const splitBatch = async (req, res) => {
 
     let canKy = false;
     await withTransaction(async (connection) => {
+      let khauTruNgay = 0; // khối lượng lô con đã có hiệu lực ngay (không cần ký) để trừ khỏi lô gốc
       const [lots] = await connection.execute(
         `
         SELECT ma_san_pham, ma_mua_vu, so_luong_hien_tai, don_vi_tinh, giai_doan_hien_tai, tinh_trang_su_dung
@@ -1201,31 +1245,48 @@ const splitBatch = async (req, res) => {
           ],
         );
 
-        // Blockchain: mỗi lô con một lần ký createChild (lấy đúng phần khối lượng của nó từ lô gốc)
-        if (await ghiSuKienLoCon(connection, newMaLo))
-          canKy = layCauHinh().daCauHinh;
+        // Blockchain: mỗi lô con một lần ký createChild (lấy đúng phần khối lượng của nó từ lô gốc).
+        // Có blockchain: lô con ở trạng thái chờ (CANCELLED) và lô gốc chưa bị trừ khối lượng, cả hai chỉ đổi
+        // SAU KHI cơ sở ký xong (tham_so.ap_dung TACH_GOP, xem ghiNhan.js).
+        const choKyLoCon = layCauHinh().daCauHinh;
+        const suKien = await ghiSuKienLoCon(
+          connection,
+          newMaLo,
+          choKyLoCon ? { hanh_dong: "TACH_GOP", ma_lo_con: newMaLo } : null,
+        );
+        if (suKien && choKyLoCon) {
+          canKy = true;
+          await connection.execute(
+            `UPDATE lo_nong_san SET tinh_trang_su_dung = 'CANCELLED' WHERE ma_lo_nong_san = ?`,
+            [newMaLo],
+          );
+        } else {
+          khauTruNgay += child.khoi_luong; // không cần ký: có hiệu lực ngay
+        }
       }
 
-      const conLai =
-        Math.round((Number(lot.so_luong_hien_tai) - tongKhoiLuong) * 1000) /
-        1000;
+      if (khauTruNgay > 0) {
+        const conLai =
+          Math.round((Number(lot.so_luong_hien_tai) - khauTruNgay) * 1000) /
+          1000;
 
-      await connection.execute(
-        `
-        UPDATE lo_nong_san
-        SET so_luong_hien_tai = ?,
-            tinh_trang_su_dung = IF(? <= 0, 'CONSUMED_BY_SPLIT', tinh_trang_su_dung)
-        WHERE ma_lo_nong_san = ?
-        `,
-        [conLai, conLai, ma_lo_goc],
-      );
+        await connection.execute(
+          `
+          UPDATE lo_nong_san
+          SET so_luong_hien_tai = ?,
+              tinh_trang_su_dung = IF(? <= 0, 'CONSUMED_BY_SPLIT', tinh_trang_su_dung)
+          WHERE ma_lo_nong_san = ?
+          `,
+          [conLai, conLai, ma_lo_goc],
+        );
+      }
     });
 
     return res.status(201).json({
       success: true,
       cho_ky: canKy,
       message: canKy
-        ? `Đã tách lô. Hãy ký bước tạo các lô con ở tab "Ký blockchain", ký xong mới sơ chế tiếp, tách / gộp hay bàn giao được.${await nhacViCoSo(maCoSo)}`
+        ? `Đã tạo yêu cầu tách lô. Hãy ký bước tạo các lô con ở tab "Ký blockchain": ký xong các lô con mới xuất hiện và lô gốc mới bị trừ khối lượng.${await nhacViCoSo(maCoSo)}`
         : "Đã tách lô thành công",
     });
   } catch (err) {
@@ -1344,24 +1405,37 @@ const mergeBatch = async (req, res) => {
             donViTinh,
           ],
         );
-
-        await connection.execute(
-          `UPDATE lo_nong_san SET so_luong_hien_tai = 0, tinh_trang_su_dung = 'CONSUMED_BY_MERGE' WHERE ma_lo_nong_san = ?`,
-          [lot.ma_lo_nong_san],
-        );
       }
 
-      // Blockchain: cơ sở ký tạo lô gộp từ các lô nguồn (createChild với nhiều lô nguồn cùng sản phẩm)
-      canKy =
-        Boolean(await ghiSuKienLoCon(connection, newMaLo)) &&
-        layCauHinh().daCauHinh;
+      // Blockchain: cơ sở ký tạo lô gộp từ các lô nguồn (createChild với nhiều lô nguồn cùng sản phẩm).
+      // Có blockchain: lô gộp ở trạng thái chờ (CANCELLED) và các lô nguồn còn nguyên, chỉ đổi SAU KHI ký xong
+      // (tham_so.ap_dung TACH_GOP, xem ghiNhan.js).
+      const choKyLoCon = layCauHinh().daCauHinh;
+      const suKien = await ghiSuKienLoCon(
+        connection,
+        newMaLo,
+        choKyLoCon ? { hanh_dong: "TACH_GOP", ma_lo_con: newMaLo } : null,
+      );
+      if (suKien && choKyLoCon) {
+        canKy = true;
+        await connection.execute(
+          `UPDATE lo_nong_san SET tinh_trang_su_dung = 'CANCELLED' WHERE ma_lo_nong_san = ?`,
+          [newMaLo],
+        );
+      } else {
+        // không cần ký: các lô nguồn được dùng hết ngay
+        await connection.query(
+          `UPDATE lo_nong_san SET so_luong_hien_tai = 0, tinh_trang_su_dung = 'CONSUMED_BY_MERGE' WHERE ma_lo_nong_san IN (?)`,
+          [lots.map((l) => l.ma_lo_nong_san)],
+        );
+      }
     });
 
     return res.status(201).json({
       success: true,
       cho_ky: canKy,
       message: canKy
-        ? `Đã gộp lô. Hãy ký bước tạo lô gộp ở tab "Ký blockchain", ký xong mới sơ chế tiếp, tách / gộp hay bàn giao được.${await nhacViCoSo(maCoSo)}`
+        ? `Đã tạo yêu cầu gộp lô. Hãy ký bước tạo lô gộp ở tab "Ký blockchain": ký xong lô gộp mới xuất hiện và các lô nguồn mới được dùng hết.${await nhacViCoSo(maCoSo)}`
         : "Đã gộp lô thành công",
     });
   } catch (err) {

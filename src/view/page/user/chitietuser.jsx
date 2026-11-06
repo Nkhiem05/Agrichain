@@ -6,6 +6,8 @@ import {
   Award,
   Package,
   Store,
+  Truck,
+  ShoppingBag,
   ArrowLeft,
   ShieldCheck,
   AlertCircle,
@@ -33,6 +35,73 @@ const formatDate = (dateStr) => {
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString("vi-VN");
 };
+
+const NHAN_TRANG_THAI_VAN_DON = {
+  CHO_CHAP_NHAN: "Chờ đơn vị vận chuyển chấp nhận",
+  CHO_LAY_HANG: "Chờ lấy hàng",
+  DANG_VAN_CHUYEN: "Đang vận chuyển",
+  CHO_TIEP_NHAN: "Đã đến nơi, chờ bên nhận xác nhận",
+  HOAN_THANH: "Đã giao và được tiếp nhận",
+  TU_CHOI: "Bị từ chối, hàng trả về bên gửi",
+  DANG_TRA_HANG: "Bị từ chối, đang chở trả về bên gửi",
+  DA_TRA_LAI: "Đã trả hàng về bên gửi",
+};
+const NHAN_TRANG_THAI_PHIEU = {
+  CHO_XUAT: "Chờ xuất kho",
+  DANG_GIAO: "Đang giao",
+  DA_GIAO: "Đã giao",
+};
+
+const dinhDangKhoiLuong = (v, dv) =>
+  v === null || v === undefined || v === ""
+    ? "Chưa cập nhật"
+    : `${Number(v).toLocaleString("vi-VN")} ${dv || ""}`.trim();
+
+// Xếp lệnh vận chuyển vào chặng: 1 = nông trại → sơ chế, 2 = sơ chế → nhà phân phối, 3 = nhà phân phối → đại lý
+const timChang = (s) => {
+  if (s.vai_tro_ben_nhan === "PROCESSOR") return 1;
+  if (s.vai_tro_ben_nhan === "DISTRIBUTOR") return 2;
+  if (s.vai_tro_ben_nhan === "RETAILER") return 3;
+  if (s.vai_tro_ben_gui === "FARMER_COOP") return 1;
+  if (s.vai_tro_ben_gui === "PROCESSOR") return 2;
+  if (s.vai_tro_ben_gui === "DISTRIBUTOR") return 3;
+  return 0;
+};
+
+// Một chặng vận chuyển trong dòng đời sản phẩm
+const BuocVanChuyen = ({ so, tieuDe, lenh }) => (
+  <div className="timeline-step">
+    <span className="timeline-step-dot dot-transport"></span>
+    <div className="timeline-step-title">
+      <Truck size={16} color="#0891b2" /> {so}. {tieuDe}
+    </div>
+    {lenh.map((s) => (
+      <div key={s.ma_van_don}>
+        <p className="transport-info-highlight">
+          {s.ten_don_vi_van_chuyen}: {s.ten_ben_gui || "Bên gửi"} ➔{" "}
+          {s.ten_ben_nhan || s.dia_chi_giao_hang || "Điểm nhận"}
+        </p>
+        <div className="step-card-box bg-transport">
+          <p>
+            • Tài xế: {s.ten_tai_xe || "Chưa phân công"} (Biển số:{" "}
+            {s.bien_so_xe || "N/A"})
+          </p>
+          <p>
+            • Xuất phát: {formatDate(s.thoi_gian_xuat)} • Khối lượng:{" "}
+            {dinhDangKhoiLuong(s.khoi_luong, s.don_vi_tinh)}
+            {s.khoi_luong_nhan !== null && s.khoi_luong_nhan !== undefined
+              ? ` → thực nhận ${dinhDangKhoiLuong(s.khoi_luong_nhan, s.don_vi_tinh)}`
+              : ""}
+          </p>
+          <p>
+            • Trạng thái:{" "}
+            {NHAN_TRANG_THAI_VAN_DON[s.trang_thai] || s.trang_thai}
+          </p>
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 const TraceDetailPage = ({ onBack }) => {
   const [searchParams] = useSearchParams();
@@ -163,8 +232,39 @@ const TraceDetailPage = ({ onBack }) => {
     );
   }
 
-  const { batch, farming, audit, processing, shipping } = data;
-  const latestShipment = shipping && shipping.length > 0 ? shipping[0] : null;
+  const { batch, farming, audit, processing, shipping, distribution } = data;
+
+  // Dòng đời đầy đủ: canh tác → kiểm định → vận chuyển → sơ chế → vận chuyển → phân phối → vận chuyển → đại lý
+  const chang = { 1: [], 2: [], 3: [] };
+  (shipping || []).forEach((s) => {
+    const c = timChang(s);
+    if (c) chang[c].push(s);
+  });
+  const phieuXuat = distribution || [];
+  const nhaPhanPhoi =
+    chang[2][chang[2].length - 1]?.ten_ben_nhan ||
+    phieuXuat[0]?.ten_nha_phan_phoi ||
+    chang[3][0]?.ten_ben_gui ||
+    null;
+  const lenhDaiLy = chang[3][chang[3].length - 1] || null;
+  const tenDaiLy =
+    lenhDaiLy?.ten_ben_nhan ||
+    phieuXuat.find((p) => p.ten_dai_ly)?.ten_dai_ly ||
+    null;
+  const coBuocPhanPhoi =
+    chang[2].length > 0 || phieuXuat.length > 0 || Boolean(batch?.vi_tri_luu_kho);
+  const coBuocDaiLy = chang[3].length > 0 || Boolean(tenDaiLy);
+
+  const cacBuoc = [];
+  if (farming) cacBuoc.push("canhtac");
+  if (audit) cacBuoc.push("kiemdinh");
+  if (chang[1].length > 0) cacBuoc.push("vc1");
+  if (processing) cacBuoc.push("soche");
+  if (chang[2].length > 0) cacBuoc.push("vc2");
+  if (coBuocPhanPhoi) cacBuoc.push("phanphoi");
+  if (chang[3].length > 0) cacBuoc.push("vc3");
+  if (coBuocDaiLy) cacBuoc.push("daily");
+  const so = (khoa) => cacBuoc.indexOf(khoa) + 1;
 
   return (
     <div className="trace-page">
@@ -287,7 +387,7 @@ const TraceDetailPage = ({ onBack }) => {
                 <div className="timeline-step">
                   <span className="timeline-step-dot dot-farming"></span>
                   <div className="timeline-step-title">
-                    <Sprout size={16} color="#16a34a" /> 1. Canh Tác & Thu Hoạch
+                    <Sprout size={16} color="#16a34a" /> {so("canhtac")}. Canh Tác & Thu Hoạch
                   </div>
                   <p className="farm-info-highlight">
                     {farming.ten_nong_trai} - Nông dân: {farming.ten_nong_dan} (
@@ -331,7 +431,7 @@ const TraceDetailPage = ({ onBack }) => {
                 <div className="timeline-step">
                   <span className="timeline-step-dot dot-audit"></span>
                   <div className="timeline-step-title">
-                    <Award size={16} color="#9333ea" /> 2. Kiểm Định Chất Lượng
+                    <Award size={16} color="#9333ea" /> {so("kiemdinh")}. Kiểm Định Chất Lượng
                   </div>
                   <p className="audit-info-highlight">
                     {audit.ten_co_quan} - Mã hồ sơ: {audit.ma_ho_so}
@@ -394,12 +494,21 @@ const TraceDetailPage = ({ onBack }) => {
                 </div>
               )}
 
+              {/* Vận chuyển: nông trại → cơ sở sơ chế */}
+              {chang[1].length > 0 && (
+                <BuocVanChuyen
+                  so={so("vc1")}
+                  tieuDe="Vận Chuyển tới Cơ Sở Sơ Chế"
+                  lenh={chang[1]}
+                />
+              )}
+
               {/* 3. Sơ chế */}
               {processing && (
                 <div className="timeline-step">
                   <span className="timeline-step-dot dot-processing"></span>
                   <div className="timeline-step-title">
-                    <Package size={16} color="#2563eb" /> 3. Sơ Chế & Đóng Gói
+                    <Package size={16} color="#2563eb" /> {so("soche")}. Sơ Chế & Đóng Gói
                   </div>
                   <p className="processing-info-highlight">
                     {processing.ten_co_so} - {processing.tieu_de}
@@ -421,27 +530,83 @@ const TraceDetailPage = ({ onBack }) => {
                 </div>
               )}
 
-              {/* 4. Phân phối */}
-              {latestShipment && (
+              {/* Vận chuyển: cơ sở sơ chế → nhà phân phối */}
+              {chang[2].length > 0 && (
+                <BuocVanChuyen
+                  so={so("vc2")}
+                  tieuDe="Vận Chuyển tới Nhà Phân Phối"
+                  lenh={chang[2]}
+                />
+              )}
+
+              {/* Phân phối: nhập kho, lưu kho, xuất kho cho đại lý */}
+              {coBuocPhanPhoi && (
                 <div className="timeline-step">
                   <span className="timeline-step-dot dot-shipping"></span>
                   <div className="timeline-step-title">
-                    <Store size={16} color="#d97706" /> 4. Phân Phối & Bán Lẻ
+                    <Store size={16} color="#d97706" /> {so("phanphoi")}. Phân
+                    Phối (Nhà Phân Phối)
                   </div>
                   <p className="shipping-info-highlight">
-                    {latestShipment.ten_don_vi_van_chuyen} ➔{" "}
-                    {latestShipment.ten_ben_nhan ||
-                      latestShipment.dia_chi_giao_hang ||
-                      "Điểm bán lẻ"}
+                    {nhaPhanPhoi || "Nhà phân phối"}
                   </p>
                   <div className="step-card-box bg-shipping">
                     <p>
-                      • Tài xế: {latestShipment.ten_tai_xe || "Chưa phân công"}{" "}
-                      (Biển số: {latestShipment.bien_so_xe || "N/A"})
+                      • Kho: {batch?.vi_tri_luu_kho || "Chưa cập nhật"} • Hạn
+                      lưu kho: {formatDate(batch?.han_luu_kho)}
+                    </p>
+                    {phieuXuat.map((p) => (
+                      <p key={p.ma_phieu}>
+                        • Phiếu xuất kho {p.ma_phieu}:{" "}
+                        {dinhDangKhoiLuong(p.so_luong_xuat, p.don_vi_tinh)} ➔{" "}
+                        {p.ten_dai_ly || "Đại lý"} •{" "}
+                        {NHAN_TRANG_THAI_PHIEU[p.trang_thai] || p.trang_thai}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Vận chuyển: nhà phân phối → đại lý */}
+              {chang[3].length > 0 && (
+                <BuocVanChuyen
+                  so={so("vc3")}
+                  tieuDe="Vận Chuyển tới Đại Lý"
+                  lenh={chang[3]}
+                />
+              )}
+
+              {/* Đại lý bán lẻ */}
+              {coBuocDaiLy && (
+                <div className="timeline-step">
+                  <span className="timeline-step-dot dot-retail"></span>
+                  <div className="timeline-step-title">
+                    <ShoppingBag size={16} color="#db2777" /> {so("daily")}.
+                    Đại Lý Bán Lẻ
+                  </div>
+                  <p className="retail-info-highlight">
+                    {tenDaiLy || "Điểm bán lẻ"}
+                  </p>
+                  <div className="step-card-box bg-retail">
+                    <p>
+                      • Tiếp nhận:{" "}
+                      {lenhDaiLy?.trang_thai === "HOAN_THANH"
+                        ? `Đã nhận hàng, khối lượng thực nhận ${dinhDangKhoiLuong(
+                            lenhDaiLy.khoi_luong_nhan ?? lenhDaiLy.khoi_luong,
+                            lenhDaiLy.don_vi_tinh,
+                          )}`
+                        : lenhDaiLy
+                          ? NHAN_TRANG_THAI_VAN_DON[lenhDaiLy.trang_thai] ||
+                            lenhDaiLy.trang_thai
+                          : "Chờ giao hàng"}
                     </p>
                     <p>
-                      • Xuất phát: {formatDate(latestShipment.thoi_gian_xuat)} •
-                      Trạng thái: {latestShipment.trang_thai}
+                      • Tình trạng lô:{" "}
+                      {batch?.giai_doan_hien_tai === "COMPLETED"
+                        ? "Đã bán hết"
+                        : lenhDaiLy?.trang_thai === "HOAN_THANH"
+                          ? "Đang bán tại cửa hàng"
+                          : "Chưa tới cửa hàng"}
                     </p>
                   </div>
                 </div>

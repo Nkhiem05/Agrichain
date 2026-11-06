@@ -209,7 +209,8 @@ const taoSuKien = async (
 //   - lô gốc từ nông trại  -> HARVEST_CONFIRMED (kèm snapshot mùa vụ và vật tư)
 //   - lô tạo từ sơ chế/chia/gộp -> BATCH_RELATION (cam kết với hash của các lô nguồn)
 // Gọi tự động trước mọi sự kiện khác; gọi trực tiếp ngay sau khi tạo lô con.
-const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
+// thamSoThem (tùy chọn): tham số gắn thêm vào sự kiện BATCH_RELATION của lô con (ví dụ ap_dung: chỉ áp dụng sau khi ký)
+const baoDamSuKienGoc = async (executor, maLo, doSau = 0, thamSoThem = null) => {
   if (doSau > MAX_DO_SAU_DONG_DOI)
     throw new Error(`Dòng dõi lô ${maLo} quá sâu hoặc bị vòng lặp`);
 
@@ -260,6 +261,7 @@ const baoDamSuKienGoc = async (executor, maLo, doSau = 0) => {
         so_luong_nguon_gram: gramNguon,
         so_luong_con_gram: sangGram(lot.so_luong_hien_tai, lot.don_vi_tinh),
         ma_san_pham: lot.ma_san_pham,
+        ...(thamSoThem || {}),
       },
     });
     return khoaLo(executor, maLo);

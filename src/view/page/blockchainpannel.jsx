@@ -1,6 +1,15 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { BrowserProvider, Contract } from "ethers";
-import { Wallet, RefreshCw, PenLine, CheckCircle2, AlertTriangle, Clock, History, ExternalLink } from "lucide-react";
+import {
+  Wallet,
+  RefreshCw,
+  PenLine,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  History,
+  ExternalLink,
+} from "lucide-react";
 import {
   fetchCauHinh,
   fetchViCuaToi,
@@ -122,7 +131,12 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
   const [tienDo, setTienDo] = useState("");
   const [thongBao, setThongBao] = useState({ loai: "", text: "" });
   const [loiSuKien, setLoiSuKien] = useState({});
-  const [mm, setMm] = useState({ coMetaMask: true, diaChi: null, chainId: null, soDu: null });
+  const [mm, setMm] = useState({
+    coMetaMask: true,
+    diaChi: null,
+    chainId: null,
+    soDu: null,
+  });
   const [lichSu, setLichSu] = useState(null);
   const [moLichSu, setMoLichSu] = useState(false);
   const choKyTruoc = useRef(null);
@@ -133,7 +147,10 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
   // Hiện lỗi sau khi nút đã trở lại bình thường: alert chặn giao diện nên không được gọi lúc nút còn ở "Đang ký..."
   const baoLoi = (e, khoa) => {
     const text = loiNgan(e);
-    const id = khoa && khoa !== "ky-tat-ca" && khoa !== "lien-ket" ? khoa : idDangKy.current;
+    const id =
+      khoa && khoa !== "ky-tat-ca" && khoa !== "lien-ket"
+        ? khoa
+        : idDangKy.current;
     if (id) setLoiSuKien((cu) => ({ ...cu, [id]: text }));
     if (thongBaoBangAlert) setTimeout(() => alert(text), 0);
     else setThongBao({ loai: "loi", text });
@@ -172,7 +189,13 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
         choKyTruoc.current = ds.map((x) => x.ma_lich_su);
         setChoKy(ds);
         // Sự kiện đã rời danh sách thì bỏ lỗi cũ của nó
-        setLoiSuKien((cu) => Object.fromEntries(Object.entries(cu).filter(([id]) => ds.some((x) => x.ma_lich_su === id))));
+        setLoiSuKien((cu) =>
+          Object.fromEntries(
+            Object.entries(cu).filter(([id]) =>
+              ds.some((x) => x.ma_lich_su === id),
+            ),
+          ),
+        );
       } else {
         setChoKy([]);
       }
@@ -217,7 +240,9 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
   }, [coDangCho, taiDuLieu]);
 
   // Đang chờ người khác ký bước trước: thỉnh thoảng tự tải lại để bước của mình sáng lên khi tới lượt
-  const coChoNguoiKhac = choKy.some((x) => !x.san_sang && x.trang_thai !== "SUBMITTED");
+  const coChoNguoiKhac = choKy.some(
+    (x) => !x.san_sang && x.trang_thai !== "SUBMITTED",
+  );
   useEffect(() => {
     if (!coChoNguoiKhac) return undefined;
     const timer = setInterval(taiDuLieu, 20000);
@@ -320,11 +345,15 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
 
   const soSanSang = choKy.filter((x) => x.san_sang).length;
   const soDaGui = choKy.filter((x) => x.trang_thai === "SUBMITTED").length;
-  const soChoTruoc = choKy.filter((x) => !x.san_sang && x.trang_thai !== "SUBMITTED").length;
+  const soChoTruoc = choKy.filter(
+    (x) => !x.san_sang && x.trang_thai !== "SUBMITTED",
+  ).length;
   const viDaKetNoi = laAdmin || vi?.trang_thai_duyet === "DA_DUYET";
 
   const linkTx = (tx) =>
-    tx && cauHinh?.explorerUrl ? `${cauHinh.explorerUrl.replace(/\/$/, "")}/tx/${tx}` : null;
+    tx && cauHinh?.explorerUrl
+      ? `${cauHinh.explorerUrl.replace(/\/$/, "")}/tx/${tx}`
+      : null;
 
   // Gom sự kiện theo lô, giữ thứ tự xuất hiện
   const nhomTheoLo = [];
@@ -336,10 +365,21 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
     }
     nhom.ds.push(it);
   });
+  // Lô mới nhất hiện lên đầu; trong mỗi lô vẫn giữ thứ tự ký (bước nhỏ ở trên, ký từ trên xuống)
+  nhomTheoLo.forEach((n) => n.ds.sort((a, b) => Number(a.stt) - Number(b.stt)));
+  const thoiDiemMoiNhat = (n) =>
+    Math.max(...n.ds.map((x) => new Date(x.thoi_diem).getTime() || 0));
+  nhomTheoLo.sort(
+    (a, b) =>
+      thoiDiemMoiNhat(b) - thoiDiemMoiNhat(a) ||
+      String(b.ma_lo).localeCompare(String(a.ma_lo)),
+  );
 
   // Phần kiểm tra MetaMask (chỉ đọc, không mở popup)
-  const dungVi = mm.diaChi && vi && mm.diaChi.toLowerCase() === vi.dia_chi_vi.toLowerCase();
-  const dungMang = cauHinh && mm.chainId !== null && mm.chainId === cauHinh.chainId;
+  const dungVi =
+    mm.diaChi && vi && mm.diaChi.toLowerCase() === vi.dia_chi_vi.toLowerCase();
+  const dungMang =
+    cauHinh && mm.chainId !== null && mm.chainId === cauHinh.chainId;
   const soDuThap = mm.soDu !== null && mm.soDu < PHAN_TRAM_SO_DU_THAP;
   const kiemTra = [
     {
@@ -362,21 +402,23 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
       khoa: "mang",
       nhan: "Mạng",
       ok: Boolean(dungMang),
-      text: mm.chainId === null
-        ? "Chưa biết"
-        : dungMang
-          ? cauHinh.tenMang
-          : `Đang ở mạng ${mm.chainId}, khi ký sẽ tự chuyển sang ${cauHinh?.tenMang}`,
+      text:
+        mm.chainId === null
+          ? "Chưa biết"
+          : dungMang
+            ? cauHinh.tenMang
+            : `Đang ở mạng ${mm.chainId}, khi ký sẽ tự chuyển sang ${cauHinh?.tenMang}`,
     },
     {
       khoa: "so-du",
       nhan: "Số dư phí",
       ok: mm.soDu !== null && !soDuThap,
-      text: mm.soDu === null
-        ? "Chưa đọc được"
-        : soDuThap
-          ? `${mm.soDu.toFixed(4)} ${cauHinh?.tienTe || ""}: quá thấp, có thể không đủ trả phí`
-          : `${mm.soDu.toFixed(4)} ${cauHinh?.tienTe || ""}`,
+      text:
+        mm.soDu === null
+          ? "Chưa đọc được"
+          : soDuThap
+            ? `${mm.soDu.toFixed(4)} ${cauHinh?.tienTe || ""}: quá thấp, có thể không đủ trả phí`
+            : `${mm.soDu.toFixed(4)} ${cauHinh?.tienTe || ""}`,
     },
   ];
 
@@ -407,7 +449,10 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
       )}
 
       {thongBao.text && (
-        <p className={thongBao.loai === "ok" ? "bc-ok" : "bc-error"} style={{ whiteSpace: "pre-line" }}>
+        <p
+          className={thongBao.loai === "ok" ? "bc-ok" : "bc-error"}
+          style={{ whiteSpace: "pre-line" }}
+        >
           {thongBao.text}
         </p>
       )}
@@ -462,7 +507,8 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
 
       {vi?.trang_thai_duyet === "CHO_DUYET" && (
         <p className="bc-warn">
-          Ví của bạn đang chờ quản trị viên duyệt vai trò trên blockchain. Sau khi được duyệt bạn mới ký được.
+          Ví của bạn đang chờ quản trị viên duyệt vai trò trên blockchain. Sau
+          khi được duyệt bạn mới ký được.
         </p>
       )}
 
@@ -478,7 +524,12 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
             </div>
           ))}
           {mm.coMetaMask && !mm.diaChi && (
-            <button type="button" className="bc-btn bc-btn-ghost" onClick={ketNoiVi} disabled={Boolean(dangXuLy)}>
+            <button
+              type="button"
+              className="bc-btn bc-btn-ghost"
+              onClick={ketNoiVi}
+              disabled={Boolean(dangXuLy)}
+            >
               Kết nối MetaMask
             </button>
           )}
@@ -509,13 +560,16 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
             <div className="bc-summary" data-testid="bc-summary">
               <span className="bc-chip ok">Sẵn sàng ký: {soSanSang}</span>
               <span className="bc-chip wait">Chờ bước trước: {soChoTruoc}</span>
-              <span className="bc-chip sent">Đã gửi, chờ xác nhận: {soDaGui}</span>
+              <span className="bc-chip sent">
+                Đã gửi, chờ xác nhận: {soDaGui}
+              </span>
             </div>
           )}
 
           {choKy.length === 0 ? (
             <p className="bc-muted">
-              Không có sự kiện nào đang chờ ký. Khi bạn thực hiện một bước cần ghi lên blockchain, yêu cầu sẽ hiện ở đây.
+              Không có sự kiện nào đang chờ ký. Khi bạn thực hiện một bước cần
+              ghi lên blockchain, yêu cầu sẽ hiện ở đây.
             </p>
           ) : (
             nhomTheoLo.map((nhom) => (
@@ -532,16 +586,32 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
                   const nhan = NHAN_TRANG_THAI[tt];
                   const link = linkTx(it.tx_hash);
                   return (
-                    <div key={it.ma_lich_su} className={`bc-ev bc-ev-${nhan.cls}`} data-ma-lich-su={it.ma_lich_su}>
+                    <div
+                      key={it.ma_lich_su}
+                      className={`bc-ev bc-ev-${nhan.cls}`}
+                      data-ma-lich-su={it.ma_lich_su}
+                    >
                       <div className="bc-ev-top">
-                        <span className="bc-step-num">#{it.stt}</span>
-                        <strong className="bc-ev-name">{TEN_SU_KIEN[it.loai] || it.loai}</strong>
-                        <span className={`bc-chip ${nhan.cls}`}>
-                          {tt === "da_gui" ? <Clock size={12} /> : null} {nhan.text}
+                        <span
+                          className="bc-step-num"
+                          title={`Bước ${it.stt} của lô`}
+                        >
+                          {it.ma_lo}
                         </span>
-                        <span className="bc-ev-time">{new Date(it.thoi_diem).toLocaleString("vi-VN")}</span>
+                        <strong className="bc-ev-name">
+                          {TEN_SU_KIEN[it.loai] || it.loai}
+                        </strong>
+                        <span className={`bc-chip ${nhan.cls}`}>
+                          {tt === "da_gui" ? <Clock size={12} /> : null}{" "}
+                          {nhan.text}
+                        </span>
+                        <span className="bc-ev-time">
+                          {new Date(it.thoi_diem).toLocaleString("vi-VN")}
+                        </span>
                       </div>
-                      {it.ket_qua && <p className="bc-ev-result">{it.ket_qua}</p>}
+                      {it.ket_qua && (
+                        <p className="bc-ev-result">{it.ket_qua}</p>
+                      )}
                       {it.chi_tiet?.length > 0 && (
                         <dl className="bc-ev-detail">
                           {it.chi_tiet.map((c) => (
@@ -557,12 +627,15 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
                       )}
                       {it.trang_thai === "SUBMITTED" && (
                         <div className="bc-ev-why">
-                          Giao dịch đã gửi, đang chờ blockchain xác nhận. Hệ thống tự kiểm tra, bạn không cần làm gì thêm.
+                          Giao dịch đã gửi, đang chờ blockchain xác nhận. Hệ
+                          thống tự kiểm tra, bạn không cần làm gì thêm.
                         </div>
                       )}
                       {(loiRieng || it.loi_truoc) && (
                         <div className="bc-ev-err">
-                          {loiRieng ? loiRieng : `Lần ký trước chưa thành công: ${it.loi_truoc}`}
+                          {loiRieng
+                            ? loiRieng
+                            : `Lần ký trước chưa thành công: ${it.loi_truoc}`}
                         </div>
                       )}
                       <div className="bc-ev-actions">
@@ -580,7 +653,12 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
                             : "Ký lên blockchain"}
                         </button>
                         {link && (
-                          <a href={link} target="_blank" rel="noreferrer" className="bc-link">
+                          <a
+                            href={link}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="bc-link"
+                          >
                             xem giao dịch <ExternalLink size={11} />
                           </a>
                         )}
@@ -603,14 +681,17 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
             onClick={() => setMoLichSu((v) => !v)}
             aria-expanded={moLichSu}
           >
-            <History size={14} /> {moLichSu ? "Ẩn lịch sử đã ký" : "Xem lịch sử đã ký"}
+            <History size={14} />{" "}
+            {moLichSu ? "Ẩn lịch sử đã ký" : "Xem lịch sử đã ký"}
           </button>
           {moLichSu && (
             <div className="bc-history" data-testid="bc-history">
               {lichSu === null ? (
                 <p className="bc-muted">Đang tải...</p>
               ) : lichSu.length === 0 ? (
-                <p className="bc-muted">Bạn chưa ký sự kiện nào đã được xác nhận.</p>
+                <p className="bc-muted">
+                  Bạn chưa ký sự kiện nào đã được xác nhận.
+                </p>
               ) : (
                 <table className="bc-table">
                   <thead>
@@ -628,7 +709,9 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
                         <tr key={h.ma_lich_su}>
                           <td className="bc-mono">{h.ma_lo}</td>
                           <td>{TEN_SU_KIEN[h.loai] || h.loai}</td>
-                          <td>{new Date(h.thoi_diem).toLocaleString("vi-VN")}</td>
+                          <td>
+                            {new Date(h.thoi_diem).toLocaleString("vi-VN")}
+                          </td>
                           <td className="bc-mono">
                             {h.tx_hash ? (
                               link ? (
@@ -641,7 +724,12 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
                             ) : (
                               "—"
                             )}
-                            {h.so_block ? <span className="bc-muted"> · khối {h.so_block}</span> : null}
+                            {h.so_block ? (
+                              <span className="bc-muted">
+                                {" "}
+                                · khối {h.so_block}
+                              </span>
+                            ) : null}
                           </td>
                         </tr>
                       );

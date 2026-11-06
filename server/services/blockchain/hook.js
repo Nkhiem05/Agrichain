@@ -144,8 +144,14 @@ const ghiSuKienTuChoiNhanHang = async (
 
 // Lô mới tạo từ sơ chế / tách / gộp: ghi BATCH_RELATION (cơ sở ký createChild, lấy khối lượng từ lô nguồn).
 // Trả null nếu lô nguồn không được theo dõi trên chain (lô cũ).
-const ghiSuKienLoCon = async (executor, maLoMoi) => {
-  const lot = await baoDamSuKienGoc(executor, maLoMoi);
+// ketQuaTam (tùy chọn): kết quả CHƯA áp dụng, gắn vào sự kiện (tham_so.ap_dung) để chỉ áp dụng sau khi cơ sở ký xong.
+const ghiSuKienLoCon = async (executor, maLoMoi, ketQuaTam = null) => {
+  const lot = await baoDamSuKienGoc(
+    executor,
+    maLoMoi,
+    0,
+    ketQuaTam ? { ap_dung: ketQuaTam } : null,
+  );
   return lot && Number(lot.latest_event_sequence) > 0 ? lot : null;
 };
 
@@ -328,7 +334,24 @@ const suKienChuaKyCuaLo = async (executor, maLo) => {
     `,
     [maLo],
   );
-  return rows[0] || null;
+  if (rows[0]) return rows[0];
+  // Lô nguồn của một lần tách / gộp mà lô con chưa được ký: lô nguồn chưa bị trừ khối lượng nên không được dùng tiếp
+  const [con] = await executor.query(
+    `
+    SELECT ls.so_thu_tu_su_kien AS stt, ls.loai_hoat_dong AS loai, ls.ma_nguoi_dung AS ma_nguoi_ky,
+           ls.blockchain_sync_status AS trang_thai, lk.ma_lo_duoc_tao_ra AS ma_lo_con
+    FROM lien_ket_nguon_goc_lo lk
+    JOIN lich_su_truy_xuat_lo ls
+      ON ls.ma_lo_nong_san = lk.ma_lo_duoc_tao_ra
+     AND ls.loai_hoat_dong = 'BATCH_RELATION'
+     AND ls.blockchain_sync_status <> 'CONFIRMED'
+    WHERE lk.ma_lo_nguon = ? AND lk.loai_lien_ket IN ('SPLIT', 'MERGE')
+    ORDER BY ls.so_thu_tu_su_kien
+    LIMIT 1
+    `,
+    [maLo],
+  );
+  return con[0] || null;
 };
 
 // Mã người dùng (trong danh sách) chưa có ví được duyệt: các bước họ phải ký sẽ chờ tới khi có ví

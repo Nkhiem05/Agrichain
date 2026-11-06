@@ -138,7 +138,42 @@ const generateCode = async (connection, table, column, prefix) => {
   return prefix + String(Number(rows[0].max_no) + 1).padStart(3, "0");
 };
 
-// Lô chỉ được sửa/xóa khi chưa có sự kiện truy xuất và chưa gửi kiểm định
+// Gỡ các sự kiện CHƯA KÝ (chỉ mới nằm trong hàng chờ) của lô để sửa / xóa lô.
+// Gọi sau assertBatchEditable nên chắc chắn chưa có sự kiện nào gửi lên blockchain.
+const goSuKienChuaKy = async (connection, maLo) => {
+  const [ev] = await connection.query(
+    `SELECT ma_lich_su FROM lich_su_truy_xuat_lo WHERE ma_lo_nong_san = ? FOR UPDATE`,
+    [maLo],
+  );
+  if (ev.length > 0) {
+    const ids = ev.map((e) => e.ma_lich_su);
+    await connection.query(
+      `DELETE FROM blockchain_outbox WHERE event_id IN (?)`,
+      [ids],
+    );
+    await connection.query(
+      `UPDATE lich_su_truy_xuat_lo SET ma_su_kien_goc = NULL WHERE ma_lich_su IN (?)`,
+      [ids],
+    );
+    await connection.query(
+      `DELETE FROM lich_su_truy_xuat_lo WHERE ma_lich_su IN (?)`,
+      [ids],
+    );
+  }
+  await connection.query(
+    `
+    UPDATE lo_nong_san
+    SET latest_event_sequence = 0,
+        latest_event_hash = NULL,
+        blockchain_sync_status = 'QUEUED',
+        integrity_status = 'NOT_CHECKED'
+    WHERE ma_lo_nong_san = ?
+    `,
+    [maLo],
+  );
+};
+
+// Lô chỉ được sửa/xóa khi chưa có sự kiện nào gửi lên blockchain và chưa gửi kiểm định
 const assertBatchEditable = async (connection, maLo) => {
   const [rows] = await connection.execute(
     `
@@ -159,13 +194,34 @@ const assertBatchEditable = async (connection, maLo) => {
 
   if (
     lo.tinh_trang_su_dung !== "ACTIVE" ||
-    lo.giai_doan_hien_tai !== "CREATED" ||
-    Number(lo.latest_event_sequence) > 0
+    lo.giai_doan_hien_tai !== "CREATED"
   ) {
     throw new ApiError(
       409,
       "Lô đã có sự kiện truy xuất nguồn gốc nên không thể thay đổi",
     );
+  }
+
+  // Sự kiện chốt thu hoạch được xếp vào hàng chờ ký ngay khi tạo lô. Chỉ khi có sự kiện đã
+  // gửi lên blockchain (đã ký hoặc đang chờ xác nhận) thì lô mới bị khóa; còn chưa ký thì vẫn sửa / xóa được.
+  const coSuKien = Number(lo.latest_event_sequence) > 0;
+  if (coSuKien) {
+    const [daGui] = await connection.execute(
+      `
+      SELECT 1
+      FROM lich_su_truy_xuat_lo
+      WHERE ma_lo_nong_san = ?
+        AND blockchain_sync_status <> 'QUEUED'
+      LIMIT 1
+      `,
+      [maLo],
+    );
+    if (daGui.length > 0) {
+      throw new ApiError(
+        409,
+        "Lô đã ký sự kiện thu hoạch lên blockchain nên không thể sửa hoặc xóa",
+      );
+    }
   }
 
   // Bảng kiểm định có thể chưa được tạo trong CSDL
@@ -213,6 +269,8 @@ const assertBatchEditable = async (connection, maLo) => {
   } catch (err) {
     if (err.code !== "ER_NO_SUCH_TABLE") throw err;
   }
+
+  return { coSuKien };
 };
 
 // Lô nông sản cần có sản phẩm: dùng sản phẩm trùng tên cây trồng, chưa có thì tạo mới.
@@ -559,7 +617,10 @@ const updateBatch = async (req, res) => {
     const harvest = parseHarvestBody(req.body);
 
     await withTransaction(async (connection) => {
-      await assertBatchEditable(connection, maLo);
+      const { coSuKien } = await assertBatchEditable(connection, maLo);
+
+      // Sự kiện chốt thu hoạch chưa ký đang chứa số liệu cũ: gỡ đi, ghi lại sau khi cập nhật
+      if (coSuKien) await goSuKienChuaKy(connection, maLo);
 
       await connection.execute(
         `
@@ -572,6 +633,9 @@ const updateBatch = async (req, res) => {
         `,
         [harvest.ngay_thu_hoach, harvest.so_luong, DON_VI_TINH, maLo],
       );
+
+      // Ghi lại sự kiện chốt thu hoạch với số liệu mới (lại nằm trong hàng chờ ký)
+      if (coSuKien) await baoDamSuKienGoc(connection, maLo);
     });
 
     return res.json({
@@ -593,7 +657,10 @@ const deleteBatch = async (req, res) => {
 
   try {
     await withTransaction(async (connection) => {
-      await assertBatchEditable(connection, maLo);
+      const { coSuKien } = await assertBatchEditable(connection, maLo);
+
+      // Lô chưa ký: gỡ sự kiện chốt thu hoạch đang chờ ký để không còn mục nào trong tab "Ký blockchain"
+      if (coSuKien) await goSuKienChuaKy(connection, maLo);
 
       await connection.execute(
         `
