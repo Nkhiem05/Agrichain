@@ -13,7 +13,14 @@ pragma solidity ^0.8.24;
 ///   - Lô lưu khối lượng (gram). Tạo lô con trừ khối lượng lô nguồn, lô nguồn hết hàng thì "đã dùng".
 ///   - Lệnh bàn giao bắt buộc có bên nhận, ghi khối lượng thực nhận, có bước trả hàng về.
 ///   - Khóa / mở ví, ghi phiên bản bảng ngưỡng, đính chính hồ sơ.
+///
+///  Phiên bản 3 (bớt số lần ký): bên nhận ký nhận hàng (hoặc từ chối) ngay khi hàng đã được lấy đi, không còn
+///  bắt đơn vị vận chuyển ký thêm bước "đã đến nơi". Chữ ký nhận hàng của bên nhận đã chứng minh hàng tới nơi.
+///  Hàm arrive() vẫn giữ để lệnh đang dở theo cách cũ ký nốt được.
 contract AgriChain {
+    /// Phiên bản hợp đồng. Server đọc số này để biết có bỏ được bước ký "đến nơi" hay không (v2 không có hàm này).
+    uint8 public constant VERSION = 3;
+
     // Vai trò khớp nguoi_dung.vai_tro trong MySQL (ADMIN và CONSUMER không cần ví ký).
     enum Role { NONE, FARMER_COOP, PROCESSOR, TRANSPORTER, DISTRIBUTOR, CERT_AUTHORITY, RETAILER }
 
@@ -58,7 +65,7 @@ contract AgriChain {
     uint8 public constant ORDER_NONE = 0;
     uint8 public constant ORDER_CREATED = 1;   // đã tạo lệnh, chờ lấy hàng
     uint8 public constant ORDER_PICKED_UP = 2; // vận chuyển đã lấy hàng
-    uint8 public constant ORDER_ARRIVED = 3;   // đã đến nơi, chờ bên nhận ký
+    uint8 public constant ORDER_ARRIVED = 3;   // đã đến nơi (v2); từ v3 bước này không bắt buộc nữa, bên nhận ký ngay từ PICKED_UP
     uint8 public constant ORDER_REJECTED = 4;  // bên nhận từ chối, hàng còn trên xe
     uint8 public constant ORDER_RETURNED = 5;  // vận chuyển đã chở hàng về, chờ bên gửi ký nhận lại
 
@@ -301,11 +308,12 @@ contract AgriChain {
     }
 
     /// @notice Bên nhận ký nhận hàng kèm khối lượng thực nhận (<= khối lượng gửi). Lô đổi chủ tại đây.
+    ///         Từ v3: nhận được ngay khi hàng đã được lấy đi (ORDER_PICKED_UP), không cần bước "đã đến nơi".
     function confirmReceive(bytes32 batchId, uint128 receivedQty, bytes32 prevHash, bytes32 eventHash) external {
         _requireActive();
         Batch storage b = _batch(batchId);
         require(b.orderReceiver == msg.sender, "khong phai ben nhan cua lenh");
-        require(b.orderStage == ORDER_ARRIVED, "hang chua den noi");
+        require(b.orderStage == ORDER_PICKED_UP || b.orderStage == ORDER_ARRIVED, "hang chua den noi");
         require(receivedQty > 0 && receivedQty <= b.orderQty, "khoi luong nhan khong hop le");
         b.owner = msg.sender;
         b.quantity = receivedQty; // hao hụt = orderQty - receivedQty
@@ -315,13 +323,14 @@ contract AgriChain {
 
     /// @notice Hủy hoặc từ chối lệnh bàn giao:
     ///         - chủ lô hủy / vận chuyển từ chối khi chưa lấy hàng -> lệnh bị xóa, lô ở lại bên gửi;
-    ///         - bên nhận từ chối khi hàng đã đến -> hàng còn trên xe, chờ vận chuyển chở trả về.
+    ///         - bên nhận từ chối khi hàng đã đến (đã lấy đi hoặc đã báo đến nơi) -> hàng còn trên xe, chờ vận chuyển chở trả về.
     function rejectHandover(bytes32 batchId, bytes32 prevHash, bytes32 eventHash) external {
         _requireActive();
         Batch storage b = _batch(batchId);
         bool ownerCancels = msg.sender == b.owner && b.orderStage == ORDER_CREATED;
         bool transporterRejects = msg.sender == b.orderTransporter && b.orderStage == ORDER_CREATED;
-        bool receiverRejects = msg.sender == b.orderReceiver && b.orderStage == ORDER_ARRIVED;
+        bool receiverRejects = msg.sender == b.orderReceiver &&
+            (b.orderStage == ORDER_PICKED_UP || b.orderStage == ORDER_ARRIVED);
         require(ownerCancels || transporterRejects || receiverRejects, "khong the huy/tu choi o buoc nay");
         if (receiverRejects) {
             b.orderStage = ORDER_REJECTED;

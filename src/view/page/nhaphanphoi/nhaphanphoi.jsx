@@ -1584,8 +1584,8 @@ const NhaPhanPhoiPage = () => {
                   <p className="bc-tab-desc">
                     Nhà phân phối ký khi nhận hàng (kèm khối lượng thực nhận)
                     hoặc từ chối nhận, khi lập phiếu phân phối cho đại lý (xác
-                    nhận giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển tự ký
-                    lấy hàng và tới nơi. Các bước của một lô ký theo thứ tự.
+                    nhận giao nguyên lô cho xe lấy đi). Đơn vị vận chuyển chỉ ký
+                    lấy hàng (báo tới nơi không cần ký). Các bước của một lô ký theo thứ tự.
                   </p>
                   <BlockchainPanel />
                 </div>
@@ -2170,7 +2170,7 @@ const NhaPhanPhoiPage = () => {
               >
                 Đơn vị vận chuyển sẽ nhận lệnh, chọn tài xế và xe rồi chấp nhận.
                 Sau đó bạn ký "Xác nhận lấy hàng đi" ở tab Ký blockchain; đơn vị
-                vận chuyển tự ký lấy hàng và đến nơi trên trang của họ, rồi đại
+                vận chuyển tự ký lấy hàng trên trang của họ, báo đến nơi, rồi đại
                 lý ký nhận.
               </p>
             </div>

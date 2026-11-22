@@ -20,7 +20,7 @@ export const TEN_SU_KIEN = {
   PROCESSING_STARTED: "Bắt đầu sơ chế",
   WASHING_DONE: "Hoàn tất rửa, diệt khuẩn",
   PROCESSING_DONE: "Hoàn tất sơ chế",
-  PACKAGING_DONE: "Hoàn tất đóng gói",
+  PACKAGING_DONE: "Hoàn tất sơ chế, đóng gói",
   DISPATCHED: "Xuất kho cho đại lý",
   DELIVERED_TO_AGENT: "Giao hàng cho đại lý",
   COMPLETE_CONFIRMED: "Hoàn tất",

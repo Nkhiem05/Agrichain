@@ -466,3 +466,30 @@
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
   font-size: 12.5px;
 }
+
+/* Ví đã sẵn sàng: cửa sổ liên kết ví thu gọn thành một dòng */
+:root:root .bc-wallet-compact {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  background: #ecfdf5;
+  color: #166534;
+  font-size: 13px;
+}
+:root:root .bc-wallet-compact svg {
+  flex: none;
+}
+:root:root .bc-wallet-compact button.bc-link {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #15803d;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

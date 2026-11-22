@@ -1,6 +1,6 @@
 const { ghiSuKienVanDon } = require("./hook");
 const { apDungKetQuaVanDon } = require("./ghiNhan");
-const { layCauHinh } = require("./chainClient");
+const { layCauHinh, coBoQuaKyDenNoi } = require("./chainClient");
 
 // Bước của lệnh vận chuyển đã bấm và đang chờ ký (tránh tạo trùng sự kiện khi bấm lại)
 const daCoBuocChoKy = async (executor, maVanDon, loai) => {
@@ -28,6 +28,13 @@ const thucHienBuocCoKy = async (
   apDung,
 ) => {
   if (await daCoBuocChoKy(connection, maVanDon, loai)) return true;
+
+  // Bước "đã đến nơi" của đơn vị vận chuyển: hợp đồng v3 để bên nhận ký nhận hàng ngay sau khi lấy hàng, nên bước này
+  // không cần chữ ký / giao dịch / phí gas nữa. Chuyến vẫn chuyển sang "chờ bên nhận" như cũ, chỉ không ghi lên chain.
+  if (loai === "DELIVERY_CONFIRMED" && (await coBoQuaKyDenNoi())) {
+    await apDungKetQuaVanDon(connection, maVanDon, apDung);
+    return false;
+  }
 
   const suKien = await ghiSuKienVanDon(
     connection,

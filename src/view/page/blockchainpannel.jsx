@@ -139,6 +139,9 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
   });
   const [lichSu, setLichSu] = useState(null);
   const [moLichSu, setMoLichSu] = useState(false);
+  // Cửa sổ liên kết ví / kiểm tra MetaMask chỉ hiện khi cần làm gì đó; ví đã sẵn sàng thì thu gọn thành một dòng
+  const [moChiTietVi, setMoChiTietVi] = useState(false);
+  const [mmDaTai, setMmDaTai] = useState(false);
   const choKyTruoc = useRef(null);
   const idDangKy = useRef(null);
   const onDaKyRef = useRef(onDaKy);
@@ -162,6 +165,7 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
 
   const taiMetaMask = useCallback(async () => {
     setMm(await docTrangThaiMetaMask());
+    setMmDaTai(true);
   }, []);
 
   const taiLichSu = useCallback(async () => {
@@ -422,6 +426,17 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
     },
   ];
 
+  // Cần người dùng xử lý gì đó về ví thì mới hiện cửa sổ liên kết ví
+  const chuaLienKetVi = !vi || (!laAdmin && vi.trang_thai_duyet !== "DA_DUYET");
+  // Sai mạng không tính: lúc ký hệ thống tự chuyển sang đúng mạng nên không cần người dùng làm gì
+  const viCoVanDe =
+    !laAdmin &&
+    Boolean(vi) &&
+    mmDaTai &&
+    kiemTra.some((k) => !k.ok && k.khoa !== "mang");
+  const canChuYVi = chuaLienKetVi || viCoVanDe;
+  const hienCuaSoVi = canChuYVi || moChiTietVi;
+
   return (
     <div className="bc-panel">
       <div className="bc-panel-head">
@@ -457,53 +472,57 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
         </p>
       )}
 
-      {/* Liên kết ví */}
-      <div className="bc-row">
-        {thongBaoBangAlert ? (
-          <div>
-            <div className="bc-label">Trạng thái ví</div>
-            {vi && <div className="bc-mono">{vi.dia_chi_vi}</div>}
-            <div
-              className="bc-muted"
-              style={{
-                color: viDaKetNoi ? "#16a34a" : "#b45309",
-                fontWeight: 600,
-              }}
-            >
-              {viDaKetNoi ? "Ví đã kết nối" : "Chưa kết nối ví"}
+      {/* Cửa sổ liên kết ví: ẩn khi ví đã liên kết, được duyệt, đúng ví / mạng / đủ phí. Chỉ hiện khi cần xử lý
+          (chưa liên kết, chờ duyệt, sai ví, sai mạng, thiếu phí) hoặc khi người dùng bấm "Chi tiết ví". */}
+      {hienCuaSoVi ? (
+        <>
+        {/* Liên kết ví */}
+        <div className="bc-row">
+          {thongBaoBangAlert ? (
+            <div>
+              <div className="bc-label">Trạng thái ví</div>
+              {vi && <div className="bc-mono">{vi.dia_chi_vi}</div>}
+              <div
+                className="bc-muted"
+                style={{
+                  color: viDaKetNoi ? "#16a34a" : "#b45309",
+                  fontWeight: 600,
+                }}
+              >
+                {viDaKetNoi ? "Ví đã kết nối" : "Chưa kết nối ví"}
+              </div>
             </div>
-          </div>
-        ) : vi ? (
-          <div>
-            <div className="bc-label">Ví đã liên kết</div>
-            <div className="bc-mono">{vi.dia_chi_vi}</div>
+          ) : vi ? (
+            <div>
+              <div className="bc-label">Ví đã liên kết</div>
+              <div className="bc-mono">{vi.dia_chi_vi}</div>
+              <div className="bc-muted">
+                {laAdmin
+                  ? "Ví quản trị (admin của contract)"
+                  : TRANG_THAI_DUYET[vi.trang_thai_duyet]}
+              </div>
+            </div>
+          ) : (
             <div className="bc-muted">
-              {laAdmin
-                ? "Ví quản trị (admin của contract)"
-                : TRANG_THAI_DUYET[vi.trang_thai_duyet]}
+              Bạn chưa liên kết ví. Cần ví MetaMask để ký các bước truy xuất nguồn
+              gốc của mình.
             </div>
-          </div>
-        ) : (
-          <div className="bc-muted">
-            Bạn chưa liên kết ví. Cần ví MetaMask để ký các bước truy xuất nguồn
-            gốc của mình.
-          </div>
-        )}
-        {(!vi || vi.trang_thai_duyet !== "DA_DUYET") && (
-          <button
-            type="button"
-            className="bc-btn"
-            onClick={lienKet}
-            disabled={dangXuLy === "lien-ket" || !cauHinh?.daCauHinh}
-          >
-            {dangXuLy === "lien-ket"
-              ? "Đang xử lý..."
-              : vi
-                ? "Liên kết lại ví"
-                : "Liên kết ví MetaMask"}
-          </button>
-        )}
-      </div>
+          )}
+          {(!vi || vi.trang_thai_duyet !== "DA_DUYET") && (
+            <button
+              type="button"
+              className="bc-btn"
+              onClick={lienKet}
+              disabled={dangXuLy === "lien-ket" || !cauHinh?.daCauHinh}
+            >
+              {dangXuLy === "lien-ket"
+                ? "Đang xử lý..."
+                : vi
+                  ? "Liên kết lại ví"
+                  : "Liên kết ví MetaMask"}
+            </button>
+          )}
+        </div>
 
       {vi?.trang_thai_duyet === "CHO_DUYET" && (
         <p className="bc-warn">
@@ -512,27 +531,54 @@ const BlockchainPanel = ({ thongBaoBangAlert = false, onDaKy = null }) => {
         </p>
       )}
 
-      {/* Kiểm tra MetaMask trước khi ký */}
-      {vi && !laAdmin && (
-        <div className="bc-checks" data-testid="bc-checks">
-          {kiemTra.map((k) => (
-            <div key={k.khoa} className={`bc-check ${k.ok ? "ok" : "warn"}`}>
-              {k.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
-              <span>
-                <b>{k.nhan}:</b> {k.text}
-              </span>
-            </div>
-          ))}
-          {mm.coMetaMask && !mm.diaChi && (
+        {/* Kiểm tra MetaMask trước khi ký */}
+        {vi && !laAdmin && (
+          <div className="bc-checks" data-testid="bc-checks">
+            {kiemTra.map((k) => (
+              <div key={k.khoa} className={`bc-check ${k.ok ? "ok" : "warn"}`}>
+                {k.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
+                <span>
+                  <b>{k.nhan}:</b> {k.text}
+                </span>
+              </div>
+            ))}
+            {mm.coMetaMask && !mm.diaChi && (
+              <button
+                type="button"
+                className="bc-btn bc-btn-ghost"
+                onClick={ketNoiVi}
+                disabled={Boolean(dangXuLy)}
+              >
+                Kết nối MetaMask
+              </button>
+            )}
+          </div>
+        )}
+
+          {!canChuYVi && (
             <button
               type="button"
               className="bc-btn bc-btn-ghost"
-              onClick={ketNoiVi}
-              disabled={Boolean(dangXuLy)}
+              onClick={() => setMoChiTietVi(false)}
             >
-              Kết nối MetaMask
+              Ẩn chi tiết ví
             </button>
           )}
+        </>
+      ) : (
+        <div className="bc-wallet-compact" data-testid="bc-wallet-compact">
+          <CheckCircle2 size={14} />
+          <span>
+            Ví {laAdmin ? "quản trị" : "MetaMask"} đã sẵn sàng
+            {vi?.dia_chi_vi ? ` (${rutGon(vi.dia_chi_vi)})` : ""}
+          </span>
+          <button
+            type="button"
+            className="bc-link"
+            onClick={() => setMoChiTietVi(true)}
+          >
+            Chi tiết ví
+          </button>
         </div>
       )}
 

@@ -167,6 +167,29 @@ const chanDoanHopDong = async () => {
   return null;
 };
 
+// Hợp đồng v3 trở lên cho bên nhận ký nhận hàng ngay sau khi vận chuyển lấy hàng, nên bước "đã đến nơi" của đơn vị
+// vận chuyển không cần ký lên blockchain nữa (chỉ cập nhật trạng thái chuyến trong cơ sở dữ liệu). Hợp đồng v2 không có
+// hàm VERSION() nên trả false: vẫn ký như cũ. Không đọc được hợp đồng (RPC lỗi): trả false, tức là vẫn ký, không bao giờ sai.
+let phienBanDaBiet = null; // { key, boQuaKyDenNoi }
+const coBoQuaKyDenNoi = async () => {
+  const c = layContract();
+  if (!c) return false;
+  if (phienBanDaBiet && phienBanDaBiet.key === c.key) {
+    return phienBanDaBiet.boQuaKyDenNoi;
+  }
+  try {
+    const v = Number(await c.contract.VERSION());
+    phienBanDaBiet = { key: c.key, boQuaKyDenNoi: v >= 3 };
+  } catch (err) {
+    // Hợp đồng cũ không có VERSION(): nhớ luôn. Lỗi mạng: không nhớ, lần sau đọc lại.
+    if (err?.code === "BAD_DATA" || err?.code === "CALL_EXCEPTION") {
+      phienBanDaBiet = { key: c.key, boQuaKyDenNoi: false };
+    }
+    return false;
+  }
+  return phienBanDaBiet.boQuaKyDenNoi;
+};
+
 // Bộ ngưỡng kiểm định (mã băm) đã được admin ghi lên hợp đồng chưa. null = chưa cấu hình hợp đồng.
 const nguongTrenChain = async (maBam) => {
   const c = layContract();
@@ -290,6 +313,7 @@ module.exports = {
   timMaLoChuaCoTrenChain,
   adminTrenChain,
   chanDoanHopDong,
+  coBoQuaKyDenNoi,
   nguongTrenChain,
   kiemTraGiaoDichHopDong,
   vaiTroTrenChain,

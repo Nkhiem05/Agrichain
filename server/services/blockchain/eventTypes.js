@@ -40,6 +40,7 @@ const VAI_TRO_ON_CHAIN = {
 };
 
 const ABI = [
+  "function VERSION() view returns (uint8)",
   "function admin() view returns (address)",
   "function roleOf(address) view returns (uint8)",
   "function isLocked(address) view returns (bool)",

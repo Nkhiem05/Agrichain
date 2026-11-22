@@ -854,8 +854,9 @@ export default function AgriChainLogistics() {
                 {currentTab === "blockchain" && (
                   <div className="blockchain-tab-wrapper">
                     <p className="blockchain-tab-desc">
-                      Đơn vị vận chuyển ký các bước: lấy hàng, giao tới nơi, từ
-                      chối chuyến, chở trả hàng bị từ chối. Các bước của một lô
+                      Đơn vị vận chuyển ký các bước: lấy hàng, từ chối chuyến, chở
+                      trả hàng bị từ chối. Báo "đã đến nơi" không cần ký nữa
+                      (bên nhận ký nhận hàng là đủ bằng chứng). Các bước của một lô
                       ký theo thứ tự, nên có bước phải chờ bên gửi ký tạo lệnh
                       trước.
                     </p>

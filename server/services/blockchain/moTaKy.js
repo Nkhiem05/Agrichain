@@ -92,7 +92,7 @@ const moTaSuKien = (loai, thamSo, nhanDien) => {
       ketQua = "Xác nhận đã sơ chế xong lô. Hồ sơ sơ chế chuyển giai đoạn sau khi ký.";
       break;
     case "PACKAGING_DONE":
-      ketQua = "Xác nhận đã đóng gói xong lô. Hồ sơ chuyển giai đoạn sau khi ký.";
+      ketQua = "Xác nhận đã sơ chế và đóng gói xong lô (một chữ ký cho cả quá trình sơ chế). Hồ sơ chỉ sang \"hoàn tất\" sau khi ký, rồi lô mới bàn giao tiếp được.";
       break;
     case "COMPLETE_CONFIRMED":
       ketQua = "Xác nhận lô đã bán hết và đóng lô trên blockchain. Lô chỉ kết thúc sau khi ký.";

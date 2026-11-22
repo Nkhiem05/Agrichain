@@ -155,23 +155,13 @@ const ghiSuKienLoCon = async (executor, maLoMoi, ketQuaTam = null) => {
   return lot && Number(lot.latest_event_sequence) > 0 ? lot : null;
 };
 
-// Các sự kiện sơ chế theo thứ tự quy trình; cơ sở sơ chế (chủ lô) ký từng bước bằng hàm step của hợp đồng:
-//   bắt đầu sơ chế -> PROCESSING_STARTED; sang "phân loại" -> + WASHING_DONE (rửa, diệt khuẩn xong);
-//   sang "đóng gói" -> + PROCESSING_DONE; "hoàn tất" -> + PACKAGING_DONE.
-// Đổi giai đoạn nhảy cóc thì ghi bù các bước trước còn thiếu. Mỗi loại chỉ ghi một lần cho mỗi lô.
-const SU_KIEN_SO_CHE = [
-  "PROCESSING_STARTED",
-  "WASHING_DONE",
-  "PROCESSING_DONE",
-  "PACKAGING_DONE",
-];
-// Số sự kiện cần có để lô sơ chế tới một giai đoạn ("BAT_DAU" = vừa bắt đầu sơ chế)
-const SO_SU_KIEN_TOI_GIAI_DOAN = {
-  BAT_DAU: 1,
-  DANG_RUA_KHU_KHUAN: 1,
-  DANG_PHAN_LOAI: 2,
-  DANG_DONG_GOI: 3,
-  DA_HOAN_TAT: 4,
+// Sơ chế chỉ ký MỘT lần cho cả quá trình: khi cơ sở bấm "hoàn tất" thì ký PACKAGING_DONE (hàm step của hợp đồng).
+// Các giai đoạn ở giữa (bắt đầu, rửa - diệt khuẩn, phân loại, đóng gói) đều do chính cơ sở sơ chế giữ lô và chưa đổi chủ,
+// nên chỉ cập nhật trong cơ sở dữ liệu, không ký và không tốn phí gas. Trước đây mỗi giai đoạn ký một lần (4 chữ ký).
+// Các mã PROCESSING_STARTED / WASHING_DONE / PROCESSING_DONE vẫn còn trong hợp đồng để đọc dữ liệu cũ.
+// Giai đoạn nào không có trong bảng này thì đổi ngay, không ký.
+const SU_KIEN_KY_THEO_GIAI_DOAN = {
+  DA_HOAN_TAT: ["PACKAGING_DONE"],
 };
 // ketQuaTam (tùy chọn): thay đổi giai đoạn CHƯA áp dụng; gắn vào sự kiện cuối cùng của lần đổi này (tham_so.ap_dung)
 // để lô sơ chế chỉ chuyển giai đoạn sau khi cơ sở đã ký xong. Trả [] nếu không có sự kiện mới nào cần ký.
@@ -181,7 +171,7 @@ const ghiSuKienGiaiDoanSoChe = async (
   giaiDoan,
   ketQuaTam = null,
 ) => {
-  const can = SU_KIEN_SO_CHE.slice(0, SO_SU_KIEN_TOI_GIAI_DOAN[giaiDoan] || 0);
+  const can = SU_KIEN_KY_THEO_GIAI_DOAN[giaiDoan] || [];
   if (can.length === 0) return [];
 
   const [rows] = await executor.query(

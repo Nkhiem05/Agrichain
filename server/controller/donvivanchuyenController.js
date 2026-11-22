@@ -6,6 +6,8 @@ const {
 } = require("../services/blockchain/hook");
 const { apDungKetQuaVanDon } = require("../services/blockchain/ghiNhan");
 const { layCauHinh } = require("../services/blockchain/chainClient");
+// Một bước vận chuyển có ký (dùng chung với nhà phân phối / đại lý; hợp đồng v3 bỏ ký "đến nơi" nằm trong hàm này)
+const { thucHienBuocCoKy } = require("../services/blockchain/buocCoKy");
 
 /*
 ==================================================
@@ -120,42 +122,6 @@ const canBenGuiDaKy = async (executor, maVanDon) => {
   if (!layCauHinh().daCauHinh) return;
   const st = await trangThaiKyLenh(executor, maVanDon);
   if (st && st !== "CONFIRMED") throw new ApiError(409, CHUA_KY_LENH);
-};
-
-// Một bước vận chuyển có ký: tạo sự kiện chờ ký kèm thay đổi sẽ áp dụng sau khi ký (apDung).
-// Trả true nếu đang chờ ký (chuyến chưa đổi trạng thái); false nếu không có gì để ký và đã áp dụng ngay.
-const thucHienBuocCoKy = async (
-  connection,
-  maVanDon,
-  loai,
-  maNguoiKy,
-  duLieuThem,
-  apDung,
-) => {
-  const [dangCho] = await connection.query(
-    `
-    SELECT ma_lich_su FROM lich_su_truy_xuat_lo
-    WHERE loai_hoat_dong = ? AND blockchain_sync_status <> 'CONFIRMED'
-      AND JSON_UNQUOTE(JSON_EXTRACT(du_lieu_chi_tiet, '$.du_lieu.ma_van_don')) = ?
-    LIMIT 1
-    `,
-    [loai, maVanDon],
-  );
-  if (dangCho.length > 0) return true; // đã gửi yêu cầu trước đó, đang chờ ký
-
-  const suKien = await ghiSuKienVanDon(
-    connection,
-    maVanDon,
-    loai,
-    maNguoiKy,
-    duLieuThem,
-    apDung,
-  );
-  if (!layCauHinh().daCauHinh || !suKien) {
-    await apDungKetQuaVanDon(connection, maVanDon, apDung);
-    return false;
-  }
-  return true;
 };
 
 // Gắn cờ cho mỗi chuyến: cho_ky = bước đã bấm đang chờ ký (LAY_HANG | DEN_NOI | TU_CHOI | TRA_HANG_TOI_NOI);

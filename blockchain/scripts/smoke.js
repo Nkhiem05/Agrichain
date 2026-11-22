@@ -327,14 +327,16 @@ await sign(L1, async (p, e) =>
     .connect(farmer)
     .orderTransport(L1, await addr(truck), await addr(factory), p, e),
 );
-await sign(L1, (p, e) => c.connect(truck).pickup(L1, p, e));
 {
+  // Chưa lấy hàng thì bên nhận chưa ký nhận được
   const e = next(L1);
   await rejects(
     c.connect(factory).confirmReceive(L1, 1n, e.prev, e.eventHash),
     "hang chua den noi",
   );
 }
+await sign(L1, (p, e) => c.connect(truck).pickup(L1, p, e));
+// Đường cũ (v2): vận chuyển ký thêm "đã đến nơi" vẫn được. Từ v3 bước này không bắt buộc (xem lô L4 ở mục 9).
 await sign(L1, (p, e) => c.connect(truck).arrive(L1, p, e));
 {
   const e = next(L1);
@@ -581,7 +583,8 @@ for (const [lot, who, gram] of [
       .orderTransport(lot, await addr(truck), await addr(factory), p, e),
   );
   await sign(lot, (p, e) => c.connect(truck).pickup(lot, p, e));
-  await sign(lot, (p, e) => c.connect(truck).arrive(lot, p, e));
+  // v3: bên nhận ký nhận ngay sau khi lấy hàng, không cần "đã đến nơi" (L2 vẫn đi đường cũ để thử cả hai)
+  if (lot === L2) await sign(lot, (p, e) => c.connect(truck).arrive(lot, p, e));
   await sign(lot, (p, e) => c.connect(factory).confirmReceive(lot, gram, p, e));
 }
 await rejects(
@@ -640,6 +643,8 @@ assert.equal(await c.isCertValid(D2), true);
 check(
   "gộp lô thừa hưởng mọi chứng nhận; thu hồi chứng nhận gốc làm lô con mất hiệu lực ngay",
 );
+assert.equal(await c.VERSION(), 3n);
+check("hợp đồng v3: bên nhận ký nhận được ngay sau khi vận chuyển lấy hàng (không cần ký đến nơi)");
 
 // 10. Hash on-chain khớp hash tính ngoài chain
 for (const [k, v] of Object.entries({ L1, L2, L4, P1, D1, D2, G1 })) {
